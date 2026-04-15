@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QC Gate Production — Block Cylinder Monitoring</title>
+  <meta name="description" content="QC Gate Production Block Cylinder Line Finishing Monitoring System">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+
+  <style>
+    /* ===== DESIGN TOKENS ===== */
+    :root {
+      --bg-primary: #0f1117;
+      --bg-secondary: #1a1d27;
+      --bg-card: #21242f;
+      --bg-card-hover: #282c3a;
+      --border-color: #2e3346;
+      --text-primary: #f0f1f5;
+      --text-secondary: #9ca3b8;
+      --text-muted: #6b7280;
+      --accent-red: #dc2626;
+      --accent-red-soft: #7f1d1d;
+      --accent-green: #22c55e;
+      --accent-green-soft: rgba(34,197,94,0.12);
+      --accent-orange: #f59e0b;
+      --accent-orange-soft: rgba(245,158,11,0.12);
+      --accent-red-soft-bg: rgba(220,38,38,0.12);
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-bc1: #dc2626; /* Red for BC 1TR */
+      --accent-bc2: #3b82f6; /* Blue for BC 2TR */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+      --shadow-popup: 0 25px 50px -12px rgba(0,0,0,0.6);
+      --transition: 0.2s ease;
+    }
+
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      background: linear-gradient(135deg, var(--accent-red) 0%, #991b1b 100%);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .header-subtitle {
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.75);
+      margin-top: 2px;
+    }
+
+    .header-clock {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .conn-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      margin-top: 4px;
+    }
+
+    .conn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #6b7280;
+      transition: background 0.4s ease;
+    }
+
+    .conn-dot.online  { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
+    .conn-dot.offline { background: #dc2626; box-shadow: 0 0 6px #dc262688; }
+
+    /* ===== TOOLBAR ===== */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 32px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      flex-wrap: wrap;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .toolbar-input, .toolbar-select {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .toolbar-input:focus, .toolbar-select:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .toolbar-input { width: 180px; }
+
+    .toolbar-divider {
+      width: 1px;
+      height: 28px;
+      background: var(--border-color);
+    }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 0;
+      min-height: calc(100vh - 120px);
+    }
+
+    .content-area {
+      padding: 24px 32px;
+      overflow-y: auto;
+    }
+
+    .sidebar {
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    /* ===== TARGET & ACHIEVEMENT BAR ===== */
+    .target-strip {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 20px;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .target-strip .toolbar-group { gap: 8px; }
+
+    .progress-wrapper {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .progress-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .progress-track {
+      height: 10px;
+      background: var(--bg-primary);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-green), #16a34a);
+      border-radius: 99px;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 0%;
+    }
+
+    .achievement-badge {
+      background: var(--accent-green-soft);
+      color: var(--accent-green);
+      font-size: 14px;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 99px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== PRODUCT SECTION ===== */
+    .product-section {
+      margin-bottom: 28px;
+    }
+
+    .product-header {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .product-header-1tr::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 20px;
+      background: var(--accent-bc1);
+      border-radius: 2px;
+    }
+
+    .product-header-2tr::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 20px;
+      background: var(--accent-bc2);
+      border-radius: 2px;
+    }
+
+    .counter-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .counter-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      text-align: center;
+      transition: all var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .counter-card:hover {
+      background: var(--bg-card-hover);
+      border-color: #3b4560;
+    }
+
+    .counter-card.ok { border-top: 3px solid var(--accent-green); }
+    .counter-card.repair { border-top: 3px solid var(--accent-orange); }
+    .counter-card.ng { border-top: 3px solid var(--accent-red); }
+
+    .counter-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .counter-card.ok .counter-label { color: var(--accent-green); }
+    .counter-card.repair .counter-label { color: var(--accent-orange); }
+    .counter-card.ng .counter-label { color: var(--accent-red); }
+
+    .counter-value {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 14px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+
+    .counter-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .btn-counter {
+      width: 44px;
+      height: 38px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      font-size: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+      user-select: none;
+    }
+
+    .btn-counter:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-blue);
+    }
+
+    .btn-counter:active {
+      transform: scale(0.93);
+    }
+
+    /* ===== RATE STRIP ===== */
+    .rate-strip {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .rate-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+    }
+
+    .rate-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .rate-dot.ok { background: var(--accent-green); }
+    .rate-dot.repair { background: var(--accent-orange); }
+    .rate-dot.ng { background: var(--accent-red); }
+
+    .rate-label {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .rate-value {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== CHART SECTION ===== */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px;
+    }
+
+    .chart-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 220px;
+    }
+
+    .chart-wrapper canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* ===== ACTION BUTTONS ===== */
+    .action-bar {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .btn {
+      padding: 9px 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-danger {
+      background: rgba(220,38,38,0.12);
+      color: var(--accent-red);
+      border: 1px solid rgba(220,38,38,0.25);
+    }
+
+    .btn-danger:hover {
+      background: rgba(220,38,38,0.2);
+    }
+
+    .btn-success {
+      background: var(--accent-green);
+      color: #000;
+    }
+
+    .btn-success:hover {
+      background: #16a34a;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 14px;
+    }
+
+    .hourly-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 24px;
+    }
+
+    .hourly-table th {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      padding: 8px 10px;
+      text-align: center;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .hourly-table td {
+      padding: 7px 10px;
+      text-align: center;
+      border-bottom: 1px solid var(--border-color);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .hourly-table tr:hover td {
+      background: var(--bg-card);
+    }
+
+    /* Defect & Repair summary in sidebar */
+    .sidebar-summary {
+      margin-bottom: 24px;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 12px;
+    }
+
+    .summary-item-name {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .summary-item-count {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      background: var(--bg-card);
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+    }
+
+    /* ===== POPUP / MODAL OVERLAY ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 900;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal-overlay.active { display: flex; align-items: center; justify-content: center; }
+
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      width: 400px;
+      max-width: 90vw;
+      box-shadow: var(--shadow-popup);
+      animation: slideUp 0.25s ease;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-title-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .modal-title-dot.repair { background: var(--accent-orange); }
+    .modal-title-dot.ng { background: var(--accent-red); }
+
+    .modal-field {
+      margin-bottom: 16px;
+    }
+
+    .modal-field-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .modal-select, .modal-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .modal-select:focus, .modal-input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .modal-input[type="number"] {
+      text-align: center;
+      font-weight: 700;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .btn-modal-cancel {
+      padding: 9px 20px;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-modal-cancel:hover {
+      border-color: var(--text-muted);
+      color: var(--text-primary);
+    }
+
+    .btn-modal-save {
+      padding: 9px 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      transition: all var(--transition);
+    }
+
+    .btn-modal-save.repair { background: var(--accent-orange); }
+    .btn-modal-save.repair:hover { background: #d97706; }
+    .btn-modal-save.ng { background: var(--accent-red); }
+    .btn-modal-save.ng:hover { background: #b91c1c; }
+
+    /* ===== RESET MODAL ===== */
+    .modal-password {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .modal-password:focus { border-color: var(--accent-red); }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== TOAST / NOTIFICATION ===== */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      box-shadow: var(--shadow-popup);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+      min-width: 260px;
+    }
+
+    .toast.success { border-left: 3px solid var(--accent-green); }
+    .toast.warning { border-left: 3px solid var(--accent-orange); }
+    .toast.error { border-left: 3px solid var(--accent-red); }
+
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+      }
+      .charts-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .header { padding: 12px 16px; }
+      .toolbar { padding: 12px 16px; gap: 10px; }
+      .content-area { padding: 16px; }
+      .counter-grid { grid-template-columns: 1fr; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .counter-value { font-size: 34px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div>
+      <div class="header-title">QC Gate Production</div>
+      <div class="header-subtitle">Block Cylinder Line Finishing — Monitoring System</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="header-clock" id="headerClock">--:--:--</div>
+      <div class="conn-status">
+        <div class="conn-dot" id="connDot"></div>
+        <span id="connLabel">Connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== TOOLBAR ===== -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <span class="toolbar-label">Operator</span>
+      <input id="operator" class="toolbar-input" placeholder="Nama Operator" autocomplete="off">
+    </div>
+    <div class="toolbar-divider"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Shift</span>
+      <select id="shift" class="toolbar-select">
+        <option value="Shift Red">Shift Red</option>
+        <option value="Shift White">Shift White</option>
+      </select>
+    </div>
+    <div class="toolbar-divider"></div>
+    <div class="toolbar-group">
+      <span class="toolbar-label">Tanggal</span>
+      <span id="tanggal" style="font-size:13px;font-weight:600;">-</span>
+    </div>
+  </div>
+
+  <!-- ===== MAIN LAYOUT ===== -->
+  <div class="main-layout">
+
+    <!-- ===== CONTENT AREA ===== -->
+    <div class="content-area">
+
+      <!-- Target & Progress -->
+      <div class="target-strip">
+        <div class="toolbar-group">
+          <span class="toolbar-label">Target</span>
+          <input id="targetInput" class="toolbar-input" type="number" value="0" min="0" style="width:100px;">
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-label">
+            <span>Progress</span>
+            <span id="progressPercent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressBar"></div>
+          </div>
+        </div>
+        <div class="achievement-badge" id="achievement">0%</div>
+      </div>
+
+      <!-- BC 1TR -->
+      <div class="product-section">
+        <div class="product-header product-header-1tr">BC 1TR</div>
+        <div class="counter-grid">
+          <div class="counter-card ok">
+            <div class="counter-label">OK</div>
+            <div class="counter-value" id="ok1">0</div>
+            <div class="counter-actions">
+              <button class="btn-counter" onclick="add('ok1')">+</button>
+              <button class="btn-counter" onclick="minus('ok1')">−</button>
+            </div>
+          </div>
+          <div class="counter-card repair">
+            <div class="counter-label">Repair</div>
+            <div class="counter-value" id="repair1">0</div>
+            <div class="counter-actions">
+              <button class="btn-counter" onclick="openRepairModal('repair1')">+</button>
+              <button class="btn-counter" onclick="minus('repair1')">−</button>
+            </div>
+          </div>
+          <div class="counter-card ng">
+            <div class="counter-label">NG</div>
+            <div class="counter-value" id="ng1">0</div>
+            <div class="counter-actions">
+              <button class="btn-counter" onclick="openDefectModal('ng1')">+</button>
+              <button class="btn-counter" onclick="minus('ng1')">−</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BC 2TR -->
+      <div class="product-section">
+        <div class="product-header product-header-2tr">BC 2TR</div>
+        <div class="counter-grid">
+          <div class="counter-card ok">
+            <div class="counter-label">OK</div>
+            <div class="counter-value" id="ok2">0</div>
+            <div class="counter-actions">
+              <button class="btn-counter" onclick="add('ok2')">+</button>
+              <button class="btn-counter" onclick="minus('ok2')">−</button>
+            </div>
+          </div>
+          <div class="counter-card repair">
+            <div class="counter-label">Repair</div>
+            <div class="counter-value" id="repair2">0</div>
+            <div class="counter-actions">
+              <button class="btn-counter" onclick="openRepairModal('repair2')">+</button>
+              <button class="btn-counter" onclick="minus('repair2')">−</button>
+            </div>
+          </div>
+          <div class="counter-card ng">
+            <div class="counter-label">NG</div>
+            <div class="counter-value" id="ng2">0</div>
+            <div class="counter-actions">
+              <button class="btn-counter" onclick="openDefectModal('ng2')">+</button>
+              <button class="btn-counter" onclick="minus('ng2')">−</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rates -->
+      <div class="rate-strip">
+        <div class="rate-chip">
+          <div class="rate-dot ok"></div>
+          <span class="rate-label">OK Rate</span>
+          <span class="rate-value" id="okRate">0%</span>
+        </div>
+        <div class="rate-chip">
+          <div class="rate-dot repair"></div>
+          <span class="rate-label">Repair Rate</span>
+          <span class="rate-value" id="repairRate">0%</span>
+        </div>
+        <div class="rate-chip">
+          <div class="rate-dot ng"></div>
+          <span class="rate-label">NG Rate</span>
+          <span class="rate-value" id="ngRate">0%</span>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-card-title">Production Distribution</div>
+          <div class="chart-wrapper">
+            <canvas id="productionChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Pareto Defect (NG)</div>
+          <div class="chart-wrapper">
+            <canvas id="defectChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Pareto Repair</div>
+          <div class="chart-wrapper">
+            <canvas id="repairChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-bar">
+        <button class="btn btn-danger" onclick="openResetModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          Reset
+        </button>
+        <button class="btn btn-success" onclick="saveData()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          Save Data
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+      <div class="sidebar-title">Hourly Production</div>
+      <table class="hourly-table" id="hourlyTable">
+        <thead>
+          <tr>
+            <th>Jam</th>
+            <th>OK</th>
+            <th>Repair</th>
+            <th>NG</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="sidebar-summary">
+        <div class="sidebar-title">Defect Details</div>
+        <div id="defectSummary">
+          <div class="summary-item"><span class="summary-item-name" style="color:var(--text-muted);">Belum ada data</span></div>
+        </div>
+      </div>
+
+      <div class="sidebar-summary">
+        <div class="sidebar-title">Repair Details</div>
+        <div id="repairSummary">
+          <div class="summary-item"><span class="summary-item-name" style="color:var(--text-muted);">Belum ada data</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ===== MODAL: DEFECT (NG) ===== -->
+  <div class="modal-overlay" id="modalDefect">
+    <div class="modal">
+      <div class="modal-title">
+        <div class="modal-title-dot ng"></div>
+        Input Defect (NG)
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Jenis Defect</div>
+        <select id="jenisDefect" class="modal-select">
+          <option>Gas Hole Cope</option>
+          <option>Gas Hole Drag</option>
+          <option>Gomi Drag</option>
+          <option>Gomi Cope</option>
+          <option>Pin Hole Cope</option>
+          <option>Kake Headment</option>
+          <option>Tsurikomi Oil Pan</option>
+          <option>Tsurikomi Front</option>
+          <option>Kandama Front</option>
+          <option>Kandama Rear</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Jumlah</div>
+        <input type="number" id="defectQty" class="modal-input" value="1" min="1" max="999">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeModal('modalDefect')">Batal</button>
+        <button class="btn-modal-save ng" onclick="saveDefect()">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: REPAIR ===== -->
+  <div class="modal-overlay" id="modalRepair">
+    <div class="modal">
+      <div class="modal-title">
+        <div class="modal-title-dot repair"></div>
+        Input Repair
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Jenis Repair</div>
+        <select id="jenisRepair" class="modal-select">
+          <option>Mejashi Bore 1</option>
+          <option>Mejashi Bore 2</option>
+          <option>Mejashi Bore 3</option>
+          <option>Mejashi Bore 4</option>
+          <option>Gomi Drag</option>
+          <option>Gomi Cope</option>
+          <option>Gomi Front</option>
+          <option>Gomi Rear</option>
+          <option>Pin Hole Cope</option>
+          <option>Kake</option>
+          <option>Dakon</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Jumlah</div>
+        <input type="number" id="repairQty" class="modal-input" value="1" min="1" max="999">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeModal('modalRepair')">Batal</button>
+        <button class="btn-modal-save repair" onclick="saveRepair()">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: RESET ===== -->
+  <div class="modal-overlay" id="modalReset">
+    <div class="modal">
+      <div class="modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Konfirmasi Reset
+      </div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+        Semua data produksi akan dihapus. Masukkan password untuk melanjutkan.
+      </p>
+      <div class="modal-field">
+        <div class="modal-field-label">Password</div>
+        <input type="password" id="resetPassword" class="modal-password" placeholder="Masukkan password">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeModal('modalReset')">Batal</button>
+        <button class="btn-modal-save ng" onclick="confirmReset()">Reset Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== JAVASCRIPT ===== -->
+  <script>
+    /* ==========================================
+       STATE MANAGEMENT
+    ========================================== */
+    const RESET_PASSWORD = '1234';
+    const API_BASE = '';   // same-origin; e.g. 'http://10.168.74.237:3000' if needed
+
+    let defectData = {};
+    let repairData = {};
+    let selectedProduk = '';
+    let selectedRepairProduk = '';
+    let hourlyData = {};
+
+    /* ==========================================
+       CLOCK & DATE
+    ========================================== */
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateStr = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('headerClock').textContent = timeStr;
+      document.getElementById('tanggal').textContent = dateStr;
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Socket will be initialized at the end to avoid race conditions with chart init
+    let socket = null; 
+
+    /* ==========================================
+       COUNTER OPERATIONS
+    ========================================== */
+    function getVal(id) {
+      return parseInt(document.getElementById(id).textContent) || 0;
+    }
+
+    function setVal(id, val) {
+      document.getElementById(id).textContent = Math.max(0, val);
+    }
+
+    function add(id) {
+      setVal(id, getVal(id) + 1);
+      updateAll();
+    }
+
+    function addAmount(id, amount) {
+      setVal(id, getVal(id) + amount);
+      updateAll();
+    }
+
+    function minus(id) {
+      if (getVal(id) > 0) {
+        setVal(id, getVal(id) - 1);
+        updateAll();
+      }
+    }
+
+    /* ==========================================
+       TOTALS & RATES
+    ========================================== */
+    function getTotal() {
+      return getVal('ok1') + getVal('repair1') + getVal('ng1') +
+             getVal('ok2') + getVal('repair2') + getVal('ng2');
+    }
+
+    function getOkTotal() { return getVal('ok1') + getVal('ok2'); }
+    function getRepairTotal() { return getVal('repair1') + getVal('repair2'); }
+    function getNgTotal() { return getVal('ng1') + getVal('ng2'); }
+
+    function updateRate() {
+      const total = getTotal();
+      const ok = getOkTotal();
+      const repair = getRepairTotal();
+      const ng = getNgTotal();
+
+      document.getElementById('okRate').textContent = total > 0 ? Math.round(ok / total * 100) + '%' : '0%';
+      document.getElementById('repairRate').textContent = total > 0 ? Math.round(repair / total * 100) + '%' : '0%';
+      document.getElementById('ngRate').textContent = total > 0 ? Math.round(ng / total * 100) + '%' : '0%';
+
+      const target = parseInt(document.getElementById('targetInput').value) || 0;
+      const achPercent = target > 0 ? Math.round(total / target * 100) : 0;
+      document.getElementById('achievement').textContent = `Achievement: ${achPercent}%`;
+    }
+
+    function updateProgressBar() {
+      const total = getTotal();
+      const target = parseInt(document.getElementById('targetInput').value) || 0;
+      let percent = target > 0 ? Math.min(Math.round(total / target * 100), 100) : 0;
+
+      const bar = document.getElementById('progressBar');
+      bar.style.width = percent + '%';
+      document.getElementById('progressPercent').textContent = percent + '%';
+
+      // Color shift based on progress
+      if (percent >= 80) {
+        bar.style.background = 'linear-gradient(90deg, #22c55e, #16a34a)';
+      } else if (percent >= 50) {
+        bar.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+      } else {
+        bar.style.background = 'linear-gradient(90deg, #3b82f6, #2563eb)';
+      }
+    }
+
+    /* ==========================================
+       MODAL OPERATIONS
+    ========================================== */
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    function openDefectModal(produk) {
+      selectedProduk = produk;
+      document.getElementById('defectQty').value = 1;
+      openModal('modalDefect');
+    }
+
+    function openRepairModal(produk) {
+      selectedRepairProduk = produk;
+      document.getElementById('repairQty').value = 1;
+      openModal('modalRepair');
+    }
+
+    function saveDefect() {
+      const defect = document.getElementById('jenisDefect').value;
+      const qty = parseInt(document.getElementById('defectQty').value) || 1;
+
+      if (qty < 1) {
+        showToast('Jumlah harus minimal 1', 'warning');
+        return;
+      }
+
+      // Add to counter without persisting yet
+      setVal(selectedProduk, getVal(selectedProduk) + qty);
+
+      if (!defectData[defect]) defectData[defect] = 0;
+      defectData[defect] += qty;
+
+      updateAll(); // This will refresh charts and persist everything
+      checkNGAlarm();
+      closeModal('modalDefect');
+      showToast(`${qty}x ${defect} ditambahkan`, 'error');
+    }
+
+    function saveRepair() {
+      const repair = document.getElementById('jenisRepair').value;
+      const qty = parseInt(document.getElementById('repairQty').value) || 1;
+
+      if (qty < 1) {
+        showToast('Jumlah harus minimal 1', 'warning');
+        return;
+      }
+
+      // Add to counter
+      setVal(selectedRepairProduk, getVal(selectedRepairProduk) + qty);
+
+      if (!repairData[repair]) repairData[repair] = 0;
+      repairData[repair] += qty;
+
+      updateAll();
+      closeModal('modalRepair');
+      showToast(`${qty}x ${repair} ditambahkan`, 'warning');
+    }
+
+    /* ==========================================
+       RESET
+    ========================================== */
+    function openResetModal() {
+      document.getElementById('resetPassword').value = '';
+      openModal('modalReset');
+    }
+
+    async function confirmReset() {
+      const pass = document.getElementById('resetPassword').value;
+      if (pass !== RESET_PASSWORD) {
+        showToast('Password salah!', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/reset`, { method: 'POST' });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error);
+
+        ['ok1', 'repair1', 'ng1', 'ok2', 'repair2', 'ng2'].forEach(id => setVal(id, 0));
+        defectData = {};
+        repairData = {};
+        hourlyData = {};
+
+        updateAll();
+        renderHourlyTable();
+        updateSidebarSummary('defect');
+        updateSidebarSummary('repair');
+        closeModal('modalReset');
+        showToast('Data berhasil direset & diarsipkan', 'success');
+      } catch (err) {
+        showToast('Reset gagal: ' + err.message, 'error');
+      }
+    }
+
+    /* ==========================================
+       SIDEBAR SUMMARY
+    ========================================== */
+    function updateSidebarSummary(type) {
+      const data = type === 'defect' ? defectData : repairData;
+      const container = document.getElementById(type === 'defect' ? 'defectSummary' : 'repairSummary');
+
+      const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+
+      if (sorted.length === 0) {
+        container.innerHTML = '<div class="summary-item"><span class="summary-item-name" style="color:var(--text-muted);">Belum ada data</span></div>';
+        return;
+      }
+
+      container.innerHTML = sorted.map(([name, count]) =>
+        `<div class="summary-item">
+          <span class="summary-item-name">${name}</span>
+          <span class="summary-item-count">${count}</span>
+        </div>`
+      ).join('');
+    }
+
+    /* ==========================================
+       HOURLY TABLE
+    ========================================== */
+    function updateHourlyTable() {
+      const now = new Date();
+      // Only record data if total > 0 to not pollute empty hours when idle
+      if (getTotal() === 0) return;
+
+      const key = String(now.getHours()).padStart(2, '0') + ':00';
+
+      hourlyData[key] = {
+        ok: getOkTotal(),
+        repair: getRepairTotal(),
+        ng: getNgTotal()
+      };
+
+      renderHourlyTable();
+      persistData();
+    }
+
+    function renderHourlyTable() {
+      const tbody = document.querySelector('#hourlyTable tbody');
+      const sortedKeys = Object.keys(hourlyData).sort();
+
+      tbody.innerHTML = sortedKeys.map(key => {
+        const d = hourlyData[key];
+        return `<tr>
+          <td>${key}</td>
+          <td>${d.ok}</td>
+          <td>${d.repair}</td>
+          <td>${d.ng}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    setInterval(updateHourlyTable, 300000); // 5 min
+
+    /* ==========================================
+       NG ALARM
+    ========================================== */
+    function checkNGAlarm() {
+      const ng = getNgTotal();
+      const total = getTotal();
+      if (total === 0) return;
+
+      const rate = ng / total * 100;
+      if (rate > 5) {
+        showToast(`⚠️ WARNING: NG Rate ${rate.toFixed(1)}% — melebihi batas 5%!`, 'error');
+      }
+    }
+
+    /* ==========================================
+       CHARTS
+    ========================================== */
+    const chartDefaults = {
+      color: '#9ca3b8',
+      font: { family: "'Inter', sans-serif" }
+    };
+
+    Chart.defaults.color = chartDefaults.color;
+    Chart.defaults.font.family = chartDefaults.font.family;
+
+    // Production Pie Chart
+    window.productionChart = new Chart(document.getElementById('productionChart'), {
+      type: 'doughnut',
+      plugins: [ChartDataLabels],
+      data: {
+        labels: ['OK', 'Repair', 'NG'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: ['#22c55e', '#f59e0b', '#dc2626'],
+          borderColor: 'transparent',
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '55%',
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 11 } } },
+          datalabels: {
+            color: '#fff',
+            font: { weight: 'bold', size: 13 },
+            formatter: (value, ctx) => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              if (total === 0 || value === 0) return '';
+              return value;
+            }
+          }
+        }
+      }
+    });
+
+    function updateProductionChart() {
+      if (!window.productionChart) return;
+      productionChart.data.datasets[0].data = [getOkTotal(), getRepairTotal(), getNgTotal()];
+      productionChart.update();
+    }
+
+    // Defect Pareto Chart
+    window.defectChart = new Chart(document.getElementById('defectChart'), {
+      type: 'bar',
+      plugins: [ChartDataLabels],
+      data: { labels: [], datasets: [{ label: 'Defect', data: [], backgroundColor: '#dc2626', borderRadius: 4 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: { color: '#f0f1f5', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45, color: '#9ca3b8' } },
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true, ticks: { color: '#9ca3b8', stepSize: 1 } }
+        }
+      }
+    });
+
+    function updateDefectChart() {
+      if (!window.defectChart) return;
+      const sorted = Object.entries(defectData).sort((a, b) => b[1] - a[1]);
+      defectChart.data.labels = sorted.map(x => x[0]);
+      defectChart.data.datasets[0].data = sorted.map(x => x[1]);
+      defectChart.update();
+    }
+
+    // Repair Pareto Chart
+    window.repairChart = new Chart(document.getElementById('repairChart'), {
+      type: 'bar',
+      plugins: [ChartDataLabels],
+      data: { labels: [], datasets: [{ label: 'Repair', data: [], backgroundColor: '#f59e0b', borderRadius: 4 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: { color: '#f0f1f5', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45, color: '#9ca3b8' } },
+          y: { grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true, ticks: { color: '#9ca3b8', stepSize: 1 } }
+        }
+      }
+    });
+
+    function updateRepairChart() {
+      if (!window.repairChart) return;
+      const sorted = Object.entries(repairData).sort((a, b) => b[1] - a[1]);
+      repairChart.data.labels = sorted.map(x => x[0]);
+      repairChart.data.datasets[0].data = sorted.map(x => x[1]);
+      repairChart.update();
+    }
+
+    /* ==========================================
+       SAVE / EXPORT EXCEL
+    ========================================== */
+    function saveData() {
+      const operator = document.getElementById('operator').value || 'N/A';
+      const shift = document.getElementById('shift').value;
+      const tanggal = document.getElementById('tanggal').textContent;
+
+      // Sheet 1: Production Summary
+      const prodData = [
+        { Produk: 'BC 1TR', Operator: operator, Shift: shift, Tanggal: tanggal, OK: getVal('ok1'), Repair: getVal('repair1'), NG: getVal('ng1') },
+        { Produk: 'BC 2TR', Operator: operator, Shift: shift, Tanggal: tanggal, OK: getVal('ok2'), Repair: getVal('repair2'), NG: getVal('ng2') },
+        { Produk: 'TOTAL', Operator: operator, Shift: shift, Tanggal: tanggal, OK: getOkTotal(), Repair: getRepairTotal(), NG: getNgTotal() }
+      ];
+
+      // Sheet 2: Defect Detail
+      const defectDetail = Object.entries(defectData).sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ 'Jenis Defect': name, Jumlah: count }));
+
+      // Sheet 3: Repair Detail
+      const repairDetail = Object.entries(repairData).sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ 'Jenis Repair': name, Jumlah: count }));
+
+      // Sheet 4: Hourly
+      const hourlyDetail = Object.keys(hourlyData).sort()
+        .map(key => ({ Jam: key, OK: hourlyData[key].ok, Repair: hourlyData[key].repair, NG: hourlyData[key].ng }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prodData), 'Production');
+      if (defectDetail.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(defectDetail), 'Defect');
+      if (repairDetail.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(repairDetail), 'Repair');
+      if (hourlyDetail.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hourlyDetail), 'Hourly');
+
+      const fileName = `QC_Gate_${shift.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      showToast(`File ${fileName} berhasil diexport`, 'success');
+    }
+
+    /* ==========================================
+       API PERSISTENCE (SQLite via Node.js)
+    ========================================== */
+
+    // Debounce timer so rapid clicks don't flood the server
+    let _persistTimer = null;
+    let _lastUserAction = 0; // Timestamp of last local change
+
+    function persistData() {
+      _lastUserAction = Date.now();
+      clearTimeout(_persistTimer);
+      _persistTimer = setTimeout(_doPersist, 400);
+    }
+
+    async function _doPersist() {
+      const state = {
+        ok1:     getVal('ok1'),
+        repair1: getVal('repair1'),
+        ng1:     getVal('ng1'),
+        ok2:     getVal('ok2'),
+        repair2: getVal('repair2'),
+        ng2:     getVal('ng2'),
+        defectData,
+        repairData,
+        hourlyData,
+        operator: document.getElementById('operator').value,
+        shift:    document.getElementById('shift').value,
+        target:   parseInt(document.getElementById('targetInput').value) || 0,
+        date:     document.getElementById('tanggal').textContent
+      };
+
+      // Use WebSocket for real-time update instead of POST
+      if (socket && socket.connected) {
+        socket.emit('updateState', state);
+        setConnStatus(true);
+      } else {
+        // Fallback to API if WebSocket is not ready
+        try {
+          const res = await fetch(`${API_BASE}/api/state`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(state)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          setConnStatus(true);
+        } catch (err) {
+          console.warn('Persist failed:', err);
+          setConnStatus(false);
+        }
+      }
+    }
+
+    async function loadData() {
+      // loadData is now mostly handled by the initial 'stateUpdate' from socket
+      // but we keep this as a fallback or for initial connection label
+      try {
+        const res  = await fetch(`${API_BASE}/api/state`);
+        const json = await res.json();
+        if (json.success) {
+          applyReceivedState(json.data);
+          setConnStatus(true);
+        }
+      } catch (err) {
+        console.warn('Initial load failed:', err);
+        setConnStatus(false);
+      }
+    }
+
+    function setConnStatus(online) {
+      const dot   = document.getElementById('connDot');
+      const label = document.getElementById('connLabel');
+      if (online) {
+        dot.className   = 'conn-dot online';
+        label.textContent = 'Real-time Connected';
+      } else {
+        dot.className   = 'conn-dot offline';
+        label.textContent = 'Disconnected';
+      }
+    }
+
+    /* ==========================================
+       AUTO-RESET AT SHIFT CHANGE
+    ========================================== */
+    async function autoResetShift() {
+      const now = new Date();
+      if ((now.getHours() === 7 || now.getHours() === 19) && now.getMinutes() === 0) {
+        // Auto-save Excel before reset
+        saveData();
+
+        try {
+          await fetch(`${API_BASE}/api/reset`, { method: 'POST' });
+        } catch (e) { console.warn('Auto-reset API call failed:', e); }
+
+        ['ok1', 'repair1', 'ng1', 'ok2', 'repair2', 'ng2'].forEach(id => setVal(id, 0));
+        defectData = {};
+        repairData = {};
+        hourlyData = {};
+
+        updateAll();
+        renderHourlyTable();
+        updateSidebarSummary('defect');
+        updateSidebarSummary('repair');
+        showToast('Data otomatis direset & diarsipkan — pergantian shift', 'warning');
+      }
+    }
+
+    setInterval(autoResetShift, 60000);
+
+    /* ==========================================
+       TOAST NOTIFICATIONS
+    ========================================== */
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+
+      const icons = {
+        success: '✓',
+        warning: '⚡',
+        error: '✕'
+      };
+
+      toast.innerHTML = `<span style="font-weight:700;">${icons[type] || '•'}</span> ${message}`;
+      container.appendChild(toast);
+
+      setTimeout(() => toast.remove(), 3200);
+    }
+
+    /* ==========================================
+       GLOBAL UPDATE
+    ========================================== */
+    function updateAll(doPersist = true) {
+      updateProductionChart();
+      updateRate();
+      updateDefectChart();
+      updateRepairChart();
+      updateProgressBar();
+      updateHourlyTable(); 
+      if (doPersist) persistData();
+    }
+
+    // Listen to target input changes
+    document.getElementById('targetInput').addEventListener('input', () => {
+      updateProgressBar();
+      updateRate();
+      persistData();
+    });
+
+    // Listen to operator & shift changes for persistence
+    document.getElementById('operator').addEventListener('input', persistData);
+    document.getElementById('shift').addEventListener('change', persistData);
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('active');
+      });
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+      }
+    });
+
+    /* ==========================================
+       INIT
+    ========================================== */
+    updateAll(false);
+    loadData();   // async — fetches from SQLite via API
+
+    /* ==========================================
+       REAL-TIME MONITORING (Socket.IO) 
+       Initialized last to avoid race conditions
+    ========================================== */
+    socket = io();
+
+    socket.on('connect', () => {
+      setConnStatus(true);
+      console.log('Connected to Real-time server');
+    });
+
+    socket.on('disconnect', () => {
+      setConnStatus(false);
+      console.warn('Lost connection to server');
+    });
+
+    socket.on('stateUpdate', (state) => {
+      if (!state) return;
+      applyReceivedState(state);
+    });
+
+    function applyReceivedState(state) {
+      if (!state) return;
+      
+      // SAFETY LOCK: If user just interacted locally (< 1.5s), 
+      // ignore incoming counters to prevent "bouncing" or "reverting" values.
+      const isLocked = (Date.now() - _lastUserAction < 1500);
+      
+      if (!isLocked) {
+        // Counters
+        if (state.ok1 !== undefined)     setVal('ok1', state.ok1);
+        if (state.repair1 !== undefined) setVal('repair1', state.repair1);
+        if (state.ng1 !== undefined)     setVal('ng1', state.ng1);
+        if (state.ok2 !== undefined)     setVal('ok2', state.ok2);
+        if (state.repair2 !== undefined) setVal('repair2', state.repair2);
+        if (state.ng2 !== undefined)     setVal('ng2', state.ng2);
+
+        // Objects
+        if (state.defectData) defectData = state.defectData;
+        if (state.repairData) repairData = state.repairData;
+        if (state.hourlyData) hourlyData = state.hourlyData;
+      }
+
+      // Meta (only if not focused to avoid overwriting user typing)
+      const opInput = document.getElementById('operator');
+      if (state.operator !== undefined && document.activeElement !== opInput) {
+        opInput.value = state.operator;
+      }
+      
+      const shiftInput = document.getElementById('shift');
+      if (state.shift !== undefined && document.activeElement !== shiftInput) {
+        shiftInput.value = state.shift;
+      }
+
+      const targetInput = document.getElementById('targetInput');
+      if (state.target !== undefined && document.activeElement !== targetInput) {
+        targetInput.value = state.target;
+      }
+
+      // UI Refresh
+      renderHourlyTable();
+      updateSidebarSummary('defect');
+      updateSidebarSummary('repair');
+      updateAll(false); // don't re-persist
+    }
+  </script>
+
+</body>
+</html>

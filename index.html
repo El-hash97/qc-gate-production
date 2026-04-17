@@ -1241,16 +1241,25 @@
       }
 
       try {
+        // CRITICAL: Cancel any pending debounced persist to prevent race condition
+        // where old data would be re-saved to DB after the reset completes.
+        clearTimeout(_persistTimer);
+        _persistTimer = null;
+
         const res = await fetch(`${API_BASE}/api/reset`, { method: 'POST' });
         const json = await res.json();
         if (!json.success) throw new Error(json.error);
 
+        // Apply reset state locally
         ['ok1', 'repair1', 'ng1', 'ok2', 'repair2', 'ng2'].forEach(id => setVal(id, 0));
         defectData = {};
         repairData = {};
         hourlyData = {};
 
-        updateAll();
+        // Reset the user action timestamp so incoming socket stateUpdate is NOT blocked
+        _lastUserAction = 0;
+
+        updateAll(false); // false = don't persist again (server already reset)
         renderHourlyTable();
         updateSidebarSummary('defect');
         updateSidebarSummary('repair');
@@ -1300,7 +1309,10 @@
       };
 
       renderHourlyTable();
-      persistData();
+      // NOTE: Do NOT call persistData() here — updateHourlyTable is already
+      // called from within updateAll() which handles persistence itself.
+      // Calling persistData() here would extend _lastUserAction, interfering
+      // with the safety lock and causing recursive debounce loops.
     }
 
     function renderHourlyTable() {
@@ -1612,7 +1624,9 @@
       updateDefectChart();
       updateRepairChart();
       updateProgressBar();
-      updateHourlyTable(); 
+      updateHourlyTable();
+      updateSidebarSummary('defect');
+      updateSidebarSummary('repair');
       if (doPersist) persistData();
     }
 

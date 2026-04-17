@@ -32,8 +32,10 @@ io.on('connection', (socket) => {
   socket.on('updateState', (state) => {
     try {
       db.saveState(state);
-      // Broadcast to EVERYONE ELSE only (not the sender) to avoid local flicker
-      socket.broadcast.emit('stateUpdate', state);
+      // Broadcast to ALL clients (including sender) so UI stays in sync with DB.
+      // The sender's applyReceivedState will be a no-op if safety-locked,
+      // but other devices will receive the update in real-time.
+      io.emit('stateUpdate', state);
     } catch (err) {
       console.error('[Socket] Update failed:', err.message);
     }
@@ -70,12 +72,10 @@ app.post('/api/state', (req, res) => {
 app.post('/api/reset', (req, res) => {
   try {
     db.resetState(true);
-    // Broadcast reset to all clients
-    io.emit('stateUpdate', { 
-      ok1: 0, repair1: 0, ng1: 0, 
-      ok2: 0, repair2: 0, ng2: 0, 
-      defectData: {}, repairData: {}, hourlyData: {} 
-    });
+    // Fetch the actual reset state from DB and broadcast it to ensure
+    // all clients (including caller) receive a complete zeroed state.
+    const freshState = db.getState();
+    io.emit('stateUpdate', freshState);
     res.json({ success: true, message: 'Data direset dan diarsipkan' });
   } catch (err) {
     console.error('POST /api/reset:', err.message);

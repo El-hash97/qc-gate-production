@@ -1,0 +1,7 @@
+.page {
+  padding: 24px 32px;
+}
+
+.error {
+  color: var(--accent-red);
+}

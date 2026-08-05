@@ -3549,7 +3549,7 @@ ChartJS.defaults.font.family = "'Inter', sans-serif";
 Create `tests/components/ProductionChart.test.tsx`:
 
 ```tsx
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 
 const doughnutSpy = vi.fn();
@@ -3562,6 +3562,12 @@ vi.mock('@/lib/chartSetup', () => ({}));
 import { ProductionChart } from '@/components/production/ProductionChart';
 
 describe('ProductionChart', () => {
+  // Clear between tests — otherwise mock.calls[0] in a later test still
+  // refers to an earlier test's render.
+  beforeEach(() => {
+    doughnutSpy.mockClear();
+  });
+
   it('passes OK/Repair/NG totals as the doughnut dataset', () => {
     render(<ProductionChart ok={10} repair={2} ng={1} />);
     const [props] = doughnutSpy.mock.calls[0];
@@ -3638,7 +3644,7 @@ Expected: PASS (2 tests)
 Create `tests/components/ParetoChart.test.tsx`:
 
 ```tsx
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 
 const barSpy = vi.fn();
@@ -3651,6 +3657,10 @@ vi.mock('@/lib/chartSetup', () => ({}));
 import { ParetoChart } from '@/components/production/ParetoChart';
 
 describe('ParetoChart', () => {
+  beforeEach(() => {
+    barSpy.mockClear();
+  });
+
   it('sorts entries by count descending before charting', () => {
     render(<ParetoChart data={{ 'Gomi Drag': 2, Kake: 5 }} color="#dc2626" />);
     const [props] = barSpy.mock.calls[0];

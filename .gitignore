@@ -15,5 +15,8 @@
 /test-results
 /playwright-report
 
+# typescript
+*.tsbuildinfo
+
 # misc
 *.log

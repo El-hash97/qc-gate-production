@@ -3259,7 +3259,7 @@ git commit -m "feat: add useHourlySnapshot hook with stale-closure-safe interval
 Create `tests/components/InputPage.test.tsx`:
 
 ```tsx
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '@/components/ui/ToastProvider';
@@ -3280,6 +3280,13 @@ vi.mock('@/hooks/useReset', () => ({ useReset: () => ({ mutate: vi.fn() }) }));
 import InputPage from '@/app/input/page';
 
 describe('InputPage', () => {
+  // The mock is shared across tests (module-level `const`), so it must be
+  // cleared between them — otherwise a later `not.toHaveBeenCalled()`
+  // assertion sees a leftover call from an earlier test.
+  beforeEach(() => {
+    updateStateMock.mockClear();
+  });
+
   it('renders the BC 1TR and BC 2TR OK counters with their current values', () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
     expect(screen.getAllByText('5')[0]).toBeInTheDocument();

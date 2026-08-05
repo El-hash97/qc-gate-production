@@ -1,0 +1,147 @@
+.page {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbarGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.toolbarLabel {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.toolbarInput, .toolbarSelect {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.progressStrip {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.progressWrapper {
+  flex: 1;
+  min-width: 200px;
+}
+
+.progressLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.progressTrack {
+  height: 10px;
+  background: var(--bg-primary);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-green), #16a34a);
+  border-radius: 99px;
+}
+
+.achievementBadge {
+  background: var(--accent-green-soft);
+  color: var(--accent-green);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 99px;
+  font-variant-numeric: tabular-nums;
+}
+
+.productSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.productHeaderBc1, .productHeaderBc2 {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.productHeaderBc1::before, .productHeaderBc2::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+}
+
+.productHeaderBc1::before { background: var(--accent-bc1); }
+.productHeaderBc2::before { background: var(--accent-bc2); }
+
+.counterGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.rateStrip {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.actionBar {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.btnDanger {
+  padding: 9px 24px;
+  border: 1px solid rgba(220,38,38,0.25);
+  border-radius: var(--radius-sm);
+  background: rgba(220,38,38,0.12);
+  color: var(--accent-red);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .counterGrid { grid-template-columns: 1fr; }
+}

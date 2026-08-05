@@ -6,10 +6,11 @@ import { HistoryFilterBar } from '@/components/history/HistoryFilterBar';
 import { HistoryTable } from '@/components/history/HistoryTable';
 import { HistoryDetail } from '@/components/history/HistoryDetail';
 import { exportShiftToExcel } from '@/utils/excelExport';
+import { todayString } from '@/utils/date';
 import styles from './page.module.css';
 
 export default function HistoryPage() {
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(todayString());
   const [shift, setShift] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
 

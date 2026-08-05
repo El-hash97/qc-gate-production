@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useHourlySnapshot } from '@/hooks/useHourlySnapshot';
 import { useToast } from '@/components/ui/ToastProvider';
@@ -11,6 +11,8 @@ import { ResetModal } from '@/components/production/ResetModal';
 import {
   getRates, getAchievementPercent, getProgressPercent, isNgAlarmActive,
 } from '@/utils/rates';
+import { exportShiftToExcel } from '@/utils/excelExport';
+import { todayString } from '@/utils/date';
 import { SHIFTS } from '@/utils/constants';
 import type { ProductionState } from '@/lib/types';
 import styles from './page.module.css';
@@ -29,6 +31,14 @@ export default function InputPage() {
   const current = state ?? EMPTY_STATE;
 
   useHourlySnapshot(current, updateState);
+
+  const currentRef = useRef(current);
+  useEffect(() => { currentRef.current = current; }, [current]);
+
+  useEffect(() => {
+    if (currentRef.current.date) return;
+    updateState({ ...currentRef.current, date: todayString() });
+  }, [current.date]);
 
   const [defectTarget, setDefectTarget] = useState<'ng1' | 'ng2' | null>(null);
   const [repairTarget, setRepairTarget] = useState<'repair1' | 'repair2' | null>(null);
@@ -81,6 +91,15 @@ export default function InputPage() {
   return (
     <main className={styles.page}>
       <div className={styles.toolbar}>
+        <label className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>Tanggal</span>
+          <input
+            type="date"
+            className={styles.toolbarInput}
+            value={current.date}
+            onChange={(event) => commit({ date: event.target.value })}
+          />
+        </label>
         <label className={styles.toolbarGroup}>
           <span className={styles.toolbarLabel}>Operator</span>
           <input
@@ -150,6 +169,9 @@ export default function InputPage() {
       </div>
 
       <div className={styles.actionBar}>
+        <button type="button" className={styles.btnSuccess} onClick={() => exportShiftToExcel(current)}>
+          Save Data
+        </button>
         <button type="button" className={styles.btnDanger} onClick={() => setResetOpen(true)}>Reset</button>
       </div>
 

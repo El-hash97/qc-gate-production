@@ -126,8 +126,27 @@
 .actionBar {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
   padding-top: 8px;
   border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.btnSuccess {
+  padding: 9px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-green);
+  color: #000;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.btnSuccess:hover {
+  background: #16a34a;
 }
 
 .btnDanger {
@@ -143,5 +162,11 @@
 }
 
 @media (max-width: 640px) {
+  .page { padding: 16px; gap: 16px; }
   .counterGrid { grid-template-columns: 1fr; }
+  .toolbar { flex-direction: column; }
+  .toolbarGroup { width: 100%; }
+  .rateStrip { flex-wrap: wrap; gap: 12px; }
+  .actionBar { justify-content: stretch; }
+  .btnSuccess, .btnDanger { flex: 1; }
 }

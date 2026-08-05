@@ -6,7 +6,6 @@ import { ParetoChart } from '@/components/production/ParetoChart';
 import { HourlyTable } from '@/components/production/HourlyTable';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
 import { getOkTotal, getRepairTotal, getNgTotal, getRates, getAchievementPercent, getProgressPercent } from '@/utils/rates';
-import { exportShiftToExcel } from '@/utils/excelExport';
 import type { ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -63,12 +62,6 @@ export default function DashboardPage() {
           <div className={styles.chartTitle}>Pareto Repair</div>
           <div className={styles.chartWrapper}><ParetoChart data={current.repairData} color="#f59e0b" /></div>
         </div>
-      </div>
-
-      <div className={styles.actionBar}>
-        <button type="button" className={styles.btnSuccess} onClick={() => exportShiftToExcel(current)}>
-          Save Data
-        </button>
       </div>
 
       <aside className={styles.sidebar}>

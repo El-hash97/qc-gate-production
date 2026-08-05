@@ -1,6 +1,5 @@
 import type { HistoryRecord } from '@/lib/types';
 import { ParetoChart } from '@/components/production/ParetoChart';
-import { HourlyTable } from '@/components/production/HourlyTable';
 import styles from './HistoryDetail.module.css';
 
 export function HistoryDetail({ record }: { record: HistoryRecord }) {
@@ -16,7 +15,6 @@ export function HistoryDetail({ record }: { record: HistoryRecord }) {
           <div className={styles.chartWrapper}><ParetoChart data={record.repairData} color="#f59e0b" /></div>
         </div>
       </div>
-      <HourlyTable hourlyData={record.hourlyData} />
     </div>
   );
 }

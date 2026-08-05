@@ -91,23 +91,6 @@
   height: 220px;
 }
 
-.actionBar {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btnSuccess {
-  padding: 9px 24px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--accent-green);
-  color: #000;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .sidebar {
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-color);
@@ -128,4 +111,17 @@
 @media (max-width: 1024px) {
   .page { grid-template-columns: 1fr; }
   .chartsGrid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .page { padding: 16px; gap: 16px; }
+  .chartsGrid { grid-template-columns: 1fr; }
+  .progressStrip { flex-direction: column; align-items: stretch; gap: 12px; }
+  .achievementBadge { text-align: center; }
+  .rateStrip { flex-wrap: wrap; gap: 12px; }
+  .sidebar {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding: 16px;
+  }
 }

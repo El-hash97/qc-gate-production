@@ -915,8 +915,15 @@ Create `tests/unit/lib/reset.test.ts`:
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const mockSql = vi.fn() as any;
-mockSql.transaction = vi.fn();
+// vi.mock factories are hoisted above top-level const declarations, so a
+// factory that directly returns a plain reference (not wrapped in a lazy
+// arrow function) must declare that reference via vi.hoisted() or it throws
+// "Cannot access 'mockSql' before initialization".
+const { mockSql } = vi.hoisted(() => {
+  const fn = vi.fn() as any;
+  fn.transaction = vi.fn();
+  return { mockSql: fn };
+});
 vi.mock('@/lib/db', () => ({ sql: mockSql }));
 
 const mockGetProductionState = vi.fn();
@@ -1084,9 +1091,16 @@ Create `tests/unit/api/reset.test.ts`:
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockReset = vi.fn();
-const mockCheckPassword = vi.fn();
-class MockInvalidResetPasswordError extends Error {}
+// Same vi.hoisted() requirement as reset.test.ts above — the factory
+// returns MockInvalidResetPasswordError directly.
+const { mockReset, mockCheckPassword, MockInvalidResetPasswordError } = vi.hoisted(() => {
+  class MockInvalidResetPasswordError extends Error {}
+  return {
+    mockReset: vi.fn(),
+    mockCheckPassword: vi.fn(),
+    MockInvalidResetPasswordError,
+  };
+});
 
 vi.mock('@/lib/reset', () => ({
   resetProductionState: (...args: any[]) => mockReset(...args),

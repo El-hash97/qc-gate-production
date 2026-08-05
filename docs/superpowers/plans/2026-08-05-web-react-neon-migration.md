@@ -370,11 +370,15 @@ describe('lib/db', () => {
     process.env.DATABASE_URL = originalUrl;
   });
 
-  it('throws a clear error when DATABASE_URL is not set', async () => {
+  it('does not throw on import even when DATABASE_URL is not set (Next.js build-time safety)', async () => {
     delete process.env.DATABASE_URL;
-    await expect(import('@/lib/db')).rejects.toThrow(
-      'DATABASE_URL environment variable is not set',
-    );
+    await expect(import('@/lib/db')).resolves.toBeDefined();
+  });
+
+  it('throws a clear error when a query is attempted without DATABASE_URL', async () => {
+    delete process.env.DATABASE_URL;
+    const { sql } = await import('@/lib/db');
+    expect(() => sql`SELECT 1`).toThrow('DATABASE_URL environment variable is not set');
   });
 });
 ```
@@ -386,17 +390,39 @@ Expected: FAIL — `Cannot find module '@/lib/db'` (the file doesn't exist yet).
 
 - [ ] **Step 5: Create `lib/db.ts`**
 
+**Important:** the client must be constructed lazily, not at module-import time. `next build` imports every Route Handler module during its "Collecting page data" step — before any request happens — so an eager `if (!process.env.DATABASE_URL) throw` at module scope breaks `npm run build` in any environment where `DATABASE_URL` isn't set yet (discovered by actually running the build in Task 8's checkpoint, not by inspection).
+
 ```ts
 import { neon } from '@neondatabase/serverless';
 
 // API reference: https://neon.tech/docs/serverless/serverless-driver
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    'DATABASE_URL environment variable is not set. Copy .env.example to .env.local and fill in your Neon connection string.',
-  );
+//
+// Lazily constructed: `next build` imports every Route Handler module during
+// its "Collecting page data" step, before any request happens. Throwing here
+// at module-import time (rather than on first actual query) would break
+// `npm run build` in any environment where DATABASE_URL isn't set yet — so
+// the check is deferred to the first real call.
+let client: ReturnType<typeof neon> | null = null;
+
+function getClient(): ReturnType<typeof neon> {
+  if (!client) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        'DATABASE_URL environment variable is not set. Copy .env.example to .env.local and fill in your Neon connection string.',
+      );
+    }
+    client = neon(process.env.DATABASE_URL);
+  }
+  return client;
 }
 
-export const sql = neon(process.env.DATABASE_URL);
+function sqlTag(strings: TemplateStringsArray, ...values: unknown[]) {
+  return getClient()(strings, ...values);
+}
+sqlTag.transaction = (...args: Parameters<ReturnType<typeof neon>['transaction']>) =>
+  getClient().transaction(...(args as Parameters<ReturnType<typeof neon>['transaction']>));
+
+export const sql = sqlTag as ReturnType<typeof neon>;
 ```
 
 - [ ] **Step 6: Run the test to verify it passes**

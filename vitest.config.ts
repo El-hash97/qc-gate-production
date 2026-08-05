@@ -8,6 +8,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     globals: true,
+    // tests/e2e is Playwright-only (conflicting test()/expect() globals) —
+    // exclude it here so Vitest doesn't try to collect it too.
+    exclude: ['**/node_modules/**', 'tests/e2e/**'],
   },
   resolve: {
     alias: { '@': path.resolve(__dirname, '.') },

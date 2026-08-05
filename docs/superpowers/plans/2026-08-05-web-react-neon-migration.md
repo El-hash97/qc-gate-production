@@ -175,6 +175,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     globals: true,
+    // tests/e2e is Playwright-only (conflicting test()/expect() globals) —
+    // exclude it here so Vitest doesn't try to collect it too. Discovered
+    // in Task 24 once tests/e2e/smoke.spec.ts existed alongside it.
+    exclude: ['**/node_modules/**', 'tests/e2e/**'],
   },
   resolve: {
     alias: { '@': path.resolve(__dirname, '.') },

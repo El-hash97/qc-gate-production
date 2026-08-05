@@ -1953,7 +1953,10 @@ describe('Modal', () => {
   it('calls onClose when the overlay background is clicked', () => {
     const onClose = vi.fn();
     render(<Modal isOpen onClose={onClose} title="Test">content</Modal>);
-    const overlay = screen.getByText('content').parentElement!.parentElement!;
+    // getByText('content') matches the `.modal` div itself (RTL matches an
+    // element whose direct text-node children equal the query), so its
+    // parent is already the `.overlay` div — one level up, not two.
+    const overlay = screen.getByText('content').parentElement!;
     fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
   });

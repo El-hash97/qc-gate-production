@@ -2576,6 +2576,8 @@ Expected: FAIL — `Cannot find module '@/components/production/DefectModal'`.
 
 - [ ] **Step 4: Create `components/production/DefectModal.tsx`**
 
+**Important:** hold the quantity field as a string, not a live-coerced number. A `parseInt(value) || 1` fallback on every keystroke snaps an emptied field straight back to `"1"`, so `clear()` never actually empties it and the next keystroke *appends* instead of *replacing* (`"1"` + typed `"3"` → `"13"`) — discovered by actually running the tests below, not by inspection. Parse to a number only at save time.
+
 ```tsx
 'use client';
 
@@ -2592,12 +2594,13 @@ interface DefectModalProps {
 
 export function DefectModal({ isOpen, onClose, onSave }: DefectModalProps) {
   const [defectType, setDefectType] = useState<string>(DEFECT_TYPES[0]);
-  const [qty, setQty] = useState(1);
+  const [qtyInput, setQtyInput] = useState('1');
 
   function handleSave() {
-    if (qty < 1) return;
+    const qty = parseInt(qtyInput, 10);
+    if (!qty || qty < 1) return;
     onSave(defectType, qty);
-    setQty(1);
+    setQtyInput('1');
   }
 
   return (
@@ -2619,8 +2622,8 @@ export function DefectModal({ isOpen, onClose, onSave }: DefectModalProps) {
           className={styles.input}
           min={1}
           max={999}
-          value={qty}
-          onChange={(event) => setQty(parseInt(event.target.value, 10) || 1)}
+          value={qtyInput}
+          onChange={(event) => setQtyInput(event.target.value)}
         />
       </label>
       <div className={styles.actions}>
@@ -2682,6 +2685,8 @@ Expected: FAIL — `Cannot find module '@/components/production/RepairModal'`.
 
 - [ ] **Step 8: Create `components/production/RepairModal.tsx`**
 
+Same string-held-quantity pattern as `DefectModal.tsx` above.
+
 ```tsx
 'use client';
 
@@ -2698,12 +2703,13 @@ interface RepairModalProps {
 
 export function RepairModal({ isOpen, onClose, onSave }: RepairModalProps) {
   const [repairType, setRepairType] = useState<string>(REPAIR_TYPES[0]);
-  const [qty, setQty] = useState(1);
+  const [qtyInput, setQtyInput] = useState('1');
 
   function handleSave() {
-    if (qty < 1) return;
+    const qty = parseInt(qtyInput, 10);
+    if (!qty || qty < 1) return;
     onSave(repairType, qty);
-    setQty(1);
+    setQtyInput('1');
   }
 
   return (
@@ -2725,8 +2731,8 @@ export function RepairModal({ isOpen, onClose, onSave }: RepairModalProps) {
           className={styles.input}
           min={1}
           max={999}
-          value={qty}
-          onChange={(event) => setQty(parseInt(event.target.value, 10) || 1)}
+          value={qtyInput}
+          onChange={(event) => setQtyInput(event.target.value)}
         />
       </label>
       <div className={styles.actions}>

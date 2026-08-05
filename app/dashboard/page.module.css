@@ -1,0 +1,131 @@
+.page {
+  padding: 24px 32px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+
+.statusBar {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.statusOnline { color: var(--accent-green); }
+.statusOffline { color: var(--accent-red); }
+
+.progressStrip {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.progressTrack {
+  height: 10px;
+  background: var(--bg-primary);
+  border-radius: 99px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-green), #16a34a);
+  border-radius: 99px;
+}
+
+.achievementBadge {
+  background: var(--accent-green-soft);
+  color: var(--accent-green);
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 99px;
+}
+
+.rateStrip {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.chartCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.chartTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.chartWrapper {
+  position: relative;
+  height: 220px;
+}
+
+.actionBar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btnSuccess {
+  padding: 9px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-green);
+  color: #000;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebar {
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebarTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1024px) {
+  .page { grid-template-columns: 1fr; }
+  .chartsGrid { grid-template-columns: 1fr 1fr; }
+}

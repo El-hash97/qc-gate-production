@@ -1,4 +1,7 @@
 {
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "installCommand": "npm install",
   "crons": [
     { "path": "/api/cron/shift-reset", "schedule": "0 0 * * *" },
     { "path": "/api/cron/shift-reset", "schedule": "0 12 * * *" }

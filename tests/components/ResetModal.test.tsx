@@ -25,7 +25,7 @@ describe('ResetModal', () => {
 
   it('shows an error toast when the password is wrong', async () => {
     (fetch as any).mockResolvedValueOnce({
-      json: async () => ({ success: false, error: 'Invalid reset password' }),
+      json: async () => ({ success: false, error: 'Password salah!' }),
     });
     const onClose = vi.fn();
     renderWithProviders(<ResetModal isOpen onClose={onClose} />);
@@ -35,6 +35,23 @@ describe('ResetModal', () => {
 
     expect(await screen.findByText('Password salah!')).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the server reason when reset is not configured', async () => {
+    (fetch as any).mockResolvedValueOnce({
+      json: async () => ({
+        success: false,
+        error: 'Reset password belum dikonfigurasi di server (RESET_PASSWORD).',
+      }),
+    });
+    renderWithProviders(<ResetModal isOpen onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText('Masukkan password'), '1234');
+    await userEvent.click(screen.getByRole('button', { name: 'Reset Data' }));
+
+    expect(
+      await screen.findByText('Reset password belum dikonfigurasi di server (RESET_PASSWORD).'),
+    ).toBeInTheDocument();
   });
 
   it('closes and shows a success toast when the password is correct', async () => {

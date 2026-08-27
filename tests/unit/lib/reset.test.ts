@@ -12,7 +12,10 @@ vi.mock('@/lib/productionState', () => ({
   getProductionState: (...args: any[]) => mockGetProductionState(...args),
 }));
 
-import { checkResetPassword, resetProductionState, InvalidResetPasswordError } from '@/lib/reset';
+import {
+  checkResetPassword, resetProductionState,
+  InvalidResetPasswordError, ResetPasswordNotConfiguredError,
+} from '@/lib/reset';
 
 describe('checkResetPassword', () => {
   const originalPassword = process.env.RESET_PASSWORD;
@@ -25,6 +28,18 @@ describe('checkResetPassword', () => {
 
   it('throws InvalidResetPasswordError for the wrong password', () => {
     expect(() => checkResetPassword('0000')).toThrow(InvalidResetPasswordError);
+  });
+
+  it('ignores surrounding whitespace on both sides', () => {
+    process.env.RESET_PASSWORD = '1234\n';
+    expect(() => checkResetPassword('  1234 ')).not.toThrow();
+  });
+
+  it('throws ResetPasswordNotConfiguredError when the env var is unset or blank', () => {
+    delete process.env.RESET_PASSWORD;
+    expect(() => checkResetPassword('1234')).toThrow(ResetPasswordNotConfiguredError);
+    process.env.RESET_PASSWORD = '   ';
+    expect(() => checkResetPassword('1234')).toThrow(ResetPasswordNotConfiguredError);
   });
 });
 

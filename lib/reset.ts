@@ -9,9 +9,23 @@ export class InvalidResetPasswordError extends Error {
   }
 }
 
+export class ResetPasswordNotConfiguredError extends Error {
+  constructor() {
+    super('RESET_PASSWORD is not set on the server');
+    this.name = 'ResetPasswordNotConfiguredError';
+  }
+}
+
 export function checkResetPassword(candidate: string): void {
-  const expected = process.env.RESET_PASSWORD;
-  if (!expected || candidate !== expected) {
+  // Trim both sides: a trailing newline pasted into the Vercel env var (or a
+  // stray space in the field) otherwise makes every attempt look "wrong".
+  const expected = process.env.RESET_PASSWORD?.trim();
+  if (!expected) {
+    // Distinct from a wrong password so a missing env var doesn't masquerade
+    // as "Password salah" forever.
+    throw new ResetPasswordNotConfiguredError();
+  }
+  if (candidate.trim() !== expected) {
     throw new InvalidResetPasswordError();
   }
 }

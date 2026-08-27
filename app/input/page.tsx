@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useHourlySnapshot } from '@/hooks/useHourlySnapshot';
+import { useDraftValue } from '@/hooks/useDraftValue';
 import { useToast } from '@/components/ui/ToastProvider';
 import { CounterCard } from '@/components/production/CounterCard';
 import { DefectModal } from '@/components/production/DefectModal';
@@ -122,6 +123,20 @@ export default function InputPage() {
   const progress = getProgressPercent(current, current.target);
   const rates = getRates(current);
 
+  // Free-text toolbar fields commit on blur, not on every keystroke, so the
+  // background poll can't overwrite a value mid-edit.
+  const operatorField = useDraftValue(current.operator, (value) => commit({ operator: value }), {
+    parse: (raw) => raw,
+    format: (value) => value,
+  });
+  const targetField = useDraftValue(current.target, (value) => commit({ target: value }), {
+    parse: (raw) => {
+      const n = parseInt(raw, 10);
+      return Number.isNaN(n) ? 0 : Math.max(0, n);
+    },
+    format: (value) => String(value),
+  });
+
   return (
     <main className={styles.page}>
       <div className={styles.toolbar}>
@@ -138,8 +153,10 @@ export default function InputPage() {
           <span className={styles.toolbarLabel}>Operator</span>
           <input
             className={styles.toolbarInput}
-            value={current.operator}
-            onChange={(event) => commit({ operator: event.target.value })}
+            value={operatorField.value}
+            onChange={operatorField.onChange}
+            onBlur={operatorField.onBlur}
+            onKeyDown={operatorField.onKeyDown}
             placeholder="Nama Operator"
           />
         </label>
@@ -158,9 +175,11 @@ export default function InputPage() {
           <input
             type="number"
             className={styles.toolbarInput}
-            value={current.target}
+            value={targetField.value}
             min={0}
-            onChange={(event) => commit({ target: parseInt(event.target.value, 10) || 0 })}
+            onChange={targetField.onChange}
+            onBlur={targetField.onBlur}
+            onKeyDown={targetField.onKeyDown}
           />
         </label>
       </div>

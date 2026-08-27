@@ -5,6 +5,12 @@
   gap: 20px;
 }
 
+.loading {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 40px 0;
+}
+
 .toolbar {
   display: flex;
   gap: 16px;

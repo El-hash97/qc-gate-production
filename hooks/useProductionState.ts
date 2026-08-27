@@ -1,11 +1,14 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ProductionState } from '@/lib/types';
 
 const STATE_QUERY_KEY = ['productionState'] as const;
 const POLL_INTERVAL_MS = 3000;
-const OPTIMISTIC_GRACE_MS = 1500;
+// Neon's serverless driver can take >1.5s on a cold compute; keep the grace
+// window comfortably above that so a post-save poll can't land before the
+// write is durable and bounce the field back to its old value.
+const OPTIMISTIC_GRACE_MS = 3000;
 
 interface StateResponse {
   success: boolean;
@@ -32,14 +35,19 @@ async function postState(state: ProductionState): Promise<void> {
 
 export function useProductionState() {
   const queryClient = useQueryClient();
+  const pendingWrites = useIsMutating({ mutationKey: STATE_QUERY_KEY });
 
   const query = useQuery({
     queryKey: STATE_QUERY_KEY,
     queryFn: fetchState,
-    refetchInterval: POLL_INTERVAL_MS,
+    // Pause the background poll while a save is in flight so a stale GET
+    // can't overwrite what the user just typed/clicked.
+    refetchInterval: pendingWrites > 0 ? false : POLL_INTERVAL_MS,
+    refetchOnWindowFocus: false,
   });
 
   const mutation = useMutation({
+    mutationKey: STATE_QUERY_KEY,
     mutationFn: postState,
     onMutate: async (nextState) => {
       await queryClient.cancelQueries({ queryKey: STATE_QUERY_KEY });

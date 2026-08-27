@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useHourlySnapshot } from '@/hooks/useHourlySnapshot';
 import { useDraftValue } from '@/hooks/useDraftValue';
@@ -17,7 +17,8 @@ import { todayString } from '@/utils/date';
 import {
   SHIFTS, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
-import type { ProductGroup, ProductionState } from '@/lib/types';
+import type { ProductLine, ProductionState } from '@/lib/types';
+import { lineGroup } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
@@ -43,35 +44,39 @@ function repairTypesFor(target: RepairTarget | null): readonly string[] {
   return target === 'repair3' || target === 'repair4' ? SHAFT_REPAIR_TYPES : REPAIR_TYPES;
 }
 
+// The counter target ('ng3', 'repair1', …) always ends in its line number.
 // Lines 1-2 are Block Cylinder; lines 3-4 are Camshaft/Crankshaft. Defect and
-// repair tallies (and the Lot/Flask log) are stored per group so the
-// dashboard toggle can scope them.
-function groupForTarget(target: DefectTarget | RepairTarget): ProductGroup {
-  return target === 'ng3' || target === 'ng4' || target === 'repair3' || target === 'repair4'
-    ? 'shaft'
-    : 'bc';
+// repair tallies (and the Lot/Flask log) are stored per group so the dashboard
+// toggle can scope them, and tagged with the line so the log shows the product.
+function lineForTarget(target: DefectTarget | RepairTarget): ProductLine {
+  return Number(target.slice(-1)) as ProductLine;
 }
 
 export default function InputPage() {
-  const { state, updateState } = useProductionState();
+  const { state, updateState, isLoading } = useProductionState();
   const { showToast } = useToast();
   const current = state ?? EMPTY_STATE;
+  // Every write merges onto the loaded state. During the very first fetch
+  // there is no loaded state and `current` is the all-zero EMPTY_STATE —
+  // writing then would POST zeros over the running shift and wipe it. Gate
+  // every write (and the whole form) on the initial load being done.
+  const ready = !isLoading;
 
   useHourlySnapshot(current, updateState);
 
-  const currentRef = useRef(current);
-  useEffect(() => { currentRef.current = current; }, [current]);
-
   useEffect(() => {
-    if (currentRef.current.date) return;
-    updateState({ ...currentRef.current, date: todayString() });
-  }, [current.date]);
+    // Auto-fill today's date, but only once the real server state has loaded
+    // and it genuinely has none — never on top of EMPTY_STATE.
+    if (isLoading || !state || state.date) return;
+    updateState({ ...state, date: todayString() });
+  }, [isLoading, state, updateState]);
 
   const [defectTarget, setDefectTarget] = useState<DefectTarget | null>(null);
   const [repairTarget, setRepairTarget] = useState<RepairTarget | null>(null);
   const [isResetOpen, setResetOpen] = useState(false);
 
   function commit(patch: Partial<ProductionState>) {
+    if (isLoading) return;
     const next = { ...current, ...patch };
     updateState(next);
 
@@ -93,13 +98,14 @@ export default function InputPage() {
 
   function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string) {
     if (!defectTarget) return;
-    const group = groupForTarget(defectTarget);
+    const line = lineForTarget(defectTarget);
+    const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'defectDataShaft' : 'defectData';
     const currentData = current[dataKey] ?? {};
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [defectType]: (currentData[defectType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'defect', group, type: defectType, qty, lot, flask }],
+      entryLogs: [...current.entryLogs, { kind: 'defect', group, line, type: defectType, qty, lot, flask }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${defectType} ditambahkan`, 'error');
     setDefectTarget(null);
@@ -107,13 +113,14 @@ export default function InputPage() {
 
   function handleSaveRepair(repairType: string, qty: number, lot: string, flask: string) {
     if (!repairTarget) return;
-    const group = groupForTarget(repairTarget);
+    const line = lineForTarget(repairTarget);
+    const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'repairDataShaft' : 'repairData';
     const currentData = current[dataKey] ?? {};
     commit({
       [repairTarget]: (current[repairTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'repair', group, type: repairType, qty, lot, flask }],
+      entryLogs: [...current.entryLogs, { kind: 'repair', group, line, type: repairType, qty, lot, flask }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');
     setRepairTarget(null);
@@ -136,6 +143,12 @@ export default function InputPage() {
     },
     format: (value) => String(value),
   });
+
+  // Block the whole form until the running shift has loaded — otherwise the
+  // first click/keystroke would write EMPTY_STATE over live data.
+  if (!ready) {
+    return <main className={styles.page}><p className={styles.loading}>Memuat data shift…</p></main>;
+  }
 
   return (
     <main className={styles.page}>

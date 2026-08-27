@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
@@ -45,18 +45,29 @@ export default function DashboardPage() {
   const achievement = getAchievementPercent(current, current.target, group);
   const progress = getProgressPercent(current, current.target, group);
 
-  const defectData = view === 'bc' ? current.defectData
-    : view === 'shaft' ? (current.defectDataShaft ?? {})
-    : mergeCounts(current.defectData, current.defectDataShaft);
-  const repairData = view === 'bc' ? current.repairData
-    : view === 'shaft' ? (current.repairDataShaft ?? {})
-    : mergeCounts(current.repairData, current.repairDataShaft);
-  const hourlyData = view === 'bc' ? current.hourlyData
-    : view === 'shaft' ? (current.hourlyDataShaft ?? {})
-    : mergeHourly(current.hourlyData, current.hourlyDataShaft);
-  const entryLogs = view === 'all'
-    ? current.entryLogs
-    : current.entryLogs.filter((log) => (log.group ?? 'bc') === view);
+  // Memoised so an unchanged background poll (react-query keeps the same
+  // `current` reference via structural sharing) doesn't hand the charts a new
+  // object every 3s and make them redraw.
+  const defectData = useMemo(() => (
+    view === 'bc' ? current.defectData
+      : view === 'shaft' ? (current.defectDataShaft ?? {})
+      : mergeCounts(current.defectData, current.defectDataShaft)
+  ), [view, current.defectData, current.defectDataShaft]);
+  const repairData = useMemo(() => (
+    view === 'bc' ? current.repairData
+      : view === 'shaft' ? (current.repairDataShaft ?? {})
+      : mergeCounts(current.repairData, current.repairDataShaft)
+  ), [view, current.repairData, current.repairDataShaft]);
+  const hourlyData = useMemo(() => (
+    view === 'bc' ? current.hourlyData
+      : view === 'shaft' ? (current.hourlyDataShaft ?? {})
+      : mergeHourly(current.hourlyData, current.hourlyDataShaft)
+  ), [view, current.hourlyData, current.hourlyDataShaft]);
+  const entryLogs = useMemo(() => (
+    view === 'all'
+      ? current.entryLogs
+      : current.entryLogs.filter((log) => (log.group ?? 'bc') === view)
+  ), [view, current.entryLogs]);
 
   return (
     <main className={styles.page}>
@@ -113,11 +124,15 @@ export default function DashboardPage() {
       <aside className={styles.sidebar}>
         <div>
           <div className={styles.sidebarTitle}>Hourly Production</div>
-          <HourlyTable hourlyData={hourlyData} />
+          <div className={styles.scrollBox}>
+            <HourlyTable hourlyData={hourlyData} />
+          </div>
         </div>
         <DefectRepairSummary title="Defect Details" data={defectData} />
         <DefectRepairSummary title="Repair Details" data={repairData} />
-        <EntryLogList title="Lot / Flask Log" logs={entryLogs} />
+        <div className={styles.scrollBox}>
+          <EntryLogList title="Lot / Flask Log" logs={entryLogs} />
+        </div>
       </aside>
     </main>
   );

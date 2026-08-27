@@ -3,11 +3,28 @@
 // both merged).
 export type ProductGroup = 'bc' | 'shaft';
 
+// The four production lines, by counter index (ok1/repair1/ng1 … ok4/…).
+export type ProductLine = 1 | 2 | 3 | 4;
+
+export const PRODUCT_LINE_LABELS: Record<ProductLine, string> = {
+  1: 'BC 1TR',
+  2: 'BC 2TR',
+  3: 'Camshaft',
+  4: 'Crankshaft',
+};
+
+export function lineGroup(line: ProductLine): ProductGroup {
+  return line <= 2 ? 'bc' : 'shaft';
+}
+
 export interface EntryLog {
   kind: 'defect' | 'repair';
   // Optional so logs written before the split still parse — they are always
   // Block Cylinder, so every read site treats a missing group as 'bc'.
   group?: ProductGroup;
+  // Which of the four lines the entry was logged against. Optional for the
+  // same back-compat reason; the log list shows the product name when set.
+  line?: ProductLine;
   type: string;
   qty: number;
   lot: string;

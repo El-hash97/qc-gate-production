@@ -109,6 +109,9 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+  /* Don't stretch the chart cards to match a tall sidebar — keep them a fixed
+     height so growing Hourly / Lot-Flask data never resizes the chart boxes. */
+  align-self: start;
 }
 
 .chartCard {
@@ -146,6 +149,13 @@
   color: var(--text-secondary);
   text-transform: uppercase;
   margin-bottom: 14px;
+}
+
+/* Cap the tall, ever-growing lists (hourly rows, lot/flask log) so the sidebar
+   stays a predictable height and the charts beside it never shift. */
+.scrollBox {
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 @media (max-width: 1024px) {

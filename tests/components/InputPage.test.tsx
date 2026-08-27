@@ -12,9 +12,10 @@ const stateMock = {
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
   entryLogs: [], savedAt: '',
 };
+let hookReturn: { state: unknown; updateState: unknown; isLoading: boolean };
 
 vi.mock('@/hooks/useProductionState', () => ({
-  useProductionState: () => ({ state: stateMock, updateState: updateStateMock }),
+  useProductionState: () => hookReturn,
 }));
 vi.mock('@/hooks/useHourlySnapshot', () => ({ useHourlySnapshot: () => {} }));
 vi.mock('@/hooks/useReset', () => ({ useReset: () => ({ mutate: vi.fn() }) }));
@@ -24,6 +25,15 @@ import InputPage from '@/app/input/page';
 describe('InputPage', () => {
   beforeEach(() => {
     updateStateMock.mockClear();
+    hookReturn = { state: stateMock, updateState: updateStateMock, isLoading: false };
+  });
+
+  it('shows a loading placeholder and writes nothing while the shift is still loading', async () => {
+    hookReturn = { state: null, updateState: updateStateMock, isLoading: true };
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    expect(screen.getByText('Memuat data shift…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tambah OK' })).not.toBeInTheDocument();
+    expect(updateStateMock).not.toHaveBeenCalled();
   });
 
   it('renders the BC 1TR and BC 2TR OK counters with their current values', () => {

@@ -26,6 +26,9 @@ export function ProductionChart({ ok, repair, ng }: ProductionChartProps) {
       options={{
         responsive: true,
         maintainAspectRatio: false,
+        // No enter/update animation — the dashboard polls every few seconds and
+        // a re-spinning donut on each refresh reads as the chart "jumping".
+        animation: false,
         cutout: '55%',
         plugins: {
           legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 11 } } },

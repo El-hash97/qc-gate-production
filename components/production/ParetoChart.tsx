@@ -20,6 +20,9 @@ export function ParetoChart({ data, color }: ParetoChartProps) {
       options={{
         responsive: true,
         maintainAspectRatio: false,
+        // No animation on refresh — keeps the bars steady while the dashboard
+        // polls instead of re-growing them from zero each time.
+        animation: false,
         plugins: {
           legend: { display: false },
           datalabels: { color: '#f0f1f5', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 } },

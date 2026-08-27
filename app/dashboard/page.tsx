@@ -5,6 +5,7 @@ import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
 import { HourlyTable } from '@/components/production/HourlyTable';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
+import { EntryLogList } from '@/components/production/EntryLogList';
 import { getOkTotal, getRepairTotal, getNgTotal, getRates, getAchievementPercent, getProgressPercent } from '@/utils/rates';
 import type { ProductionState } from '@/lib/types';
 import styles from './page.module.css';
@@ -12,7 +13,8 @@ import styles from './page.module.css';
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '',
+  ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
+  defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [], savedAt: '',
 };
 
 export default function DashboardPage() {
@@ -71,6 +73,7 @@ export default function DashboardPage() {
         </div>
         <DefectRepairSummary title="Defect Details" data={current.defectData} />
         <DefectRepairSummary title="Repair Details" data={current.repairData} />
+        <EntryLogList title="Lot / Flask Log" logs={current.entryLogs} />
       </aside>
     </main>
   );

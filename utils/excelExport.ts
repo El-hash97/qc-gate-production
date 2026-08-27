@@ -5,7 +5,14 @@ export function buildShiftWorkbook(state: ProductionState) {
   const prodData = [
     { Produk: 'BC 1TR', Operator: state.operator || 'N/A', Shift: state.shift, Tanggal: state.date, OK: state.ok1, Repair: state.repair1, NG: state.ng1 },
     { Produk: 'BC 2TR', Operator: state.operator || 'N/A', Shift: state.shift, Tanggal: state.date, OK: state.ok2, Repair: state.repair2, NG: state.ng2 },
-    { Produk: 'TOTAL', Operator: state.operator || 'N/A', Shift: state.shift, Tanggal: state.date, OK: state.ok1 + state.ok2, Repair: state.repair1 + state.repair2, NG: state.ng1 + state.ng2 },
+    { Produk: 'Camshaft', Operator: state.operator || 'N/A', Shift: state.shift, Tanggal: state.date, OK: state.ok3 ?? 0, Repair: state.repair3 ?? 0, NG: state.ng3 ?? 0 },
+    { Produk: 'Crankshaft', Operator: state.operator || 'N/A', Shift: state.shift, Tanggal: state.date, OK: state.ok4 ?? 0, Repair: state.repair4 ?? 0, NG: state.ng4 ?? 0 },
+    {
+      Produk: 'TOTAL', Operator: state.operator || 'N/A', Shift: state.shift, Tanggal: state.date,
+      OK: state.ok1 + state.ok2 + (state.ok3 ?? 0) + (state.ok4 ?? 0),
+      Repair: state.repair1 + state.repair2 + (state.repair3 ?? 0) + (state.repair4 ?? 0),
+      NG: state.ng1 + state.ng2 + (state.ng3 ?? 0) + (state.ng4 ?? 0),
+    },
   ];
 
   const defectDetail = Object.entries(state.defectData).sort((a, b) => b[1] - a[1])

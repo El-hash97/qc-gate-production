@@ -1,5 +1,6 @@
 import type { HistoryRecord } from '@/lib/types';
 import { ParetoChart } from '@/components/production/ParetoChart';
+import { EntryLogList } from '@/components/production/EntryLogList';
 import styles from './HistoryDetail.module.css';
 
 export function HistoryDetail({ record }: { record: HistoryRecord }) {
@@ -15,6 +16,7 @@ export function HistoryDetail({ record }: { record: HistoryRecord }) {
           <div className={styles.chartWrapper}><ParetoChart data={record.repairData} color="#f59e0b" /></div>
         </div>
       </div>
+      <EntryLogList title="Lot / Flask Log" logs={record.entryLogs} />
     </div>
   );
 }

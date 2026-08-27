@@ -25,7 +25,8 @@ describe('getProductionState', () => {
     expect(result).toEqual({
       date: '2026-08-05', shift: 'Shift Red', operator: 'Budi', target: 100,
       ok1: 10, repair1: 1, ng1: 0, ok2: 5, repair2: 0, ng2: 1,
-      defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {},
+      ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
+      defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {}, entryLogs: [],
       savedAt: '2026-08-05T07:00:00.000Z',
     });
   });

@@ -15,8 +15,8 @@ describe('buildShiftWorkbook', () => {
     const workbook = buildShiftWorkbook(state);
     expect(workbook.SheetNames).toContain('Production');
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Production']) as any[];
-    expect(rows).toHaveLength(3);
-    expect(rows[2]).toMatchObject({ Produk: 'TOTAL', OK: 15, Repair: 1, NG: 1 });
+    expect(rows).toHaveLength(5);
+    expect(rows[4]).toMatchObject({ Produk: 'TOTAL', OK: 15, Repair: 1, NG: 1 });
   });
 
   it('only includes a Defect sheet when there is defect data', () => {

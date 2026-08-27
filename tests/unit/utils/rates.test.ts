@@ -11,6 +11,13 @@ describe('rates utilities', () => {
     expect(getOkTotal(base)).toBe(15);
   });
 
+  it('includes Camshaft/Crankshaft counters in the totals when present', () => {
+    const withShafts = { ...base, ok3: 4, repair3: 1, ng3: 0, ok4: 2, repair4: 0, ng4: 1 };
+    expect(getOkTotal(withShafts)).toBe(21);
+    expect(getRepairTotal(withShafts)).toBe(4);
+    expect(getNgTotal(withShafts)).toBe(3);
+  });
+
   it('sums Repair across both products', () => {
     expect(getRepairTotal(base)).toBe(3);
   });

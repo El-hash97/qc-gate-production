@@ -46,4 +46,12 @@ describe('InputPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
     expect(screen.getByText('Konfirmasi Reset')).toBeInTheDocument();
   });
+
+  it('renders Camshaft and Crankshaft sections using the Shaft defect list', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    expect(screen.getByText('Camshaft')).toBeInTheDocument();
+    expect(screen.getByText('Crankshaft')).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
+    expect(screen.getByText('Ireboshi')).toBeInTheDocument();
+  });
 });

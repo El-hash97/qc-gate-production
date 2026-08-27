@@ -5,18 +5,24 @@ export interface Counters {
   ok2: number;
   repair2: number;
   ng2: number;
+  ok3?: number;
+  repair3?: number;
+  ng3?: number;
+  ok4?: number;
+  repair4?: number;
+  ng4?: number;
 }
 
 export function getOkTotal(c: Counters): number {
-  return c.ok1 + c.ok2;
+  return c.ok1 + c.ok2 + (c.ok3 ?? 0) + (c.ok4 ?? 0);
 }
 
 export function getRepairTotal(c: Counters): number {
-  return c.repair1 + c.repair2;
+  return c.repair1 + c.repair2 + (c.repair3 ?? 0) + (c.repair4 ?? 0);
 }
 
 export function getNgTotal(c: Counters): number {
-  return c.ng1 + c.ng2;
+  return c.ng1 + c.ng2 + (c.ng3 ?? 0) + (c.ng4 ?? 0);
 }
 
 export function getGrandTotal(c: Counters): number {

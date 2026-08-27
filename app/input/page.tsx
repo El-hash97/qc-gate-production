@@ -13,17 +13,32 @@ import {
 } from '@/utils/rates';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
-import { SHIFTS } from '@/utils/constants';
+import {
+  SHIFTS, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
+} from '@/utils/constants';
 import type { ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '',
+  ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
+  defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [], savedAt: '',
 };
 
-type CounterField = 'ok1' | 'repair1' | 'ng1' | 'ok2' | 'repair2' | 'ng2';
+type CounterField = 'ok1' | 'repair1' | 'ng1' | 'ok2' | 'repair2' | 'ng2'
+  | 'ok3' | 'repair3' | 'ng3' | 'ok4' | 'repair4' | 'ng4';
+
+type DefectTarget = 'ng1' | 'ng2' | 'ng3' | 'ng4';
+type RepairTarget = 'repair1' | 'repair2' | 'repair3' | 'repair4';
+
+// BC 1TR/2TR share one defect/repair list; Camshaft/Crankshaft share another.
+function defectTypesFor(target: DefectTarget | null): readonly string[] {
+  return target === 'ng3' || target === 'ng4' ? SHAFT_DEFECT_TYPES : DEFECT_TYPES;
+}
+function repairTypesFor(target: RepairTarget | null): readonly string[] {
+  return target === 'repair3' || target === 'repair4' ? SHAFT_REPAIR_TYPES : REPAIR_TYPES;
+}
 
 export default function InputPage() {
   const { state, updateState } = useProductionState();
@@ -40,8 +55,8 @@ export default function InputPage() {
     updateState({ ...currentRef.current, date: todayString() });
   }, [current.date]);
 
-  const [defectTarget, setDefectTarget] = useState<'ng1' | 'ng2' | null>(null);
-  const [repairTarget, setRepairTarget] = useState<'repair1' | 'repair2' | null>(null);
+  const [defectTarget, setDefectTarget] = useState<DefectTarget | null>(null);
+  const [repairTarget, setRepairTarget] = useState<RepairTarget | null>(null);
   const [isResetOpen, setResetOpen] = useState(false);
 
   function commit(patch: Partial<ProductionState>) {
@@ -55,30 +70,32 @@ export default function InputPage() {
   }
 
   function increment(field: CounterField) {
-    commit({ [field]: current[field] + 1 } as Partial<ProductionState>);
+    commit({ [field]: (current[field] ?? 0) + 1 } as Partial<ProductionState>);
   }
 
   function decrement(field: CounterField) {
-    if (current[field] > 0) {
-      commit({ [field]: current[field] - 1 } as Partial<ProductionState>);
+    if ((current[field] ?? 0) > 0) {
+      commit({ [field]: (current[field] ?? 0) - 1 } as Partial<ProductionState>);
     }
   }
 
-  function handleSaveDefect(defectType: string, qty: number) {
+  function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string) {
     if (!defectTarget) return;
     commit({
-      [defectTarget]: current[defectTarget] + qty,
+      [defectTarget]: (current[defectTarget] ?? 0) + qty,
       defectData: { ...current.defectData, [defectType]: (current.defectData[defectType] ?? 0) + qty },
+      entryLogs: [...current.entryLogs, { kind: 'defect', type: defectType, qty, lot, flask }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${defectType} ditambahkan`, 'error');
     setDefectTarget(null);
   }
 
-  function handleSaveRepair(repairType: string, qty: number) {
+  function handleSaveRepair(repairType: string, qty: number, lot: string, flask: string) {
     if (!repairTarget) return;
     commit({
-      [repairTarget]: current[repairTarget] + qty,
+      [repairTarget]: (current[repairTarget] ?? 0) + qty,
       repairData: { ...current.repairData, [repairType]: (current.repairData[repairType] ?? 0) + qty },
+      entryLogs: [...current.entryLogs, { kind: 'repair', type: repairType, qty, lot, flask }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');
     setRepairTarget(null);
@@ -162,6 +179,24 @@ export default function InputPage() {
         </div>
       </section>
 
+      <section className={styles.productSection}>
+        <h2 className={styles.productHeaderCamshaft}>Camshaft</h2>
+        <div className={styles.counterGrid}>
+          <CounterCard label="OK" variant="ok" value={current.ok3 ?? 0} onIncrement={() => increment('ok3')} onDecrement={() => decrement('ok3')} />
+          <CounterCard label="Repair" variant="repair" value={current.repair3 ?? 0} onIncrement={() => setRepairTarget('repair3')} onDecrement={() => decrement('repair3')} />
+          <CounterCard label="NG" variant="ng" value={current.ng3 ?? 0} onIncrement={() => setDefectTarget('ng3')} onDecrement={() => decrement('ng3')} />
+        </div>
+      </section>
+
+      <section className={styles.productSection}>
+        <h2 className={styles.productHeaderCrankshaft}>Crankshaft</h2>
+        <div className={styles.counterGrid}>
+          <CounterCard label="OK" variant="ok" value={current.ok4 ?? 0} onIncrement={() => increment('ok4')} onDecrement={() => decrement('ok4')} />
+          <CounterCard label="Repair" variant="repair" value={current.repair4 ?? 0} onIncrement={() => setRepairTarget('repair4')} onDecrement={() => decrement('repair4')} />
+          <CounterCard label="NG" variant="ng" value={current.ng4 ?? 0} onIncrement={() => setDefectTarget('ng4')} onDecrement={() => decrement('ng4')} />
+        </div>
+      </section>
+
       <div className={styles.rateStrip}>
         <span>OK Rate: {rates.okRate}%</span>
         <span>Repair Rate: {rates.repairRate}%</span>
@@ -179,11 +214,13 @@ export default function InputPage() {
         isOpen={defectTarget !== null}
         onClose={() => setDefectTarget(null)}
         onSave={handleSaveDefect}
+        types={defectTypesFor(defectTarget)}
       />
       <RepairModal
         isOpen={repairTarget !== null}
         onClose={() => setRepairTarget(null)}
         onSave={handleSaveRepair}
+        types={repairTypesFor(repairTarget)}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

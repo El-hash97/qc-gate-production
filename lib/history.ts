@@ -1,5 +1,5 @@
 import { sql } from './db';
-import type { EntryLog, HistoryRecord } from './types';
+import type { EntryLog, HourlySnapshot, HistoryRecord } from './types';
 
 interface HistoryRow {
   id: number;
@@ -13,7 +13,10 @@ interface HistoryRow {
   ok4?: number; repair4?: number; ng4?: number;
   defect_data: Record<string, number>;
   repair_data: Record<string, number>;
-  hourly_data: Record<string, { ok: number; repair: number; ng: number }>;
+  hourly_data: Record<string, HourlySnapshot>;
+  defect_data_shaft?: Record<string, number>;
+  repair_data_shaft?: Record<string, number>;
+  hourly_data_shaft?: Record<string, HourlySnapshot>;
   entry_logs: EntryLog[];
   saved_at: string;
 }
@@ -32,6 +35,9 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     defectData: row.defect_data ?? {},
     repairData: row.repair_data ?? {},
     hourlyData: row.hourly_data ?? {},
+    defectDataShaft: row.defect_data_shaft ?? {},
+    repairDataShaft: row.repair_data_shaft ?? {},
+    hourlyDataShaft: row.hourly_data_shaft ?? {},
     entryLogs: row.entry_logs ?? [],
     savedAt: row.saved_at,
   };

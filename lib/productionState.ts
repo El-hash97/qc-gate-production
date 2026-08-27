@@ -1,5 +1,5 @@
 import { sql } from './db';
-import type { EntryLog, ProductionState } from './types';
+import type { EntryLog, HourlySnapshot, ProductionState } from './types';
 
 interface ProductionStateRow {
   date: string;
@@ -20,7 +20,10 @@ interface ProductionStateRow {
   ng4?: number;
   defect_data: Record<string, number>;
   repair_data: Record<string, number>;
-  hourly_data: Record<string, { ok: number; repair: number; ng: number }>;
+  hourly_data: Record<string, HourlySnapshot>;
+  defect_data_shaft?: Record<string, number>;
+  repair_data_shaft?: Record<string, number>;
+  hourly_data_shaft?: Record<string, HourlySnapshot>;
   entry_logs: EntryLog[];
   saved_at: string;
 }
@@ -46,6 +49,9 @@ function rowToState(row: ProductionStateRow): ProductionState {
     defectData: row.defect_data ?? {},
     repairData: row.repair_data ?? {},
     hourlyData: row.hourly_data ?? {},
+    defectDataShaft: row.defect_data_shaft ?? {},
+    repairDataShaft: row.repair_data_shaft ?? {},
+    hourlyDataShaft: row.hourly_data_shaft ?? {},
     entryLogs: row.entry_logs ?? [],
     savedAt: row.saved_at,
   };
@@ -91,6 +97,9 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       defect_data = ${JSON.stringify(state.defectData ?? {})}::jsonb,
       repair_data = ${JSON.stringify(state.repairData ?? {})}::jsonb,
       hourly_data = ${JSON.stringify(state.hourlyData ?? {})}::jsonb,
+      defect_data_shaft = ${JSON.stringify(state.defectDataShaft ?? {})}::jsonb,
+      repair_data_shaft = ${JSON.stringify(state.repairDataShaft ?? {})}::jsonb,
+      hourly_data_shaft = ${JSON.stringify(state.hourlyDataShaft ?? {})}::jsonb,
       entry_logs = ${JSON.stringify(state.entryLogs ?? [])}::jsonb,
       saved_at = now()
     WHERE id = 1

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { ProductionState } from '@/lib/types';
+import { mergeCounts, mergeHourly } from '@/utils/rates';
 
 export function buildShiftWorkbook(state: ProductionState) {
   const prodData = [
@@ -15,14 +16,20 @@ export function buildShiftWorkbook(state: ProductionState) {
     },
   ];
 
-  const defectDetail = Object.entries(state.defectData).sort((a, b) => b[1] - a[1])
+  // Sheets combine Block Cylinder and Camshaft/Crankshaft so a single export
+  // still covers the whole shift, mirroring the "TOTAL" production row above.
+  const defectData = mergeCounts(state.defectData, state.defectDataShaft);
+  const repairData = mergeCounts(state.repairData, state.repairDataShaft);
+  const hourlyData = mergeHourly(state.hourlyData, state.hourlyDataShaft);
+
+  const defectDetail = Object.entries(defectData).sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ 'Jenis Defect': name, Jumlah: count }));
 
-  const repairDetail = Object.entries(state.repairData).sort((a, b) => b[1] - a[1])
+  const repairDetail = Object.entries(repairData).sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ 'Jenis Repair': name, Jumlah: count }));
 
-  const hourlyDetail = Object.keys(state.hourlyData).sort()
-    .map((key) => ({ Jam: key, OK: state.hourlyData[key].ok, Repair: state.hourlyData[key].repair, NG: state.hourlyData[key].ng }));
+  const hourlyDetail = Object.keys(hourlyData).sort()
+    .map((key) => ({ Jam: key, OK: hourlyData[key].ok, Repair: hourlyData[key].repair, NG: hourlyData[key].ng }));
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(prodData), 'Production');

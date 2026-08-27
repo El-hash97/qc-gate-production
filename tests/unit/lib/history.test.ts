@@ -22,7 +22,9 @@ describe('getHistory', () => {
       id: 7, date: '2026-08-04', shift: 'Shift Red', operator: 'Budi', target: 100,
       ok1: 50, repair1: 2, ng1: 1, ok2: 40, repair2: 1, ng2: 0,
       ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
-      defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [],
+      defectData: {}, repairData: {}, hourlyData: {},
+      defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+      entryLogs: [],
       savedAt: '2026-08-04T19:00:00.000Z',
     }]);
     const [, ...values] = mockSql.mock.calls[0];

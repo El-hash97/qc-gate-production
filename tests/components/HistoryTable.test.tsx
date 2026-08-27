@@ -7,7 +7,7 @@ import type { HistoryRecord } from '@/lib/types';
 const record: HistoryRecord = {
   id: 1, date: '2026-08-04', shift: 'Shift Red', operator: 'Budi', target: 100,
   ok1: 50, repair1: 2, ng1: 1, ok2: 40, repair2: 1, ng2: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '',
+  defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [], savedAt: '',
 };
 
 describe('HistoryTable', () => {

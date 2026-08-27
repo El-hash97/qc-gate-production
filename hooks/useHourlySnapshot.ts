@@ -2,28 +2,38 @@
 
 import { useEffect, useRef } from 'react';
 import { getOkTotal, getRepairTotal, getNgTotal, getGrandTotal } from '@/utils/rates';
-import type { ProductionState } from '@/lib/types';
+import type { HourlySnapshot, ProductionState } from '@/lib/types';
 
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
-function buildSnapshot(state: ProductionState) {
+function hourKey(): string {
   const now = new Date();
-  const key = `${String(now.getHours()).padStart(2, '0')}:00`;
+  return `${String(now.getHours()).padStart(2, '0')}:00`;
+}
+
+function groupSnapshot(state: ProductionState, group: 'bc' | 'shaft'): HourlySnapshot {
   return {
-    key,
-    values: { ok: getOkTotal(state), repair: getRepairTotal(state), ng: getNgTotal(state) },
+    ok: getOkTotal(state, group),
+    repair: getRepairTotal(state, group),
+    ng: getNgTotal(state, group),
   };
+}
+
+function sameSnapshot(a: HourlySnapshot | undefined, b: HourlySnapshot): boolean {
+  return a !== undefined && a.ok === b.ok && a.repair === b.repair && a.ng === b.ng;
 }
 
 /**
  * Records hourly OK/Repair/NG snapshots keyed by the current hour (e.g.
- * "14:00"). A snapshot is written immediately on every state change and then
- * refreshed on a 5-minute interval, so the Hourly Production table always has
- * data for the active hour as soon as counters are incremented. Skipped while
- * totals are still 0 so idle hours don't pollute the table. Uses refs (not
- * effect dependencies) so the interval is set up exactly once and always
- * reads the freshest state/updateState, avoiding a stale-closure bug where a
- * snapshot would revert unrelated fields to whatever they were at mount.
+ * "14:00"), split per product group: Block Cylinder totals land in
+ * `hourlyData`, Camshaft/Crankshaft totals in `hourlyDataShaft`. A snapshot
+ * is written immediately on every state change and then refreshed on a
+ * 5-minute interval, so the Hourly Production table always has data for the
+ * active hour as soon as counters are incremented. Skipped while all totals
+ * are still 0 so idle hours don't pollute the table. Uses refs (not effect
+ * dependencies) so the interval is set up exactly once and always reads the
+ * freshest state/updateState, avoiding a stale-closure bug where a snapshot
+ * would revert unrelated fields to whatever they were at mount.
  */
 export function useHourlySnapshot(
   current: ProductionState,
@@ -31,32 +41,39 @@ export function useHourlySnapshot(
 ): void {
   const currentRef = useRef(current);
   const updateStateRef = useRef(updateState);
-  const lastRecordedRef = useRef<Record<string, { ok: number; repair: number; ng: number }>>({});
+  const lastBcRef = useRef<Record<string, HourlySnapshot>>({});
+  const lastShaftRef = useRef<Record<string, HourlySnapshot>>({});
 
   useEffect(() => { currentRef.current = current; }, [current]);
   useEffect(() => { updateStateRef.current = updateState; }, [updateState]);
 
-  useEffect(() => {
-    function recordFromRef() {
-      const snapshot = currentRef.current;
-      if (getGrandTotal(snapshot) === 0) return;
-      const { key, values } = buildSnapshot(snapshot);
-      const last = lastRecordedRef.current[key];
-      if (last && last.ok === values.ok && last.repair === values.repair && last.ng === values.ng) return;
-      lastRecordedRef.current = { ...lastRecordedRef.current, [key]: values };
-      updateStateRef.current({ ...snapshot, hourlyData: { ...snapshot.hourlyData, [key]: values } });
-    }
+  function record(state: ProductionState, update: (next: ProductionState) => void) {
+    if (getGrandTotal(state) === 0) return;
+    const key = hourKey();
+    const bc = groupSnapshot(state, 'bc');
+    const shaft = groupSnapshot(state, 'shaft');
+    const bcChanged = !sameSnapshot(lastBcRef.current[key], bc);
+    const shaftChanged = !sameSnapshot(lastShaftRef.current[key], shaft);
+    if (!bcChanged && !shaftChanged) return;
 
-    const interval = setInterval(recordFromRef, SNAPSHOT_INTERVAL_MS);
+    lastBcRef.current = { ...lastBcRef.current, [key]: bc };
+    lastShaftRef.current = { ...lastShaftRef.current, [key]: shaft };
+    update({
+      ...state,
+      hourlyData: { ...state.hourlyData, [key]: bc },
+      hourlyDataShaft: { ...(state.hourlyDataShaft ?? {}), [key]: shaft },
+    });
+  }
+
+  useEffect(() => {
+    const interval = setInterval(
+      () => record(currentRef.current, updateStateRef.current),
+      SNAPSHOT_INTERVAL_MS,
+    );
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (getGrandTotal(current) === 0) return;
-    const { key, values } = buildSnapshot(current);
-    const last = lastRecordedRef.current[key];
-    if (last && last.ok === values.ok && last.repair === values.repair && last.ng === values.ng) return;
-    lastRecordedRef.current = { ...lastRecordedRef.current, [key]: values };
-    updateState({ ...current, hourlyData: { ...current.hourlyData, [key]: values } });
+    record(current, updateState);
   }, [current]);
 }

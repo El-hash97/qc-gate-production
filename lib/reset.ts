@@ -36,7 +36,9 @@ export async function resetProductionState(): Promise<ProductionState> {
         INSERT INTO history
           (date, shift, operator, target, ok1, repair1, ng1, ok2, repair2, ng2,
            ok3, repair3, ng3, ok4, repair4, ng4,
-           defect_data, repair_data, hourly_data, entry_logs, saved_at)
+           defect_data, repair_data, hourly_data,
+           defect_data_shaft, repair_data_shaft, hourly_data_shaft,
+           entry_logs, saved_at)
         VALUES (
           ${current.date}, ${current.shift}, ${current.operator}, ${current.target},
           ${current.ok1}, ${current.repair1}, ${current.ng1},
@@ -46,6 +48,9 @@ export async function resetProductionState(): Promise<ProductionState> {
           ${JSON.stringify(current.defectData)}::jsonb,
           ${JSON.stringify(current.repairData)}::jsonb,
           ${JSON.stringify(current.hourlyData)}::jsonb,
+          ${JSON.stringify(current.defectDataShaft ?? {})}::jsonb,
+          ${JSON.stringify(current.repairDataShaft ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyDataShaft ?? {})}::jsonb,
           ${JSON.stringify(current.entryLogs)}::jsonb,
           now()
         )
@@ -56,6 +61,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           ok1 = 0, repair1 = 0, ng1 = 0, ok2 = 0, repair2 = 0, ng2 = 0,
           ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
           defect_data = '{}'::jsonb, repair_data = '{}'::jsonb, hourly_data = '{}'::jsonb,
+          defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
           entry_logs = '[]'::jsonb,
           saved_at = now()
         WHERE id = 1
@@ -68,6 +74,7 @@ export async function resetProductionState(): Promise<ProductionState> {
         ok1 = 0, repair1 = 0, ng1 = 0, ok2 = 0, repair2 = 0, ng2 = 0,
         ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
         defect_data = '{}'::jsonb, repair_data = '{}'::jsonb, hourly_data = '{}'::jsonb,
+        defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
         entry_logs = '[]'::jsonb,
         saved_at = now()
       WHERE id = 1

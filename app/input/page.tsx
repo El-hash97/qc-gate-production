@@ -16,14 +16,16 @@ import { todayString } from '@/utils/date';
 import {
   SHIFTS, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
-import type { ProductionState } from '@/lib/types';
+import type { ProductGroup, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [], savedAt: '',
+  defectData: {}, repairData: {}, hourlyData: {},
+  defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+  entryLogs: [], savedAt: '',
 };
 
 type CounterField = 'ok1' | 'repair1' | 'ng1' | 'ok2' | 'repair2' | 'ng2'
@@ -38,6 +40,15 @@ function defectTypesFor(target: DefectTarget | null): readonly string[] {
 }
 function repairTypesFor(target: RepairTarget | null): readonly string[] {
   return target === 'repair3' || target === 'repair4' ? SHAFT_REPAIR_TYPES : REPAIR_TYPES;
+}
+
+// Lines 1-2 are Block Cylinder; lines 3-4 are Camshaft/Crankshaft. Defect and
+// repair tallies (and the Lot/Flask log) are stored per group so the
+// dashboard toggle can scope them.
+function groupForTarget(target: DefectTarget | RepairTarget): ProductGroup {
+  return target === 'ng3' || target === 'ng4' || target === 'repair3' || target === 'repair4'
+    ? 'shaft'
+    : 'bc';
 }
 
 export default function InputPage() {
@@ -81,10 +92,13 @@ export default function InputPage() {
 
   function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string) {
     if (!defectTarget) return;
+    const group = groupForTarget(defectTarget);
+    const dataKey = group === 'shaft' ? 'defectDataShaft' : 'defectData';
+    const currentData = current[dataKey] ?? {};
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
-      defectData: { ...current.defectData, [defectType]: (current.defectData[defectType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'defect', type: defectType, qty, lot, flask }],
+      [dataKey]: { ...currentData, [defectType]: (currentData[defectType] ?? 0) + qty },
+      entryLogs: [...current.entryLogs, { kind: 'defect', group, type: defectType, qty, lot, flask }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${defectType} ditambahkan`, 'error');
     setDefectTarget(null);
@@ -92,10 +106,13 @@ export default function InputPage() {
 
   function handleSaveRepair(repairType: string, qty: number, lot: string, flask: string) {
     if (!repairTarget) return;
+    const group = groupForTarget(repairTarget);
+    const dataKey = group === 'shaft' ? 'repairDataShaft' : 'repairData';
+    const currentData = current[dataKey] ?? {};
     commit({
       [repairTarget]: (current[repairTarget] ?? 0) + qty,
-      repairData: { ...current.repairData, [repairType]: (current.repairData[repairType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'repair', type: repairType, qty, lot, flask }],
+      [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
+      entryLogs: [...current.entryLogs, { kind: 'repair', group, type: repairType, qty, lot, flask }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');
     setRepairTarget(null);

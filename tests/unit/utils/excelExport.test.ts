@@ -6,7 +6,7 @@ import type { ProductionState } from '@/lib/types';
 const state: ProductionState = {
   date: '5 Agustus 2026', shift: 'Shift Red', operator: 'Budi', target: 100,
   ok1: 10, repair1: 1, ng1: 0, ok2: 5, repair2: 0, ng2: 1,
-  defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: { '07:00': { ok: 15, repair: 1, ng: 1 } },
+  defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: { '07:00': { ok: 15, repair: 1, ng: 1 } }, entryLogs: [],
   savedAt: '',
 };
 

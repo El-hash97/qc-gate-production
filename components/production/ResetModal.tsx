@@ -23,8 +23,13 @@ export function ResetModal({ isOpen, onClose }: ResetModalProps) {
         setPassword('');
         onClose();
       },
-      onError: () => {
-        showToast('Password salah!', 'error');
+      onError: (err) => {
+        // Surface the server's reason (e.g. RESET_PASSWORD not configured on
+        // the server) instead of always blaming the password.
+        const message = err instanceof Error && err.message && err.message !== 'Reset failed'
+          ? err.message
+          : 'Password salah!';
+        showToast(message, 'error');
       },
     });
   }

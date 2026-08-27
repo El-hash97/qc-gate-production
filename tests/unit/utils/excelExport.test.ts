@@ -6,7 +6,7 @@ import type { ProductionState } from '@/lib/types';
 const state: ProductionState = {
   date: '5 Agustus 2026', shift: 'Shift Red', operator: 'Budi', target: 100,
   ok1: 10, repair1: 1, ng1: 0, ok2: 5, repair2: 0, ng2: 1,
-  defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: { '07:00': { ok: 15, repair: 1, ng: 1 } },
+  defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: { '07:00': { ok: 15, repair: 1, ng: 1 } }, entryLogs: [],
   savedAt: '',
 };
 
@@ -15,8 +15,8 @@ describe('buildShiftWorkbook', () => {
     const workbook = buildShiftWorkbook(state);
     expect(workbook.SheetNames).toContain('Production');
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Production']) as any[];
-    expect(rows).toHaveLength(3);
-    expect(rows[2]).toMatchObject({ Produk: 'TOTAL', OK: 15, Repair: 1, NG: 1 });
+    expect(rows).toHaveLength(5);
+    expect(rows[4]).toMatchObject({ Produk: 'TOTAL', OK: 15, Repair: 1, NG: 1 });
   });
 
   it('only includes a Defect sheet when there is defect data', () => {

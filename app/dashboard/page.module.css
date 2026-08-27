@@ -16,6 +16,46 @@
 .statusOnline { color: var(--accent-green); }
 .statusOffline { color: var(--accent-red); }
 
+.viewToggle {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 99px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.viewButton,
+.viewButtonActive {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 99px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.viewButton:hover { color: var(--text-primary); }
+
+.viewButtonActive {
+  background: var(--accent-green-soft);
+  color: var(--accent-green);
+}
+
+@media (max-width: 640px) {
+  .viewToggle { width: 100%; }
+  .viewButton,
+  .viewButtonActive { flex: 1; padding: 6px 10px; }
+}
+
 .progressStrip {
   grid-column: 1 / -1;
   display: flex;

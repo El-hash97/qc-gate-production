@@ -1,30 +1,62 @@
 'use client';
 
+import { useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
 import { HourlyTable } from '@/components/production/HourlyTable';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
-import { getOkTotal, getRepairTotal, getNgTotal, getRates, getAchievementPercent, getProgressPercent } from '@/utils/rates';
-import type { ProductionState } from '@/lib/types';
+import { EntryLogList } from '@/components/production/EntryLogList';
+import {
+  getOkTotal, getRepairTotal, getNgTotal, getRates,
+  getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
+} from '@/utils/rates';
+import type { ProductGroup, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '',
+  ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
+  defectData: {}, repairData: {}, hourlyData: {},
+  defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+  entryLogs: [], savedAt: '',
 };
+
+type DashboardView = 'all' | ProductGroup;
+
+const VIEW_OPTIONS: { value: DashboardView; label: string }[] = [
+  { value: 'all', label: 'Semua' },
+  { value: 'bc', label: 'B/C' },
+  { value: 'shaft', label: 'Camshaft / Crankshaft' },
+];
 
 export default function DashboardPage() {
   const { state, isFetching, isError } = useProductionState();
   const current = state ?? EMPTY_STATE;
 
-  const ok = getOkTotal(current);
-  const repair = getRepairTotal(current);
-  const ng = getNgTotal(current);
-  const rates = getRates(current);
-  const achievement = getAchievementPercent(current, current.target);
-  const progress = getProgressPercent(current, current.target);
+  const [view, setView] = useState<DashboardView>('all');
+  const group = view === 'all' ? undefined : view;
+
+  const ok = getOkTotal(current, group);
+  const repair = getRepairTotal(current, group);
+  const ng = getNgTotal(current, group);
+  const rates = getRates(current, group);
+  const achievement = getAchievementPercent(current, current.target, group);
+  const progress = getProgressPercent(current, current.target, group);
+
+  const defectData = view === 'bc' ? current.defectData
+    : view === 'shaft' ? (current.defectDataShaft ?? {})
+    : mergeCounts(current.defectData, current.defectDataShaft);
+  const repairData = view === 'bc' ? current.repairData
+    : view === 'shaft' ? (current.repairDataShaft ?? {})
+    : mergeCounts(current.repairData, current.repairDataShaft);
+  const hourlyData = view === 'bc' ? current.hourlyData
+    : view === 'shaft' ? (current.hourlyDataShaft ?? {})
+    : mergeHourly(current.hourlyData, current.hourlyDataShaft);
+  const entryLogs = view === 'all'
+    ? current.entryLogs
+    : current.entryLogs.filter((log) => (log.group ?? 'bc') === view);
 
   return (
     <main className={styles.page}>
@@ -33,6 +65,20 @@ export default function DashboardPage() {
         <span className={isError ? styles.statusOffline : styles.statusOnline}>
           {isError ? 'Disconnected' : isFetching ? 'Syncing…' : 'Real-time Connected'}
         </span>
+      </div>
+
+      <div className={styles.viewToggle} role="group" aria-label="Filter produk">
+        {VIEW_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={view === option.value ? styles.viewButtonActive : styles.viewButton}
+            aria-pressed={view === option.value}
+            onClick={() => setView(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
 
       <div className={styles.progressStrip}>
@@ -56,21 +102,22 @@ export default function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           <div className={styles.chartTitle}>Pareto Defect (NG)</div>
-          <div className={styles.chartWrapper}><ParetoChart data={current.defectData} color="#dc2626" /></div>
+          <div className={styles.chartWrapper}><ParetoChart data={defectData} color="#dc2626" /></div>
         </div>
         <div className={styles.chartCard}>
           <div className={styles.chartTitle}>Pareto Repair</div>
-          <div className={styles.chartWrapper}><ParetoChart data={current.repairData} color="#f59e0b" /></div>
+          <div className={styles.chartWrapper}><ParetoChart data={repairData} color="#f59e0b" /></div>
         </div>
       </div>
 
       <aside className={styles.sidebar}>
         <div>
           <div className={styles.sidebarTitle}>Hourly Production</div>
-          <HourlyTable hourlyData={current.hourlyData} />
+          <HourlyTable hourlyData={hourlyData} />
         </div>
-        <DefectRepairSummary title="Defect Details" data={current.defectData} />
-        <DefectRepairSummary title="Repair Details" data={current.repairData} />
+        <DefectRepairSummary title="Defect Details" data={defectData} />
+        <DefectRepairSummary title="Repair Details" data={repairData} />
+        <EntryLogList title="Lot / Flask Log" logs={entryLogs} />
       </aside>
     </main>
   );

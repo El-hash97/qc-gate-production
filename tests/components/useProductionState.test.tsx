@@ -8,7 +8,7 @@ import type { ProductionState } from '@/lib/types';
 const baseState: ProductionState = {
   date: '2026-08-05', shift: 'Shift Red', operator: 'Budi', target: 100,
   ok1: 1, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '2026-08-05T07:00:00.000Z',
+  defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [], savedAt: '2026-08-05T07:00:00.000Z',
 };
 
 function wrapper({ children }: { children: ReactNode }) {

@@ -6,7 +6,10 @@ import type { ProductionState } from '@/lib/types';
 const baseState: ProductionState = {
   date: '2026-08-05', shift: 'Shift Red', operator: 'Budi', target: 100,
   ok1: 5, repair1: 1, ng1: 0, ok2: 3, repair2: 0, ng2: 1,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '',
+  ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
+  defectData: {}, repairData: {}, hourlyData: {},
+  defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+  entryLogs: [], savedAt: '',
 };
 
 describe('useHourlySnapshot', () => {
@@ -52,8 +55,9 @@ describe('useHourlySnapshot', () => {
 
     vi.advanceTimersByTime(5 * 60 * 1000);
 
-    expect(updateState).toHaveBeenCalledTimes(1);
-    const [arg] = updateState.mock.calls[0];
-    expect(arg.hourlyData['14:00'].ok).toBe(102);
+    // A snapshot is written on mount and again when state changes; the last
+    // one must reflect the freshest counters (99 + 3), not the mount value.
+    const lastCall = updateState.mock.calls[updateState.mock.calls.length - 1];
+    expect(lastCall[0].hourlyData['14:00'].ok).toBe(102);
   });
 });

@@ -31,9 +31,9 @@ export function HistoryTable({ records, expandedId, onToggle, renderDetail, onEx
               <td>{record.shift}</td>
               <td>{record.operator}</td>
               <td>{record.target}</td>
-              <td>{record.ok1 + record.ok2}</td>
-              <td>{record.repair1 + record.repair2}</td>
-              <td>{record.ng1 + record.ng2}</td>
+              <td>{record.ok1 + record.ok2 + (record.ok3 ?? 0) + (record.ok4 ?? 0)}</td>
+              <td>{record.repair1 + record.repair2 + (record.repair3 ?? 0) + (record.repair4 ?? 0)}</td>
+              <td>{record.ng1 + record.ng2 + (record.ng3 ?? 0) + (record.ng4 ?? 0)}</td>
               <td>
                 <button
                   type="button"

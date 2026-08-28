@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS production_state (
   defect_data_shaft JSONB NOT NULL DEFAULT '{}',
   repair_data_shaft JSONB NOT NULL DEFAULT '{}',
   hourly_data_shaft JSONB NOT NULL DEFAULT '{}',
+  hourly_data_cam   JSONB NOT NULL DEFAULT '{}',
+  hourly_data_crank JSONB NOT NULL DEFAULT '{}',
   entry_logs        JSONB NOT NULL DEFAULT '[]',
   saved_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -50,6 +52,8 @@ CREATE TABLE IF NOT EXISTS history (
   defect_data_shaft JSONB NOT NULL DEFAULT '{}',
   repair_data_shaft JSONB NOT NULL DEFAULT '{}',
   hourly_data_shaft JSONB NOT NULL DEFAULT '{}',
+  hourly_data_cam   JSONB NOT NULL DEFAULT '{}',
+  hourly_data_crank JSONB NOT NULL DEFAULT '{}',
   entry_logs        JSONB NOT NULL DEFAULT '[]',
   saved_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -79,6 +83,14 @@ ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_data_shaft JSONB NO
 ALTER TABLE history ADD COLUMN IF NOT EXISTS defect_data_shaft JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS repair_data_shaft JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_shaft JSONB NOT NULL DEFAULT '{}';
+
+-- Per-line hourly snapshots for Camshaft (line 3) and Crankshaft (line 4).
+-- hourly_data_shaft is still written as their sum for the merged "Semua"
+-- view and Excel export.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_data_cam JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_data_crank JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_cam JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_crank JSONB NOT NULL DEFAULT '{}';
 
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())

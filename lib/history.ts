@@ -17,6 +17,8 @@ interface HistoryRow {
   defect_data_shaft?: Record<string, number>;
   repair_data_shaft?: Record<string, number>;
   hourly_data_shaft?: Record<string, HourlySnapshot>;
+  hourly_data_cam?: Record<string, HourlySnapshot>;
+  hourly_data_crank?: Record<string, HourlySnapshot>;
   entry_logs: EntryLog[];
   saved_at: string;
 }
@@ -38,6 +40,8 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     defectDataShaft: row.defect_data_shaft ?? {},
     repairDataShaft: row.repair_data_shaft ?? {},
     hourlyDataShaft: row.hourly_data_shaft ?? {},
+    hourlyDataCam: row.hourly_data_cam ?? {},
+    hourlyDataCrank: row.hourly_data_crank ?? {},
     entryLogs: row.entry_logs ?? [],
     savedAt: row.saved_at,
   };

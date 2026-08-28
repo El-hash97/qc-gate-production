@@ -33,6 +33,19 @@ describe('useHourlySnapshot', () => {
     expect(arg.hourlyData).toEqual({ '14:00': { ok: 8, repair: 1, ng: 1 } });
   });
 
+  it('records Camshaft (line 3) and Crankshaft (line 4) hourly separately', () => {
+    const updateState = vi.fn();
+    const shaft = { ...baseState, ok3: 4, ng3: 1, ok4: 2, repair4: 1 };
+    renderHook(() => useHourlySnapshot(shaft, updateState));
+
+    vi.advanceTimersByTime(5 * 60 * 1000);
+
+    const [arg] = updateState.mock.calls[0];
+    expect(arg.hourlyDataCam).toEqual({ '14:00': { ok: 4, repair: 0, ng: 1 } });
+    expect(arg.hourlyDataCrank).toEqual({ '14:00': { ok: 2, repair: 1, ng: 0 } });
+    expect(arg.hourlyDataShaft).toEqual({ '14:00': { ok: 6, repair: 1, ng: 1 } });
+  });
+
   it('does not record a snapshot while totals are still 0', () => {
     const updateState = vi.fn();
     const empty = { ...baseState, ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0 };

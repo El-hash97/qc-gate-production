@@ -9,7 +9,8 @@ vi.mock('@/hooks/useProductionState', () => ({
       ok1: 40, repair1: 2, ng1: 1, ok2: 30, repair2: 1, ng2: 0,
       ok3: 8, repair3: 1, ng3: 1, ok4: 0, repair4: 0, ng4: 0,
       defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {},
-      defectDataShaft: { Dross: 3 }, repairDataShaft: {}, hourlyDataShaft: {},
+      defectDataShaft: { Dross: 3 }, repairDataShaft: {}, hourlyDataShaft: { '09:00': { ok: 8, repair: 1, ng: 1 } },
+      hourlyDataCam: { '09:00': { ok: 8, repair: 1, ng: 1 } }, hourlyDataCrank: {},
       entryLogs: [
         { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: 'F1' },
         { kind: 'defect', group: 'shaft', line: 3, type: 'Dross', qty: 3, lot: 'L2', flask: 'F2' },
@@ -64,5 +65,12 @@ describe('DashboardPage', () => {
     // the line-3 Dross entry must not show under Crankshaft (line 4)
     expect(screen.queryByText('Dross')).not.toBeInTheDocument();
     expect(screen.getByText('Achievement: 0%')).toBeInTheDocument();
+  });
+
+  it('shows per-line hourly on the Camshaft tab', async () => {
+    render(<DashboardPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
+    expect(screen.getByText('Hourly Production')).toBeInTheDocument();
+    expect(screen.getByText('09:00')).toBeInTheDocument();
   });
 });

@@ -68,6 +68,10 @@ export interface ProductionState {
   defectDataShaft?: Record<string, number>;
   repairDataShaft?: Record<string, number>;
   hourlyDataShaft?: Record<string, HourlySnapshot>;
+  // Per-line hourly for Camshaft (line 3) / Crankshaft (line 4). hourlyDataShaft
+  // stays as their sum for the merged view; every read site defaults to {}.
+  hourlyDataCam?: Record<string, HourlySnapshot>;
+  hourlyDataCrank?: Record<string, HourlySnapshot>;
   entryLogs: EntryLog[];
   savedAt: string;
 }

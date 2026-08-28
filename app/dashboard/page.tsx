@@ -75,12 +75,12 @@ export default function DashboardPage() {
       : isShaftLine ? bucketByLine(current.entryLogs, LINE_FOR[view], 'repair')
       : mergeCounts(current.repairData, current.repairDataShaft)
   ), [view, isShaftLine, current.repairData, current.repairDataShaft, current.entryLogs]);
-  // No per-line hourly is stored, so the hourly panel is hidden for a single
-  // shaft line (see JSX); 'all' and 'bc' still get a real breakdown here.
-  const hourlyData = useMemo(() => (
-    view === 'bc' ? current.hourlyData
-      : mergeHourly(current.hourlyData, current.hourlyDataShaft)
-  ), [view, current.hourlyData, current.hourlyDataShaft]);
+  const hourlyData = useMemo(() => {
+    if (view === 'bc') return current.hourlyData;
+    if (view === 'camshaft') return current.hourlyDataCam ?? {};
+    if (view === 'crankshaft') return current.hourlyDataCrank ?? {};
+    return mergeHourly(current.hourlyData, current.hourlyDataShaft);
+  }, [view, current.hourlyData, current.hourlyDataShaft, current.hourlyDataCam, current.hourlyDataCrank]);
   const entryLogs = useMemo(() => {
     if (view === 'all') return current.entryLogs;
     if (view === 'bc') return current.entryLogs.filter((log) => (log.group ?? 'bc') === 'bc');
@@ -140,14 +140,12 @@ export default function DashboardPage() {
       </div>
 
       <aside className={styles.sidebar}>
-        {!isShaftLine && (
-          <div>
-            <div className={styles.sidebarTitle}>Hourly Production</div>
-            <div className={styles.scrollBox}>
-              <HourlyTable hourlyData={hourlyData} />
-            </div>
+        <div>
+          <div className={styles.sidebarTitle}>Hourly Production</div>
+          <div className={styles.scrollBox}>
+            <HourlyTable hourlyData={hourlyData} />
           </div>
-        )}
+        </div>
         <DefectRepairSummary title="Defect Details" data={defectData} />
         <DefectRepairSummary title="Repair Details" data={repairData} />
         <div className={styles.scrollBox}>

@@ -24,6 +24,7 @@ describe('getHistory', () => {
       ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
       defectData: {}, repairData: {}, hourlyData: {},
       defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+      hourlyDataCam: {}, hourlyDataCrank: {},
       entryLogs: [],
       savedAt: '2026-08-04T19:00:00.000Z',
     }]);

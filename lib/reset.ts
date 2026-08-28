@@ -52,6 +52,7 @@ export async function resetProductionState(): Promise<ProductionState> {
            ok3, repair3, ng3, ok4, repair4, ng4,
            defect_data, repair_data, hourly_data,
            defect_data_shaft, repair_data_shaft, hourly_data_shaft,
+           hourly_data_cam, hourly_data_crank,
            entry_logs, saved_at)
         VALUES (
           ${current.date}, ${current.shift}, ${current.operator}, ${current.target},
@@ -65,6 +66,8 @@ export async function resetProductionState(): Promise<ProductionState> {
           ${JSON.stringify(current.defectDataShaft ?? {})}::jsonb,
           ${JSON.stringify(current.repairDataShaft ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyDataShaft ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyDataCam ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyDataCrank ?? {})}::jsonb,
           ${JSON.stringify(current.entryLogs)}::jsonb,
           now()
         )
@@ -89,6 +92,7 @@ export async function resetProductionState(): Promise<ProductionState> {
         ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
         defect_data = '{}'::jsonb, repair_data = '{}'::jsonb, hourly_data = '{}'::jsonb,
         defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
+        hourly_data_cam = '{}'::jsonb, hourly_data_crank = '{}'::jsonb,
         entry_logs = '[]'::jsonb,
         saved_at = now()
       WHERE id = 1

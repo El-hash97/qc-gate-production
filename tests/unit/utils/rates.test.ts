@@ -87,6 +87,12 @@ describe('rates utilities — product group scoping', () => {
     expect(getGrandTotal(mixed)).toBe(30);
   });
 
+  it('scopes to a single line by number (3 = Camshaft, 4 = Crankshaft)', () => {
+    expect(getGrandTotal(mixed, 3)).toBe(5); // 4 + 1 + 0
+    expect(getGrandTotal(mixed, 4)).toBe(5); // 2 + 0 + 3
+    expect(getNgTotal(mixed, 4)).toBe(3);
+  });
+
   it('scopes rates and achievement to the group', () => {
     expect(getRates(mixed, 'bc')).toEqual({ okRate: 75, repairRate: 15, ngRate: 10 });
     expect(getAchievementPercent(mixed, 40, 'bc')).toBe(50);

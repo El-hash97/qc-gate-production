@@ -11,8 +11,8 @@ vi.mock('@/hooks/useProductionState', () => ({
       defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {},
       defectDataShaft: { Dross: 3 }, repairDataShaft: {}, hourlyDataShaft: {},
       entryLogs: [
-        { kind: 'defect', group: 'bc', type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: 'F1' },
-        { kind: 'defect', group: 'shaft', type: 'Dross', qty: 3, lot: 'L2', flask: 'F2' },
+        { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: 'F1' },
+        { kind: 'defect', group: 'shaft', line: 3, type: 'Dross', qty: 3, lot: 'L2', flask: 'F2' },
       ],
       savedAt: '',
     },
@@ -50,11 +50,19 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Dross')).not.toBeInTheDocument();
   });
 
-  it('scopes the numbers to Camshaft/Crankshaft when that tab is selected', async () => {
+  it('scopes the numbers to Camshaft (line 3) on its own tab', async () => {
     render(<DashboardPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Camshaft / Crankshaft' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.getByText('Achievement: 10%')).toBeInTheDocument();
     expect(screen.getByText('Dross')).toBeInTheDocument();
     expect(screen.queryByText('Gas Hole Cope')).not.toBeInTheDocument();
+  });
+
+  it('keeps Camshaft and Crankshaft separate', async () => {
+    render(<DashboardPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Crankshaft' }));
+    // the line-3 Dross entry must not show under Crankshaft (line 4)
+    expect(screen.queryByText('Dross')).not.toBeInTheDocument();
+    expect(screen.getByText('Achievement: 0%')).toBeInTheDocument();
   });
 });

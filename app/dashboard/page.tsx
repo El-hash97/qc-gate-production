@@ -11,7 +11,7 @@ import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
-import type { ProductGroup, ProductionState } from '@/lib/types';
+import type { EntryLog, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
@@ -23,51 +23,69 @@ const EMPTY_STATE: ProductionState = {
   entryLogs: [], savedAt: '',
 };
 
-type DashboardView = 'all' | ProductGroup;
+type DashboardView = 'all' | 'bc' | 'camshaft' | 'crankshaft';
 
 const VIEW_OPTIONS: { value: DashboardView; label: string }[] = [
   { value: 'all', label: 'Semua' },
   { value: 'bc', label: 'B/C' },
-  { value: 'shaft', label: 'Camshaft / Crankshaft' },
+  { value: 'camshaft', label: 'Camshaft' },
+  { value: 'crankshaft', label: 'Crankshaft' },
 ];
+
+// Camshaft = line 3, Crankshaft = line 4. Their defect/repair tallies share
+// one stored bucket (defectDataShaft), so per-product breakdowns are summed
+// from the line-tagged entry logs instead.
+const LINE_FOR: Record<'camshaft' | 'crankshaft', 3 | 4> = { camshaft: 3, crankshaft: 4 };
+
+function bucketByLine(logs: EntryLog[], line: 3 | 4, kind: 'defect' | 'repair'): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const log of logs) {
+    if (log.line === line && log.kind === kind) out[log.type] = (out[log.type] ?? 0) + log.qty;
+  }
+  return out;
+}
 
 export default function DashboardPage() {
   const { state, isFetching, isError } = useProductionState();
   const current = state ?? EMPTY_STATE;
 
   const [view, setView] = useState<DashboardView>('all');
-  const group = view === 'all' ? undefined : view;
+  const isShaftLine = view === 'camshaft' || view === 'crankshaft';
+  // Scope passed to the rate helpers: undefined = all, 'bc' = lines 1-2,
+  // 3/4 = a single shaft line.
+  const scope = view === 'all' ? undefined : view === 'bc' ? 'bc' : LINE_FOR[view];
 
-  const ok = getOkTotal(current, group);
-  const repair = getRepairTotal(current, group);
-  const ng = getNgTotal(current, group);
-  const rates = getRates(current, group);
-  const achievement = getAchievementPercent(current, current.target, group);
-  const progress = getProgressPercent(current, current.target, group);
+  const ok = getOkTotal(current, scope);
+  const repair = getRepairTotal(current, scope);
+  const ng = getNgTotal(current, scope);
+  const rates = getRates(current, scope);
+  const achievement = getAchievementPercent(current, current.target, scope);
+  const progress = getProgressPercent(current, current.target, scope);
 
   // Memoised so an unchanged background poll (react-query keeps the same
   // `current` reference via structural sharing) doesn't hand the charts a new
   // object every 3s and make them redraw.
   const defectData = useMemo(() => (
     view === 'bc' ? current.defectData
-      : view === 'shaft' ? (current.defectDataShaft ?? {})
+      : isShaftLine ? bucketByLine(current.entryLogs, LINE_FOR[view], 'defect')
       : mergeCounts(current.defectData, current.defectDataShaft)
-  ), [view, current.defectData, current.defectDataShaft]);
+  ), [view, isShaftLine, current.defectData, current.defectDataShaft, current.entryLogs]);
   const repairData = useMemo(() => (
     view === 'bc' ? current.repairData
-      : view === 'shaft' ? (current.repairDataShaft ?? {})
+      : isShaftLine ? bucketByLine(current.entryLogs, LINE_FOR[view], 'repair')
       : mergeCounts(current.repairData, current.repairDataShaft)
-  ), [view, current.repairData, current.repairDataShaft]);
+  ), [view, isShaftLine, current.repairData, current.repairDataShaft, current.entryLogs]);
+  // No per-line hourly is stored, so the hourly panel is hidden for a single
+  // shaft line (see JSX); 'all' and 'bc' still get a real breakdown here.
   const hourlyData = useMemo(() => (
     view === 'bc' ? current.hourlyData
-      : view === 'shaft' ? (current.hourlyDataShaft ?? {})
       : mergeHourly(current.hourlyData, current.hourlyDataShaft)
   ), [view, current.hourlyData, current.hourlyDataShaft]);
-  const entryLogs = useMemo(() => (
-    view === 'all'
-      ? current.entryLogs
-      : current.entryLogs.filter((log) => (log.group ?? 'bc') === view)
-  ), [view, current.entryLogs]);
+  const entryLogs = useMemo(() => {
+    if (view === 'all') return current.entryLogs;
+    if (view === 'bc') return current.entryLogs.filter((log) => (log.group ?? 'bc') === 'bc');
+    return current.entryLogs.filter((log) => log.line === LINE_FOR[view]);
+  }, [view, current.entryLogs]);
 
   return (
     <main className={styles.page}>
@@ -122,16 +140,18 @@ export default function DashboardPage() {
       </div>
 
       <aside className={styles.sidebar}>
-        <div>
-          <div className={styles.sidebarTitle}>Hourly Production</div>
-          <div className={styles.scrollBox}>
-            <HourlyTable hourlyData={hourlyData} />
+        {!isShaftLine && (
+          <div>
+            <div className={styles.sidebarTitle}>Hourly Production</div>
+            <div className={styles.scrollBox}>
+              <HourlyTable hourlyData={hourlyData} />
+            </div>
           </div>
-        </div>
+        )}
         <DefectRepairSummary title="Defect Details" data={defectData} />
         <DefectRepairSummary title="Repair Details" data={repairData} />
         <div className={styles.scrollBox}>
-          <EntryLogList title="Lot / Flask Log" logs={entryLogs} />
+          <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
         </div>
       </aside>
     </main>

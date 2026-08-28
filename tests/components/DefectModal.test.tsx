@@ -5,9 +5,36 @@ import { DefectModal } from '@/components/production/DefectModal';
 import { DEFECT_TYPES } from '@/utils/constants';
 
 describe('DefectModal', () => {
-  it('lists all 22 fixed defect types', () => {
+  it('lists all 22 fixed defect types plus Other', () => {
     render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />);
-    expect(screen.getAllByRole('option')).toHaveLength(22);
+    expect(screen.getAllByRole('option')).toHaveLength(23);
+    expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument();
+  });
+
+  it('saves a manually typed defect when Other is selected', async () => {
+    const onSave = vi.fn();
+    render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} />);
+    await userEvent.selectOptions(screen.getByRole('listbox'), 'Other');
+    await userEvent.type(screen.getByLabelText('Defect Lainnya'), 'Retak halus');
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith('Retak halus', 1, 'L1', 'F1');
+  });
+
+  it('does not save an empty Other value', async () => {
+    const onSave = vi.fn();
+    render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} />);
+    await userEvent.selectOptions(screen.getByRole('listbox'), 'Other');
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('relabels the flask field via the flaskLabel prop', () => {
+    render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} flaskLabel="Nomor Cavity" />);
+    expect(screen.getByLabelText('Nomor Cavity')).toBeInTheDocument();
   });
 
   it('calls onSave with the selected defect type, quantity, lot, and flask', async () => {

@@ -9,15 +9,20 @@ interface DefectModalProps {
   onClose: () => void;
   onSave: (defectType: string, qty: number, lot: string, flask: string) => void;
   types: readonly string[];
+  flaskLabel?: string;
 }
 
-export function DefectModal({ isOpen, onClose, onSave, types }: DefectModalProps) {
+const OTHER = 'Other';
+
+export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask' }: DefectModalProps) {
   const [defectType, setDefectType] = useState<string>(types[0]);
+  const [customType, setCustomType] = useState('');
   // Products have different defect lists — when the target product changes
   // (e.g. BC 1TR's list to Camshaft's), fall back to that list's first
   // option instead of keeping a selection that no longer exists in it.
+  // 'Other' is never in `types` but is a valid choice, so exempt it.
   useEffect(() => {
-    if (!types.includes(defectType)) setDefectType(types[0]);
+    if (defectType !== OTHER && !types.includes(defectType)) setDefectType(types[0]);
   }, [types]);
   // Held as a string (not a coerced number) so the field can actually go
   // empty while the user is clearing/retyping it — a live `parseInt(...) ||
@@ -29,11 +34,13 @@ export function DefectModal({ isOpen, onClose, onSave, types }: DefectModalProps
 
   function handleSave() {
     const qty = parseInt(qtyInput, 10);
-    if (!qty || qty < 1 || !lot.trim() || !flask.trim()) return;
-    onSave(defectType, qty, lot.trim(), flask.trim());
+    const type = defectType === OTHER ? customType.trim() : defectType;
+    if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
+    onSave(type, qty, lot.trim(), flask.trim());
     setQtyInput('1');
     setLot('');
     setFlask('');
+    setCustomType('');
   }
 
   return (
@@ -47,8 +54,20 @@ export function DefectModal({ isOpen, onClose, onSave, types }: DefectModalProps
           onChange={(event) => setDefectType(event.target.value)}
         >
           {types.map((type) => <option key={type} value={type}>{type}</option>)}
+          <option value={OTHER}>{OTHER}</option>
         </select>
       </label>
+      {defectType === OTHER && (
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Defect Lainnya</span>
+          <input
+            className={styles.input}
+            value={customType}
+            onChange={(event) => setCustomType(event.target.value)}
+            placeholder="Ketik jenis defect"
+          />
+        </label>
+      )}
       <div className={styles.fieldRow}>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Nomor Lot</span>
@@ -59,7 +78,7 @@ export function DefectModal({ isOpen, onClose, onSave, types }: DefectModalProps
           />
         </label>
         <label className={styles.field}>
-          <span className={styles.fieldLabel}>Nomor Flask</span>
+          <span className={styles.fieldLabel}>{flaskLabel}</span>
           <input
             className={styles.input}
             value={flask}

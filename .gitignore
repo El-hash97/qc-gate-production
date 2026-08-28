@@ -20,3 +20,6 @@
 
 # misc
 *.log
+
+# local db backup
+qcgate.db.backup

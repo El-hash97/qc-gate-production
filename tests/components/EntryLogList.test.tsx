@@ -14,6 +14,8 @@ describe('EntryLogList', () => {
     expect(screen.getByText('BC 1TR')).toBeInTheDocument();
     expect(screen.getByText('Camshaft')).toBeInTheDocument();
     expect(container.textContent).toContain('Gomi Cope · Lot L1 / Flask F1');
+    // shaft entries label the slot as Cavity, not Flask
+    expect(container.textContent).toContain('Dakon · Lot L9 / Cavity F9');
   });
 
   it('still renders entries with no line (legacy) without a product label', () => {

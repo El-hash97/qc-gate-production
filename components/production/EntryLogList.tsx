@@ -11,12 +11,13 @@ export function EntryLogList({ title, logs = [] }: { title: string; logs?: Entry
       ) : (
         logs.map((log, i) => {
           const product = log.line ? PRODUCT_LINE_LABELS[log.line] : null;
+          const slotLabel = log.group === 'shaft' ? 'Cavity' : 'Flask';
           return (
             <div key={i} className={styles.item}>
               <span>
                 {product && <strong>{product}</strong>}
                 {product && ' — '}
-                {log.type} · Lot {log.lot} / Flask {log.flask}
+                {log.type} · Lot {log.lot} / {slotLabel} {log.flask}
               </span>
               <span className={styles.count}>{log.qty}</span>
             </div>

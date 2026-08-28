@@ -5,9 +5,26 @@ import { RepairModal } from '@/components/production/RepairModal';
 import { REPAIR_TYPES } from '@/utils/constants';
 
 describe('RepairModal', () => {
-  it('lists all 27 fixed repair types', () => {
+  it('lists all 27 fixed repair types plus Other', () => {
     render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
-    expect(screen.getAllByRole('option')).toHaveLength(27);
+    expect(screen.getAllByRole('option')).toHaveLength(28);
+    expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument();
+  });
+
+  it('saves a manually typed repair when Other is selected', async () => {
+    const onSave = vi.fn();
+    render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
+    await userEvent.selectOptions(screen.getByRole('listbox'), 'Other');
+    await userEvent.type(screen.getByLabelText('Repair Lainnya'), 'Gerinda ulang');
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith('Gerinda ulang', 1, 'L1', 'F1');
+  });
+
+  it('relabels the flask field via the flaskLabel prop', () => {
+    render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} flaskLabel="Nomor Cavity" />);
+    expect(screen.getByLabelText('Nomor Cavity')).toBeInTheDocument();
   });
 
   it('calls onSave with the selected repair type, quantity, lot, and flask', async () => {

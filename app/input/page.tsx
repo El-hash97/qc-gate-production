@@ -52,6 +52,12 @@ function lineForTarget(target: DefectTarget | RepairTarget): ProductLine {
   return Number(target.slice(-1)) as ProductLine;
 }
 
+// Camshaft/Crankshaft record a cavity number in the same slot BC uses for a flask.
+function flaskLabelFor(target: DefectTarget | RepairTarget | null): string {
+  if (!target) return 'Nomor Flask';
+  return lineGroup(lineForTarget(target)) === 'shaft' ? 'Nomor Cavity' : 'Nomor Flask';
+}
+
 export default function InputPage() {
   const { state, updateState, isLoading } = useProductionState();
   const { showToast } = useToast();
@@ -264,12 +270,14 @@ export default function InputPage() {
         onClose={() => setDefectTarget(null)}
         onSave={handleSaveDefect}
         types={defectTypesFor(defectTarget)}
+        flaskLabel={flaskLabelFor(defectTarget)}
       />
       <RepairModal
         isOpen={repairTarget !== null}
         onClose={() => setRepairTarget(null)}
         onSave={handleSaveRepair}
         types={repairTypesFor(repairTarget)}
+        flaskLabel={flaskLabelFor(repairTarget)}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

@@ -1,5 +1,6 @@
 import { sql } from './db';
-import type { EntryLog, HourlySnapshot, HistoryRecord } from './types';
+import { getProductionState } from './productionState';
+import type { EntryLog, HourlySnapshot, HistoryRecord, ProductionState } from './types';
 
 interface HistoryRow {
   id: number;
@@ -67,4 +68,49 @@ export async function getHistory(filters: HistoryFilters = {}): Promise<HistoryR
   `) as HistoryRow[];
 
   return rows.map(rowToHistory);
+}
+
+export class HistoryRecordNotFoundError extends Error {
+  constructor(id: number) {
+    super(`History record ${id} not found`);
+    this.name = 'HistoryRecordNotFoundError';
+  }
+}
+
+// "Edit" in the History view: copy an archived shift back into the live
+// production_state (id = 1) and remove it from history, so the operator can
+// keep editing it on the Input page and it shows on the dashboard again. The
+// next Reset re-archives it. Overwrites whatever is currently in production_state
+// — the caller is expected to have confirmed that with the user.
+export async function restoreHistoryToCurrent(id: number): Promise<ProductionState> {
+  const rows = (await sql`SELECT * FROM history WHERE id = ${id}`) as HistoryRow[];
+  const row = rows[0];
+  if (!row) throw new HistoryRecordNotFoundError(id);
+
+  await sql.transaction([
+    sql`
+      UPDATE production_state SET
+        date = ${row.date}, shift = ${row.shift}, operator = ${row.operator}, target = ${row.target},
+        ok1 = ${row.ok1}, repair1 = ${row.repair1}, ng1 = ${row.ng1},
+        ok2 = ${row.ok2}, repair2 = ${row.repair2}, ng2 = ${row.ng2},
+        ok3 = ${row.ok3 ?? 0}, repair3 = ${row.repair3 ?? 0}, ng3 = ${row.ng3 ?? 0},
+        ok4 = ${row.ok4 ?? 0}, repair4 = ${row.repair4 ?? 0}, ng4 = ${row.ng4 ?? 0},
+        defect_data = ${JSON.stringify(row.defect_data ?? {})}::jsonb,
+        repair_data = ${JSON.stringify(row.repair_data ?? {})}::jsonb,
+        hourly_data = ${JSON.stringify(row.hourly_data ?? {})}::jsonb,
+        defect_data_shaft = ${JSON.stringify(row.defect_data_shaft ?? {})}::jsonb,
+        repair_data_shaft = ${JSON.stringify(row.repair_data_shaft ?? {})}::jsonb,
+        hourly_data_shaft = ${JSON.stringify(row.hourly_data_shaft ?? {})}::jsonb,
+        hourly_data_cam = ${JSON.stringify(row.hourly_data_cam ?? {})}::jsonb,
+        hourly_data_crank = ${JSON.stringify(row.hourly_data_crank ?? {})}::jsonb,
+        entry_logs = ${JSON.stringify(row.entry_logs ?? [])}::jsonb,
+        saved_at = now()
+      WHERE id = 1
+    `,
+    sql`DELETE FROM history WHERE id = ${id}`,
+  ]);
+
+  const fresh = await getProductionState();
+  if (!fresh) throw new Error('production_state row missing after restore');
+  return fresh;
 }

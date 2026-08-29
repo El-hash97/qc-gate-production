@@ -8,9 +8,10 @@ interface HistoryTableProps {
   onToggle: (id: number) => void;
   renderDetail: (record: HistoryRecord) => ReactNode;
   onExport: (record: HistoryRecord) => void;
+  onEdit: (record: HistoryRecord) => void;
 }
 
-export function HistoryTable({ records, expandedId, onToggle, renderDetail, onExport }: HistoryTableProps) {
+export function HistoryTable({ records, expandedId, onToggle, renderDetail, onExport, onEdit }: HistoryTableProps) {
   if (records.length === 0) {
     return <div className={styles.empty}>Belum ada histori shift</div>;
   }
@@ -35,12 +36,22 @@ export function HistoryTable({ records, expandedId, onToggle, renderDetail, onEx
               <td>{record.repair1 + record.repair2 + (record.repair3 ?? 0) + (record.repair4 ?? 0)}</td>
               <td>{record.ng1 + record.ng2 + (record.ng3 ?? 0) + (record.ng4 ?? 0)}</td>
               <td>
-                <button
-                  type="button"
-                  onClick={(event) => { event.stopPropagation(); onExport(record); }}
-                >
-                  Export
-                </button>
+                <div className={styles.rowActions}>
+                  <button
+                    type="button"
+                    className={styles.rowBtn}
+                    onClick={(event) => { event.stopPropagation(); onEdit(record); }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.rowBtn}
+                    onClick={(event) => { event.stopPropagation(); onExport(record); }}
+                  >
+                    Export
+                  </button>
+                </div>
               </td>
             </tr>
             {expandedId === record.id && (

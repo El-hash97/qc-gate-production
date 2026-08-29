@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useTheme } from '@/hooks/useTheme';
 import styles from './TopNav.module.css';
 
 const LINKS = [
@@ -12,24 +13,23 @@ const LINKS = [
 ] as const;
 
 function RealTimeClock() {
-  const [now, setNow] = useState(() => new Date());
+  // Null until mounted: the server and the first client render both emit empty
+  // spans, so there is nothing to mismatch during hydration. The effect fills
+  // in the real time immediately after.
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const time = now.toLocaleTimeString('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-  const date = now.toLocaleDateString('id-ID', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-  });
+  const time = now
+    ? now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    : '';
+  const date = now
+    ? now.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' })
+    : '';
 
   return (
     <div className={styles.clock} aria-label="Waktu real-time">
@@ -41,6 +41,7 @@ function RealTimeClock() {
 
 export function TopNav() {
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
 
   return (
     <header className={styles.header}>
@@ -59,7 +60,17 @@ export function TopNav() {
           </Link>
         ))}
       </nav>
-      <RealTimeClock />
+      <div className={styles.rightControls}>
+        <button
+          type="button"
+          className={styles.themeToggle}
+          onClick={toggle}
+          aria-label={theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
+        <RealTimeClock />
+      </div>
     </header>
   );
 }

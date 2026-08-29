@@ -31,3 +31,26 @@
   padding: 20px;
   text-align: center;
 }
+
+.rowActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.rowBtn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rowBtn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}

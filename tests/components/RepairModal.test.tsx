@@ -5,9 +5,9 @@ import { RepairModal } from '@/components/production/RepairModal';
 import { REPAIR_TYPES } from '@/utils/constants';
 
 describe('RepairModal', () => {
-  it('lists all 27 fixed repair types plus Other', () => {
+  it('lists all 28 fixed repair types plus Other', () => {
     render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
-    expect(screen.getAllByRole('option')).toHaveLength(28);
+    expect(screen.getAllByRole('option')).toHaveLength(29);
     expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument();
   });
 

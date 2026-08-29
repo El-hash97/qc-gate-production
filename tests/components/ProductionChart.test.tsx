@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 const doughnutSpy = vi.fn();
 vi.mock('react-chartjs-2', () => ({
@@ -26,5 +26,13 @@ describe('ProductionChart', () => {
     const [props] = doughnutSpy.mock.calls[0];
     const formatted = props.options.plugins.datalabels.formatter(0);
     expect(formatted).toBe('');
+  });
+
+  it('shows a qty + percentage breakdown beside the donut', () => {
+    render(<ProductionChart ok={97} repair={2} ng={1} />);
+    expect(screen.getByText('97')).toBeInTheDocument();
+    expect(screen.getByText('· 97%')).toBeInTheDocument();
+    expect(screen.getByText('· 2%')).toBeInTheDocument();
+    expect(screen.getByText('· 1%')).toBeInTheDocument();
   });
 });

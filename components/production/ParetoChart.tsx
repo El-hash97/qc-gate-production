@@ -1,35 +1,73 @@
 'use client';
 
 import '@/lib/chartSetup';
-import { Bar } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
+import { pareto } from '@/utils/charts';
+import { useChartTheme } from '@/hooks/useTheme';
 
 interface ParetoChartProps {
   data: Record<string, number>;
   color: string;
 }
 
+// Horizontal Pareto: bars (count, sorted desc) on the bottom axis + a cumulative
+// percentage line on a 0–100 top axis, sharing the category (y) axis.
 export function ParetoChart({ data, color }: ParetoChartProps) {
-  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const { labels, counts, cumulativePct } = pareto(data);
+  const ct = useChartTheme();
 
   return (
-    <Bar
+    <Chart
+      type="bar"
       data={{
-        labels: sorted.map(([name]) => name),
-        datasets: [{ data: sorted.map(([, count]) => count), backgroundColor: color, borderRadius: 4 }],
+        labels,
+        datasets: [
+          {
+            type: 'bar' as const,
+            data: counts,
+            backgroundColor: color,
+            borderRadius: 4,
+            xAxisID: 'x',
+            order: 2,
+          },
+          {
+            type: 'line' as const,
+            data: cumulativePct,
+            borderColor: '#60a5fa',
+            backgroundColor: '#60a5fa',
+            borderWidth: 2,
+            pointRadius: 3,
+            xAxisID: 'x2',
+            order: 1,
+          },
+        ],
       }}
       options={{
+        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        // No animation on refresh — keeps the bars steady while the dashboard
-        // polls instead of re-growing them from zero each time.
+        // No animation on refresh — keeps the chart steady while the dashboard polls.
         animation: false,
         plugins: {
           legend: { display: false },
-          datalabels: { color: '#f0f1f5', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 } },
+          datalabels: {
+            display: (ctx) => ctx.datasetIndex === 0,
+            color: ct.label,
+            anchor: 'end',
+            align: 'right',
+            font: { weight: 'bold', size: 11 },
+          },
         },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45, color: '#9ca3b8' } },
-          y: { grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true, ticks: { color: '#9ca3b8', stepSize: 1 } },
+          x: { beginAtZero: true, grid: { color: ct.grid }, ticks: { color: ct.tick, stepSize: 1 } },
+          x2: {
+            position: 'top',
+            beginAtZero: true,
+            max: 100,
+            grid: { display: false },
+            ticks: { color: '#60a5fa', callback: (v) => `${v}%` },
+          },
+          y: { grid: { display: false }, ticks: { font: { size: 9 }, color: ct.tick } },
         },
       }}
     />

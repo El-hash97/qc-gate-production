@@ -8,7 +8,16 @@ vi.mock('@/hooks/useHistory', () => ({ useHistory: (...args: any[]) => useHistor
 const exportMock = vi.fn();
 vi.mock('@/utils/excelExport', () => ({ exportShiftToExcel: (...args: any[]) => exportMock(...args) }));
 
-vi.mock('react-chartjs-2', () => ({ Bar: () => null, Doughnut: () => null }));
+const restoreMock = vi.fn();
+vi.mock('@/hooks/useRestoreHistory', () => ({
+  useRestoreHistory: () => ({ mutate: restoreMock, isPending: false, isError: false, error: null }),
+}));
+vi.mock('@/hooks/useProductionState', () => ({ useProductionState: () => ({ state: null }) }));
+
+const pushMock = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushMock }) }));
+
+vi.mock('react-chartjs-2', () => ({ Bar: () => null, Doughnut: () => null, Chart: () => null }));
 vi.mock('@/lib/chartSetup', () => ({}));
 
 import HistoryPage from '@/app/history/page';
@@ -38,5 +47,14 @@ describe('HistoryPage', () => {
     render(<HistoryPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
     expect(exportMock).toHaveBeenCalledWith(record);
+  });
+
+  it('restores a record after confirming the Edit dialog', async () => {
+    useHistoryMock.mockReturnValue({ data: [record], isLoading: false, isError: false });
+    render(<HistoryPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByText('Edit shift dari history')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ya, edit' }));
+    expect(restoreMock).toHaveBeenCalledWith(1, expect.anything());
   });
 });

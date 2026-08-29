@@ -4,7 +4,10 @@ import { useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
+import { HourlyChart } from '@/components/production/HourlyChart';
 import { HourlyTable } from '@/components/production/HourlyTable';
+import { DefectHeatmap } from '@/components/production/DefectHeatmap';
+import { LotDefectChart } from '@/components/production/LotDefectChart';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
 import { EntryLogList } from '@/components/production/EntryLogList';
 import {
@@ -110,6 +113,29 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      <div className={styles.kpiRow}>
+        <div className={`${styles.kpiCard} ${styles.kpiTotal}`}>
+          <div className={styles.kpiLabel}>Total Produksi</div>
+          <div className={styles.kpiValue}>{ok + repair + ng}</div>
+          <div className={styles.kpiPct}>{achievement}% dari target</div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiOk}`}>
+          <div className={styles.kpiLabel}>OK</div>
+          <div className={styles.kpiValue}>{ok}</div>
+          <div className={styles.kpiPct}>{rates.okRate}%</div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiRepair}`}>
+          <div className={styles.kpiLabel}>Repair</div>
+          <div className={styles.kpiValue}>{repair}</div>
+          <div className={styles.kpiPct}>{rates.repairRate}%</div>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.kpiNg}`}>
+          <div className={styles.kpiLabel}>NG</div>
+          <div className={styles.kpiValue}>{ng}</div>
+          <div className={styles.kpiPct}>{rates.ngRate}%</div>
+        </div>
+      </div>
+
       <div className={styles.progressStrip}>
         <div style={{ flex: 1 }}>
           <div className={styles.progressLabel}><span>Progress</span><span>{progress}%</span></div>
@@ -118,40 +144,65 @@ export default function DashboardPage() {
         <div className={styles.achievementBadge}>Achievement: {achievement}%</div>
       </div>
 
-      <div className={styles.rateStrip}>
-        <span>OK Rate: {rates.okRate}%</span>
-        <span>Repair Rate: {rates.repairRate}%</span>
-        <span>NG Rate: {rates.ngRate}%</span>
-      </div>
+      <div className={styles.bento}>
+        <section className={`${styles.panel} ${styles.spanDonut} ${styles.hTrend}`}>
+          <div className={styles.panelTitle}>Production Distribution</div>
+          <div className={styles.panelBody}><ProductionChart ok={ok} repair={repair} ng={ng} /></div>
+        </section>
 
-      <div className={styles.chartsGrid}>
-        <div className={styles.chartCard}>
-          <div className={styles.chartTitle}>Production Distribution</div>
-          <div className={styles.chartWrapper}><ProductionChart ok={ok} repair={repair} ng={ng} /></div>
-        </div>
-        <div className={styles.chartCard}>
-          <div className={styles.chartTitle}>Pareto Defect (NG)</div>
-          <div className={styles.chartWrapper}><ParetoChart data={defectData} color="#dc2626" /></div>
-        </div>
-        <div className={styles.chartCard}>
-          <div className={styles.chartTitle}>Pareto Repair</div>
-          <div className={styles.chartWrapper}><ParetoChart data={repairData} color="#f59e0b" /></div>
-        </div>
-      </div>
-
-      <aside className={styles.sidebar}>
-        <div>
-          <div className={styles.sidebarTitle}>Hourly Production</div>
-          <div className={styles.scrollBox}>
-            <HourlyTable hourlyData={hourlyData} />
+        <section className={`${styles.panel} ${styles.spanHero} ${styles.hTrend}`}>
+          <div className={styles.panelTitle}>Hourly Production</div>
+          <div className={styles.panelBody}>
+            <HourlyChart hourlyData={hourlyData} target={view === 'all' ? current.target : undefined} />
           </div>
-        </div>
-        <DefectRepairSummary title="Defect Details" data={defectData} />
-        <DefectRepairSummary title="Repair Details" data={repairData} />
-        <div className={styles.scrollBox}>
-          <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
-        </div>
-      </aside>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanTable} ${styles.hTrend}`}>
+          <div className={styles.panelTitle}>Hourly (Tabel)</div>
+          <div className={styles.scrollBody}><HourlyTable hourlyData={hourlyData} /></div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+          <div className={styles.panelTitle}>Pareto Defect (NG)</div>
+          <div className={styles.panelBody}><ParetoChart data={defectData} color="#dc2626" /></div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+          <div className={styles.panelTitle}>Pareto Repair</div>
+          <div className={styles.panelBody}><ParetoChart data={repairData} color="#f59e0b" /></div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
+          <div className={styles.scrollBody}><DefectRepairSummary title="Defect Details" data={defectData} /></div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
+          <div className={styles.scrollBody}><DefectRepairSummary title="Repair Details" data={repairData} /></div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hDetail}`}>
+          <div className={styles.panelTitle}>
+            {view === 'all' ? 'Flask / Cavity × Defect' : isShaftLine ? 'Cavity × Defect' : 'Flask × Defect'}
+          </div>
+          <div className={styles.panelBody}>
+            <DefectHeatmap
+              logs={entryLogs}
+              variant={view === 'all' ? 'both' : isShaftLine ? 'cavity' : 'flask'}
+            />
+          </div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hLog}`}>
+          <div className={styles.panelTitle}>Lot × Defect</div>
+          <div className={styles.panelBody}><LotDefectChart logs={entryLogs} /></div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hLog}`}>
+          <div className={styles.scrollBody}>
+            <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

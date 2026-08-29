@@ -5,9 +5,9 @@ import { DefectModal } from '@/components/production/DefectModal';
 import { DEFECT_TYPES } from '@/utils/constants';
 
 describe('DefectModal', () => {
-  it('lists all 22 fixed defect types plus Other', () => {
+  it('lists all 23 fixed defect types plus Other', () => {
     render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />);
-    expect(screen.getAllByRole('option')).toHaveLength(23);
+    expect(screen.getAllByRole('option')).toHaveLength(24);
     expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument();
   });
 

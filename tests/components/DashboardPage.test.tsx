@@ -21,7 +21,7 @@ vi.mock('@/hooks/useProductionState', () => ({
     isError: false,
   }),
 }));
-vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null }));
+vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
 vi.mock('@/lib/chartSetup', () => ({}));
 
 import DashboardPage from '@/app/dashboard/page';

@@ -13,6 +13,15 @@ export const PRODUCT_LINE_LABELS: Record<ProductLine, string> = {
   4: 'Crankshaft',
 };
 
+// Product identity colours (match the --accent-* vars in globals.css):
+// BC 1TR red, BC 2TR blue, Camshaft yellow, Crankshaft green.
+export const PRODUCT_LINE_COLOR: Record<ProductLine, string> = {
+  1: '#dc2626',
+  2: '#3b82f6',
+  3: '#eab308',
+  4: '#22c55e',
+};
+
 export function lineGroup(line: ProductLine): ProductGroup {
   return line <= 2 ? 'bc' : 'shaft';
 }

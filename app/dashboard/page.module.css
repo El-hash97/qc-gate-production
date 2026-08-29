@@ -1,12 +1,11 @@
 .page {
   padding: 24px 32px;
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .statusBar {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
   font-size: 13px;
@@ -65,6 +64,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
 }
 
 .progressLabel {
@@ -97,31 +97,68 @@
   border-radius: 99px;
 }
 
-.rateStrip {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 20px;
-  font-size: 13px;
+/* --- KPI cards: Total / OK / Repair / NG, each with its percentage below --- */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.kpiCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.kpiTotal { border-left-color: var(--accent-blue); }
+.kpiOk { border-left-color: var(--accent-green); }
+.kpiRepair { border-left-color: var(--accent-orange); }
+.kpiNg { border-left-color: var(--accent-red); }
+
+.kpiLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-secondary);
 }
 
-.chartsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  /* Don't stretch the chart cards to match a tall sidebar — keep them a fixed
-     height so growing Hourly / Lot-Flask data never resizes the chart boxes. */
-  align-self: start;
+.kpiValue {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 4px;
 }
 
-.chartCard {
+.kpiPct {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* --- Bento mosaic: 12-column grid, each panel its own tile with a fixed
+   height so the ever-growing lists/charts never reflow the layout. --- */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.panel {
+  grid-column: span 12;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  box-shadow: var(--shadow-card);
 }
 
-.chartTitle {
+.panelTitle {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -129,49 +166,44 @@
   text-transform: uppercase;
 }
 
-.chartWrapper {
+/* Chart body: fills the panel; Chart.js reads this box for its canvas size. */
+.panelBody {
   position: relative;
-  height: 220px;
+  flex: 1;
+  min-height: 0;
 }
 
-.sidebar {
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border-color);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.sidebarTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  margin-bottom: 14px;
-}
-
-/* Cap the tall, ever-growing lists (hourly rows, lot/flask log) so the sidebar
-   stays a predictable height and the charts beside it never shift. */
-.scrollBox {
-  max-height: 240px;
+/* List/table body: fixed area, scrolls internally. */
+.scrollBody {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
-@media (max-width: 1024px) {
-  .page { grid-template-columns: 1fr; }
-  .chartsGrid { grid-template-columns: 1fr 1fr; }
+/* Column spans (desktop, 12-col) */
+.spanDonut { grid-column: span 4; }
+.spanHero  { grid-column: span 5; }
+.spanTable { grid-column: span 3; }
+.spanHalf  { grid-column: span 6; }
+.spanList  { grid-column: span 3; }
+.spanFull  { grid-column: span 12; }
+
+/* Row heights — varied by content */
+.hTrend { height: 300px; }
+.hPareto { height: 300px; }
+.hDetail { height: 260px; }
+.hLog { height: 300px; }
+
+@media (max-width: 1100px) {
+  .spanDonut, .spanHero, .spanTable, .spanList { grid-column: span 6; }
+  .spanHalf { grid-column: span 12; }
 }
 
 @media (max-width: 640px) {
   .page { padding: 16px; gap: 16px; }
-  .chartsGrid { grid-template-columns: 1fr; }
+  .bento { gap: 12px; }
+  .panel { grid-column: span 12 !important; }
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
   .progressStrip { flex-direction: column; align-items: stretch; gap: 12px; }
   .achievementBadge { text-align: center; }
-  .rateStrip { flex-wrap: wrap; gap: 12px; }
-  .sidebar {
-    border-left: none;
-    border-top: 1px solid var(--border-color);
-    padding: 16px;
-  }
 }

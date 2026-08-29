@@ -12,12 +12,12 @@ const record: HistoryRecord = {
 
 describe('HistoryTable', () => {
   it('shows an empty state when there are no records', () => {
-    render(<HistoryTable records={[]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} />);
+    render(<HistoryTable records={[]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} onEdit={() => {}} />);
     expect(screen.getByText('Belum ada histori shift')).toBeInTheDocument();
   });
 
   it('renders one row per record with OK/Repair/NG totals summed across both products', () => {
-    render(<HistoryTable records={[record]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} />);
+    render(<HistoryTable records={[record]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} onEdit={() => {}} />);
     const row = screen.getByText('Budi').closest('tr')!;
     expect(row).toHaveTextContent('90'); // ok1 + ok2
     expect(row).toHaveTextContent('3');  // repair1 + repair2
@@ -32,6 +32,7 @@ describe('HistoryTable', () => {
         onToggle={() => {}}
         renderDetail={() => <div data-testid="detail">detail content</div>}
         onExport={() => {}}
+        onEdit={() => {}}
       />,
     );
     expect(screen.getByTestId('detail')).toBeInTheDocument();
@@ -40,9 +41,18 @@ describe('HistoryTable', () => {
   it('calls onExport without triggering onToggle when Export is clicked', async () => {
     const onToggle = vi.fn();
     const onExport = vi.fn();
-    render(<HistoryTable records={[record]} expandedId={null} onToggle={onToggle} renderDetail={() => null} onExport={onExport} />);
+    render(<HistoryTable records={[record]} expandedId={null} onToggle={onToggle} renderDetail={() => null} onExport={onExport} onEdit={() => {}} />);
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
     expect(onExport).toHaveBeenCalledWith(record);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('calls onEdit without triggering onToggle when Edit is clicked', async () => {
+    const onToggle = vi.fn();
+    const onEdit = vi.fn();
+    render(<HistoryTable records={[record]} expandedId={null} onToggle={onToggle} renderDetail={() => null} onExport={() => {}} onEdit={onEdit} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith(record);
     expect(onToggle).not.toHaveBeenCalled();
   });
 });

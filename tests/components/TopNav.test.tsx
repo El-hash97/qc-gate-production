@@ -19,4 +19,10 @@ describe('TopNav', () => {
     render(<TopNav />);
     expect(screen.getByRole('link', { name: 'Dashboard' }).className).toMatch(/linkActive/);
   });
+
+  it('fills in the clock after mount', () => {
+    render(<TopNav />);
+    // effect has run under act() — a HH.MM.SS string is present
+    expect(screen.getByLabelText('Waktu real-time').textContent).toMatch(/\d{2}[.:]\d{2}[.:]\d{2}/);
+  });
 });

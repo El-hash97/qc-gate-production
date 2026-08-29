@@ -49,6 +49,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
   flex-wrap: wrap;
 }
 

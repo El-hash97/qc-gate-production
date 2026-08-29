@@ -5,16 +5,18 @@ import {
 
 describe('production constants', () => {
   it('has the defect types including the foundry NG list', () => {
-    expect(DEFECT_TYPES).toHaveLength(22);
+    expect(DEFECT_TYPES).toHaveLength(23);
     expect(DEFECT_TYPES).toContain('Gas Hole Cope');
     expect(DEFECT_TYPES).toContain('Kandama Rear');
+    expect(DEFECT_TYPES).toContain('Gomi Oil Pan');
     expect(DEFECT_TYPES).toContain('Yuzakai');
   });
 
   it('has the repair types including the foundry NG list', () => {
-    expect(REPAIR_TYPES).toHaveLength(27);
+    expect(REPAIR_TYPES).toHaveLength(28);
     expect(REPAIR_TYPES).toContain('Mejashi Bore 1');
     expect(REPAIR_TYPES).toContain('Dakon');
+    expect(REPAIR_TYPES).toContain('Gomi Oil Pan');
     expect(REPAIR_TYPES).toContain('Yuzakai');
   });
 

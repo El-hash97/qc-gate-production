@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import type { HistoryRecord } from '@/lib/types';
+import { findPic } from '@/utils/constants';
 import styles from './HistoryTable.module.css';
 
 interface HistoryTableProps {
@@ -20,7 +21,7 @@ export function HistoryTable({ records, expandedId, onToggle, renderDetail, onEx
     <table className={styles.table}>
       <thead>
         <tr>
-          <th>Tanggal</th><th>Shift</th><th>Operator</th><th>Target</th>
+          <th>Tanggal</th><th>Shift</th><th>PIC</th><th>Operator</th><th>Target</th>
           <th>OK</th><th>Repair</th><th>NG</th><th></th>
         </tr>
       </thead>
@@ -30,6 +31,7 @@ export function HistoryTable({ records, expandedId, onToggle, renderDetail, onEx
             <tr onClick={() => onToggle(record.id)} className={styles.row}>
               <td>{record.date}</td>
               <td>{record.shift}</td>
+              <td>{findPic(record.pic)?.name ?? '—'}</td>
               <td>{record.operator}</td>
               <td>{record.target}</td>
               <td>{record.ok1 + record.ok2 + (record.ok3 ?? 0) + (record.ok4 ?? 0)}</td>
@@ -56,7 +58,7 @@ export function HistoryTable({ records, expandedId, onToggle, renderDetail, onEx
             </tr>
             {expandedId === record.id && (
               <tr>
-                <td colSpan={8}>{renderDetail(record)}</td>
+                <td colSpan={9}>{renderDetail(record)}</td>
               </tr>
             )}
           </Fragment>

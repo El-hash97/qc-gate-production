@@ -1,6 +1,8 @@
 import type { HistoryRecord } from '@/lib/types';
 import { ParetoChart } from '@/components/production/ParetoChart';
 import { EntryLogList } from '@/components/production/EntryLogList';
+import { PicCard } from '@/components/production/PicCard';
+import { LineStopTable } from '@/components/production/LineStopTable';
 import { mergeCounts } from '@/utils/rates';
 import styles from './HistoryDetail.module.css';
 
@@ -12,6 +14,7 @@ export function HistoryDetail({ record }: { record: HistoryRecord }) {
 
   return (
     <div className={styles.detail}>
+      {record.pic && <PicCard pic={record.pic} />}
       <div className={styles.chartsGrid}>
         <div>
           <div className={styles.chartTitle}>Pareto Defect (NG)</div>
@@ -23,6 +26,10 @@ export function HistoryDetail({ record }: { record: HistoryRecord }) {
         </div>
       </div>
       <EntryLogList title="Lot / Flask Log" logs={record.entryLogs} />
+      <div>
+        <div className={styles.chartTitle}>Line Stop</div>
+        <LineStopTable stops={record.lineStops ?? []} />
+      </div>
     </div>
   );
 }

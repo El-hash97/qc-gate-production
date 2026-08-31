@@ -24,6 +24,11 @@ describe('HistoryTable', () => {
     expect(row).toHaveTextContent('1');  // ng1 + ng2
   });
 
+  it('shows the PIC name in its own column', () => {
+    render(<HistoryTable records={[{ ...record, pic: 'suryo' }]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} onEdit={() => {}} />);
+    expect(screen.getByText('SURYO HADI WIHARJO')).toBeInTheDocument();
+  });
+
   it('renders the detail row only for the expanded record', () => {
     render(
       <HistoryTable

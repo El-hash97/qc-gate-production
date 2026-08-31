@@ -10,10 +10,12 @@ import { DefectHeatmap } from '@/components/production/DefectHeatmap';
 import { LotDefectChart } from '@/components/production/LotDefectChart';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
 import { EntryLogList } from '@/components/production/EntryLogList';
+import { LineStopTable } from '@/components/production/LineStopTable';
 import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
+import { PicCard } from '@/components/production/PicCard';
 import type { EntryLog, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -21,9 +23,10 @@ const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
+  pic: '',
   defectData: {}, repairData: {}, hourlyData: {},
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
-  entryLogs: [], savedAt: '',
+  entryLogs: [], lineStops: [], savedAt: '',
 };
 
 type DashboardView = 'all' | 'bc' | 'camshaft' | 'crankshaft';
@@ -93,9 +96,14 @@ export default function DashboardPage() {
   return (
     <main className={styles.page}>
       <div className={styles.statusBar}>
-        <span>{current.operator || 'Belum ada operator'} — {current.shift}</span>
-        <span className={isError ? styles.statusOffline : styles.statusOnline}>
-          {isError ? 'Disconnected' : isFetching ? 'Syncing…' : 'Real-time Connected'}
+        {current.pic && <PicCard pic={current.pic} />}
+        <span className={styles.statusRight}>
+          <span>{current.date || '—'}</span>
+          <span>{current.operator || 'Belum ada operator'}</span>
+          <span>{current.shift}</span>
+          <span className={isError ? styles.statusOffline : styles.statusOnline}>
+            {isError ? 'Disconnected' : isFetching ? 'Syncing…' : 'Real-time Connected'}
+          </span>
         </span>
       </div>
 
@@ -201,6 +209,11 @@ export default function DashboardPage() {
           <div className={styles.scrollBody}>
             <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
           </div>
+        </section>
+
+        <section className={`${styles.panel} ${styles.spanFull} ${styles.hLog}`}>
+          <div className={styles.panelTitle}>Line Stop</div>
+          <div className={styles.scrollBody}><LineStopTable stops={current.lineStops ?? []} /></div>
         </section>
       </div>
     </main>

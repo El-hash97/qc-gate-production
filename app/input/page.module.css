@@ -11,10 +11,19 @@
   padding: 40px 0;
 }
 
+.topRow {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .toolbar {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .toolbarGroup {

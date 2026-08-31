@@ -77,6 +77,19 @@ export const SHAFT_REPAIR_TYPES = SHAFT_DEFECT_TYPES;
 
 export const SHIFTS = ['Shift Red', 'Shift White'] as const;
 
+// PIC / Group Leader per shift. `key` is what gets stored; `photo` is a
+// path under /public. Selecting a PIC also sets the shift.
+export const PICS = [
+  { key: 'suryo', name: 'SURYO HADI WIHARJO', shift: 'Shift Red', photo: '/pic/suryo.jpg' },
+  { key: 'koewatno', name: 'KOEWATNO', shift: 'Shift White', photo: '/pic/koewatno.jpg' },
+] as const;
+
+export type PicKey = (typeof PICS)[number]['key'];
+
+export function findPic(key: string | undefined) {
+  return PICS.find((p) => p.key === key);
+}
+
 export type DefectType = (typeof DEFECT_TYPES)[number];
 export type RepairType = (typeof REPAIR_TYPES)[number];
 export type Shift = (typeof SHIFTS)[number];

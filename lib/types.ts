@@ -40,6 +40,16 @@ export interface EntryLog {
   flask: string;
 }
 
+// A plant-wide line stop logged during the shift. start/end are "HH:MM"
+// (24h). category is an OEE loss bucket: AV (availability), PE (performance),
+// RQ (rate/quality).
+export interface LineStop {
+  start: string;
+  end: string;
+  problem: string;
+  category: 'AV' | 'PE' | 'RQ';
+}
+
 export interface HourlySnapshot {
   ok: number;
   repair: number;
@@ -50,6 +60,9 @@ export interface ProductionState {
   date: string;
   shift: string;
   operator: string;
+  // PIC / Group Leader key: 'suryo' | 'koewatno' | ''. Optional for
+  // back-compat; every read site defaults a missing value to ''.
+  pic?: string;
   target: number;
   ok1: number;
   repair1: number;
@@ -82,6 +95,9 @@ export interface ProductionState {
   hourlyDataCam?: Record<string, HourlySnapshot>;
   hourlyDataCrank?: Record<string, HourlySnapshot>;
   entryLogs: EntryLog[];
+  // Plant-wide line stops. Optional for back-compat; every read site defaults
+  // a missing value to [].
+  lineStops?: LineStop[];
   savedAt: string;
 }
 

@@ -8,8 +8,20 @@
 .statusBar {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   font-size: 13px;
   color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.statusRight {
+  margin-left: auto;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .statusOnline { color: var(--accent-green); }

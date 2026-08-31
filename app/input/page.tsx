@@ -9,25 +9,27 @@ import { CounterCard } from '@/components/production/CounterCard';
 import { DefectModal } from '@/components/production/DefectModal';
 import { RepairModal } from '@/components/production/RepairModal';
 import { ResetModal } from '@/components/production/ResetModal';
+import { LineStopSection } from '@/components/production/LineStopSection';
+import { PicCard } from '@/components/production/PicCard';
 import {
   getRates, getAchievementPercent, getProgressPercent, isNgAlarmActive,
 } from '@/utils/rates';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
 import {
-  SHIFTS, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
+  SHIFTS, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
 import type { ProductLine, ProductionState } from '@/lib/types';
 import { lineGroup } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
-  date: '', shift: 'Shift Red', operator: '', target: 0,
+  date: '', shift: 'Shift Red', operator: '', pic: '', target: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
   defectData: {}, repairData: {}, hourlyData: {},
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
-  entryLogs: [], savedAt: '',
+  entryLogs: [], lineStops: [], savedAt: '',
 };
 
 type CounterField = 'ok1' | 'repair1' | 'ng1' | 'ok2' | 'repair2' | 'ng2'
@@ -158,7 +160,27 @@ export default function InputPage() {
 
   return (
     <main className={styles.page}>
+      <div className={styles.topRow}>
+      {current.pic && <PicCard pic={current.pic} />}
       <div className={styles.toolbar}>
+        <label className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>PIC</span>
+          <select
+            className={styles.toolbarSelect}
+            value={current.pic ?? ''}
+            onChange={(event) => {
+              const p = findPic(event.target.value);
+              commit(p ? { pic: p.key, shift: p.shift } : { pic: '' });
+            }}
+          >
+            <option value="">Pilih PIC</option>
+            {PICS.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.name} ({p.shift.replace('Shift ', '').toUpperCase()})
+              </option>
+            ))}
+          </select>
+        </label>
         <label className={styles.toolbarGroup}>
           <span className={styles.toolbarLabel}>Tanggal</span>
           <input
@@ -201,6 +223,7 @@ export default function InputPage() {
             onKeyDown={targetField.onKeyDown}
           />
         </label>
+      </div>
       </div>
 
       <div className={styles.progressStrip}>
@@ -257,6 +280,11 @@ export default function InputPage() {
         <span>Repair Rate: {rates.repairRate}%</span>
         <span>NG Rate: {rates.ngRate}%</span>
       </div>
+
+      <LineStopSection
+        stops={current.lineStops ?? []}
+        onChange={(lineStops) => commit({ lineStops })}
+      />
 
       <div className={styles.actionBar}>
         <button type="button" className={styles.btnSuccess} onClick={() => exportShiftToExcel(current)}>

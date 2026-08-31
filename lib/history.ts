@@ -1,12 +1,13 @@
 import { sql } from './db';
 import { getProductionState } from './productionState';
-import type { EntryLog, HourlySnapshot, HistoryRecord, ProductionState } from './types';
+import type { EntryLog, HourlySnapshot, LineStop, HistoryRecord, ProductionState } from './types';
 
 interface HistoryRow {
   id: number;
   date: string;
   shift: string;
   operator: string;
+  pic?: string;
   target: number;
   ok1: number; repair1: number; ng1: number;
   ok2: number; repair2: number; ng2: number;
@@ -21,6 +22,7 @@ interface HistoryRow {
   hourly_data_cam?: Record<string, HourlySnapshot>;
   hourly_data_crank?: Record<string, HourlySnapshot>;
   entry_logs: EntryLog[];
+  line_stops?: LineStop[];
   saved_at: string;
 }
 
@@ -30,6 +32,7 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     date: row.date,
     shift: row.shift,
     operator: row.operator,
+    pic: row.pic ?? '',
     target: row.target,
     ok1: row.ok1, repair1: row.repair1, ng1: row.ng1,
     ok2: row.ok2, repair2: row.repair2, ng2: row.ng2,
@@ -44,6 +47,7 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     hourlyDataCam: row.hourly_data_cam ?? {},
     hourlyDataCrank: row.hourly_data_crank ?? {},
     entryLogs: row.entry_logs ?? [],
+    lineStops: row.line_stops ?? [],
     savedAt: row.saved_at,
   };
 }
@@ -90,7 +94,7 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
   await sql.transaction([
     sql`
       UPDATE production_state SET
-        date = ${row.date}, shift = ${row.shift}, operator = ${row.operator}, target = ${row.target},
+        date = ${row.date}, shift = ${row.shift}, operator = ${row.operator}, pic = ${row.pic ?? ''}, target = ${row.target},
         ok1 = ${row.ok1}, repair1 = ${row.repair1}, ng1 = ${row.ng1},
         ok2 = ${row.ok2}, repair2 = ${row.repair2}, ng2 = ${row.ng2},
         ok3 = ${row.ok3 ?? 0}, repair3 = ${row.repair3 ?? 0}, ng3 = ${row.ng3 ?? 0},
@@ -104,6 +108,7 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
         hourly_data_cam = ${JSON.stringify(row.hourly_data_cam ?? {})}::jsonb,
         hourly_data_crank = ${JSON.stringify(row.hourly_data_crank ?? {})}::jsonb,
         entry_logs = ${JSON.stringify(row.entry_logs ?? [])}::jsonb,
+        line_stops = ${JSON.stringify(row.line_stops ?? [])}::jsonb,
         saved_at = now()
       WHERE id = 1
     `,

@@ -1,10 +1,11 @@
 import { sql } from './db';
-import type { EntryLog, HourlySnapshot, ProductionState } from './types';
+import type { EntryLog, HourlySnapshot, LineStop, ProductionState } from './types';
 
 interface ProductionStateRow {
   date: string;
   shift: string;
   operator: string;
+  pic?: string;
   target: number;
   ok1: number;
   repair1: number;
@@ -27,6 +28,7 @@ interface ProductionStateRow {
   hourly_data_cam?: Record<string, HourlySnapshot>;
   hourly_data_crank?: Record<string, HourlySnapshot>;
   entry_logs: EntryLog[];
+  line_stops?: LineStop[];
   saved_at: string;
 }
 
@@ -35,6 +37,7 @@ function rowToState(row: ProductionStateRow): ProductionState {
     date: row.date,
     shift: row.shift,
     operator: row.operator,
+    pic: row.pic ?? '',
     target: row.target,
     ok1: row.ok1,
     repair1: row.repair1,
@@ -57,6 +60,7 @@ function rowToState(row: ProductionStateRow): ProductionState {
     hourlyDataCam: row.hourly_data_cam ?? {},
     hourlyDataCrank: row.hourly_data_crank ?? {},
     entryLogs: row.entry_logs ?? [],
+    lineStops: row.line_stops ?? [],
     savedAt: row.saved_at,
   };
 }
@@ -85,6 +89,7 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       date = ${state.date ?? ''},
       shift = ${state.shift ?? 'Shift Red'},
       operator = ${state.operator ?? ''},
+      pic = ${state.pic ?? ''},
       target = ${state.target ?? 0},
       ok1 = ${state.ok1 ?? 0},
       repair1 = ${state.repair1 ?? 0},
@@ -107,6 +112,7 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       hourly_data_cam = ${JSON.stringify(state.hourlyDataCam ?? {})}::jsonb,
       hourly_data_crank = ${JSON.stringify(state.hourlyDataCrank ?? {})}::jsonb,
       entry_logs = ${JSON.stringify(state.entryLogs ?? [])}::jsonb,
+      line_stops = ${JSON.stringify(state.lineStops ?? [])}::jsonb,
       saved_at = now()
     WHERE id = 1
   `;

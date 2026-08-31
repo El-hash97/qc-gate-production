@@ -29,7 +29,8 @@ import DashboardPage from '@/app/dashboard/page';
 describe('DashboardPage', () => {
   it('shows the current operator and shift', () => {
     render(<DashboardPage />);
-    expect(screen.getByText('Budi — Shift Red')).toBeInTheDocument();
+    expect(screen.getByText('Budi')).toBeInTheDocument();
+    expect(screen.getByText('Shift Red')).toBeInTheDocument();
   });
 
   it('shows combined achievement percentage by default', () => {

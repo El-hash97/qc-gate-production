@@ -20,9 +20,11 @@ describe('HourlyChart', () => {
   it('plots OK/Repair/NG bars plus a cumulative line', () => {
     render(<HourlyChart hourlyData={hourly} />);
     const [props] = chartSpy.mock.calls[0];
-    expect(props.data.labels).toEqual(['09:00', '10:00']);
+    // padded to >= 4 hour slots so a 2-hour shift doesn't draw as giant bars
+    expect(props.data.labels.length).toBe(4);
+    expect(props.data.labels.slice(0, 2)).toEqual(['09:00', '10:00']);
     const cumulative = props.data.datasets.find((d: any) => d.label === 'Kumulatif');
-    expect(cumulative.data).toEqual([10, 16]);
+    expect(cumulative.data).toEqual([10, 16, null, null]);
     expect(props.data.datasets.some((d: any) => d.label === 'Target')).toBe(false);
   });
 
@@ -30,6 +32,6 @@ describe('HourlyChart', () => {
     render(<HourlyChart hourlyData={hourly} target={100} />);
     const [props] = chartSpy.mock.calls[0];
     const target = props.data.datasets.find((d: any) => d.label === 'Target');
-    expect(target.data).toEqual([100, 100]);
+    expect(target.data).toEqual([100, 100, null, null]);
   });
 });

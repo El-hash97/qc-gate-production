@@ -3,19 +3,25 @@
 import '@/lib/chartSetup';
 import { Chart } from 'react-chartjs-2';
 import type { EntryLog } from '@/lib/types';
-import { flaskTypeMatrix, cavityTypeMatrix, type FlaskMatrix } from '@/utils/charts';
+import { flaskTypeMatrix, cavityTypeMatrix, padLabels, type FlaskMatrix } from '@/utils/charts';
 import { useChartTheme } from '@/hooks/useTheme';
 
 // rows (flask/cavity) x defect-type heatmap — cell colour tracks the summed qty,
 // so a repeatedly-bad flask/cavity or a recurring defect stands out.
 function Heatmap({ matrix, dense = false }: { matrix: FlaskMatrix; dense?: boolean }) {
-  const { flasks, types, cells, max } = matrix;
+  const { flasks: rows, types, cells, max } = matrix;
   const ct = useChartTheme();
   const tickFont = dense ? 8 : 9;
 
-  if (cells.length === 0) {
-    return <div style={{ fontSize: dense ? 11 : 13, color: ct.tick, padding: '8px 0' }}>Belum ada data</div>;
-  }
+  // Rows come pre-floored by the matrix builders (flask 1..5, cavity 1..8). Pad
+  // the defect-type columns up to MIN_CHART_SLOTS so 1-2 types don't render as a
+  // few oversized cells. Every empty grid position gets a faint grey ghost cell
+  // so the whole matrix reads as a wireframe.
+  const cols = padLabels(types);
+  const realKeys = new Set(cells.map((c) => `${c.y}|${c.x}`));
+  const ghostCells = rows.flatMap((y) =>
+    cols.filter((x) => !realKeys.has(`${y}|${x}`)).map((x) => ({ x, y, v: 0, ghost: true })),
+  );
 
   return (
     <Chart
@@ -24,16 +30,17 @@ function Heatmap({ matrix, dense = false }: { matrix: FlaskMatrix; dense?: boole
         datasets: [
           {
             label: 'Qty',
-            data: cells as any,
+            data: [...cells, ...ghostCells] as any,
             backgroundColor: (ctx: any) => {
+              if (ctx.raw?.ghost) return 'rgba(148, 163, 184, 0.1)';
               const v = ctx.raw?.v ?? 0;
               const alpha = max === 0 ? 0 : 0.15 + 0.75 * (v / max);
               return `rgba(220, 38, 38, ${alpha})`;
             },
             borderWidth: 1,
             borderColor: ct.gridBorder,
-            width: (ctx: any) => (ctx.chart.chartArea?.width ?? 0) / types.length - 2,
-            height: (ctx: any) => (ctx.chart.chartArea?.height ?? 0) / flasks.length - 2,
+            width: (ctx: any) => (ctx.chart.chartArea?.width ?? 0) / cols.length - 2,
+            height: (ctx: any) => (ctx.chart.chartArea?.height ?? 0) / rows.length - 2,
           } as any,
         ],
       }}
@@ -45,6 +52,7 @@ function Heatmap({ matrix, dense = false }: { matrix: FlaskMatrix; dense?: boole
           legend: { display: false },
           datalabels: { display: false },
           tooltip: {
+            filter: (item: any) => !item.raw?.ghost,
             callbacks: {
               title: (items: any) => `${items[0].raw.y} · ${items[0].raw.x}`,
               label: (item: any) => `Qty: ${item.raw.v}`,
@@ -54,8 +62,8 @@ function Heatmap({ matrix, dense = false }: { matrix: FlaskMatrix; dense?: boole
           },
         },
         scales: {
-          x: { type: 'category', labels: types, offset: true, grid: { display: false }, ticks: { color: ct.tick, font: { size: tickFont }, maxRotation: 45 } },
-          y: { type: 'category', labels: flasks, reverse: true, offset: true, grid: { display: false }, ticks: { color: ct.tick, font: { size: tickFont } } },
+          x: { type: 'category', labels: cols, offset: true, grid: { display: false }, ticks: { color: ct.tick, font: { size: tickFont }, maxRotation: 45 } },
+          y: { type: 'category', labels: rows, reverse: true, offset: true, grid: { display: false }, ticks: { color: ct.tick, font: { size: tickFont } } },
         },
       }}
     />

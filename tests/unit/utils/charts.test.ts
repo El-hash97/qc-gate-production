@@ -1,8 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import {
-  hourlySeries, pareto, flaskTypeMatrix, cavityTypeMatrix, expandCavities, lotDefectData,
+  hourlySeries, pareto, flaskTypeMatrix, cavityTypeMatrix, expandCavities, lotDefectData, padLabels,
 } from '@/utils/charts';
 import type { EntryLog } from '@/lib/types';
+
+describe('padLabels', () => {
+  it('pads up to 4 blank, distinct slots and leaves real labels first', () => {
+    const out = padLabels(['A', 'B']);
+    expect(out.length).toBe(4);
+    expect(out.slice(0, 2)).toEqual(['A', 'B']);
+    expect(new Set(out).size).toBe(4); // fillers are distinct categories
+  });
+
+  it('leaves a list that already meets the minimum untouched', () => {
+    expect(padLabels(['A', 'B', 'C', 'D', 'E'])).toEqual(['A', 'B', 'C', 'D', 'E']);
+  });
+});
 
 describe('hourlySeries', () => {
   it('sorts hours and accumulates a running total of ok+repair+ng', () => {
@@ -36,15 +49,19 @@ describe('flaskTypeMatrix', () => {
     { kind: 'defect', type: 'Kake', qty: 4, lot: 'L3', flask: '2' },
   ];
 
-  it('sums qty per (flask, type) cell, tracks the max, sorts flasks numerically', () => {
+  it('sums qty per (flask, type) cell, tracks the max, floors rows at 1..5 sorted numerically', () => {
     const { flasks, types, cells, max } = flaskTypeMatrix(logs);
-    expect(flasks).toEqual(['2', '10']);
+    expect(flasks).toEqual(['1', '2', '3', '4', '5', '10']);
     expect(types).toEqual(['Dross', 'Kake']);
     expect(max).toBe(4);
     expect(cells).toContainEqual({ x: 'Dross', y: '10', v: 3, lots: ['L1', 'L2'] });
     expect(cells).toContainEqual({ x: 'Kake', y: '2', v: 4, lots: ['L3'] });
     // no empty cells emitted
     expect(cells).toHaveLength(2);
+  });
+
+  it('shows flask numbers 1..5 on the left even with no logs', () => {
+    expect(flaskTypeMatrix([]).flasks).toEqual(['1', '2', '3', '4', '5']);
   });
 });
 

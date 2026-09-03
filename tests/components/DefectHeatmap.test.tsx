@@ -19,16 +19,25 @@ describe('DefectHeatmap', () => {
   it('flask variant: one matrix keyed by the flask number', () => {
     render(<DefectHeatmap logs={[bc]} variant="flask" />);
     expect(chartSpy).toHaveBeenCalledTimes(1);
-    expect(chartSpy.mock.calls[0][0].data.datasets[0].data).toEqual([
-      { x: 'Dross', y: '2', v: 3, lots: ['L1'] },
-    ]);
+    const real = chartSpy.mock.calls[0][0].data.datasets[0].data.filter((c: any) => !c.ghost);
+    expect(real).toEqual([{ x: 'Dross', y: '2', v: 3, lots: ['L1'] }]);
   });
 
   it('cavity variant: range entry lights every cavity in 1..6', () => {
     render(<DefectHeatmap logs={[shaft]} variant="cavity" />);
-    const cells = chartSpy.mock.calls[0][0].data.datasets[0].data;
+    const cells = chartSpy.mock.calls[0][0].data.datasets[0].data.filter((c: any) => !c.ghost);
     expect(cells.map((c: any) => c.y)).toEqual(['1', '2', '3', '4', '5', '6']);
     expect(cells.every((c: any) => c.v === 1)).toBe(true);
+  });
+
+  it('flask variant: left axis shows flask numbers 1..5, columns padded to 4', () => {
+    render(<DefectHeatmap logs={[bc]} variant="flask" />);
+    const props = chartSpy.mock.calls[0][0];
+    expect(props.options.scales.y.labels).toEqual(['1', '2', '3', '4', '5']);
+    expect(props.options.scales.x.labels.length).toBeGreaterThanOrEqual(4);
+    const ghosts = props.data.datasets[0].data.filter((c: any) => c.ghost);
+    // 5 rows x 4 cols - 1 real cell
+    expect(ghosts.length).toBe(19);
   });
 
   it('both variant: splits the frame into two matrices (flask BC + cavity shaft)', () => {

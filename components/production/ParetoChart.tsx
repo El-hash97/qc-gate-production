@@ -2,8 +2,11 @@
 
 import '@/lib/chartSetup';
 import { Chart } from 'react-chartjs-2';
-import { pareto } from '@/utils/charts';
+import { pareto, padLabels } from '@/utils/charts';
 import { useChartTheme } from '@/hooks/useTheme';
+
+// Grey, low-opacity fill for the wireframe skeleton slots.
+const GHOST = 'rgba(148, 163, 184, 0.15)';
 
 interface ParetoChartProps {
   data: Record<string, number>;
@@ -16,23 +19,33 @@ export function ParetoChart({ data, color }: ParetoChartProps) {
   const { labels, counts, cumulativePct } = pareto(data);
   const ct = useChartTheme();
 
+  // Keep at least MIN_CHART_SLOTS category rows so 1-2 defect types don't render
+  // as a couple of giant bars. The extra rows show a faint grey skeleton bar
+  // (on-scale with the real data) so the chart reads as a wireframe.
+  const paddedLabels = padLabels(labels);
+  const real = counts.length;
+  const skeleton = Math.max(...counts, 1);
+  const barData = paddedLabels.map((_, i) => (i < real ? counts[i] : skeleton));
+  const barColor = paddedLabels.map((_, i) => (i < real ? color : GHOST));
+  const lineData = paddedLabels.map((_, i) => (i < real ? cumulativePct[i] : null));
+
   return (
     <Chart
       type="bar"
       data={{
-        labels,
+        labels: paddedLabels,
         datasets: [
           {
             type: 'bar' as const,
-            data: counts,
-            backgroundColor: color,
+            data: barData,
+            backgroundColor: barColor,
             borderRadius: 4,
             xAxisID: 'x',
             order: 2,
           },
           {
             type: 'line' as const,
-            data: cumulativePct,
+            data: lineData,
             borderColor: '#60a5fa',
             backgroundColor: '#60a5fa',
             borderWidth: 2,
@@ -51,7 +64,7 @@ export function ParetoChart({ data, color }: ParetoChartProps) {
         plugins: {
           legend: { display: false },
           datalabels: {
-            display: (ctx) => ctx.datasetIndex === 0,
+            display: (ctx) => ctx.datasetIndex === 0 && ctx.dataIndex < real,
             color: ct.label,
             anchor: 'end',
             align: 'right',

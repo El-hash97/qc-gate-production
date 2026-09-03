@@ -1,5 +1,18 @@
 import type { EntryLog, HourlySnapshot, ProductLine } from '@/lib/types';
 
+// Minimum category slots a bar chart / heatmap axis is laid out over. With only
+// 1-2 real categories the chart would otherwise draw a couple of oversized bars;
+// padding to this many blank slots keeps them a sensible width.
+export const MIN_CHART_SLOTS = 4;
+
+// Pad a category-label list up to `min` with blank placeholders. Each filler is a
+// distinct run of spaces so Chart.js keeps them as separate categories.
+export function padLabels(labels: string[], min = MIN_CHART_SLOTS): string[] {
+  const out = [...labels];
+  while (out.length < min) out.push(' '.repeat(out.length + 1));
+  return out;
+}
+
 // --- Hourly combo chart: per-hour OK/Repair/NG bars + a cumulative total line ---
 
 export interface HourlySeries {
@@ -111,8 +124,11 @@ function fillCells(
   return { cells, max };
 }
 
-// Block Cylinder: one row per flask number seen, sorted low->high (numeric-aware,
-// so "10" sorts after "2").
+// Left axis of the flask heatmap always shows at least flask numbers 1..5.
+export const FLASK_MIN_ROWS = 5;
+
+// Block Cylinder: one row per flask number seen (plus 1..FLASK_MIN_ROWS as a
+// floor), sorted low->high (numeric-aware, so "10" sorts after "2").
 export function flaskTypeMatrix(logs: EntryLog[]): FlaskMatrix {
   const totals = new Map<string, number>();
   const lots = new Map<string, Set<string>>();
@@ -124,6 +140,9 @@ export function flaskTypeMatrix(logs: EntryLog[]): FlaskMatrix {
     const key = `${log.flask} ${log.type}`;
     totals.set(key, (totals.get(key) ?? 0) + log.qty);
     addLot(lots, key, log.lot);
+  }
+  for (let n = 1; n <= FLASK_MIN_ROWS; n++) {
+    if (!flasks.includes(String(n))) flasks.push(String(n));
   }
   flasks.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   return { flasks, types, ...fillCells(flasks, types, totals, lots) };

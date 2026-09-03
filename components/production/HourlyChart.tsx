@@ -3,8 +3,11 @@
 import '@/lib/chartSetup';
 import { Chart } from 'react-chartjs-2';
 import type { HourlySnapshot } from '@/lib/types';
-import { hourlySeries } from '@/utils/charts';
+import { hourlySeries, padLabels } from '@/utils/charts';
 import { useChartTheme } from '@/hooks/useTheme';
+
+// Grey, low-opacity fill for the wireframe skeleton slots.
+const GHOST = 'rgba(148, 163, 184, 0.15)';
 
 interface HourlyChartProps {
   hourlyData: Record<string, HourlySnapshot>;
@@ -17,14 +20,26 @@ export function HourlyChart({ hourlyData, target }: HourlyChartProps) {
   const { hours, ok, repair, ng, cumulative } = hourlySeries(hourlyData);
   const ct = useChartTheme();
 
+  // Keep at least MIN_CHART_SLOTS hour slots so a shift with 1-2 recorded hours
+  // doesn't render as a couple of giant bars. The extra slots show a faint grey
+  // skeleton bar (on-scale with the busiest real hour) so it reads as a wireframe.
+  const labels = padLabels(hours);
+  const real = hours.length;
+  const skeleton = Math.max(1, ...hours.map((_, i) => ok[i] + repair[i] + ng[i]));
+  const pad = (arr: number[]) => labels.map((_, i) => (i < real ? arr[i] : null));
+
   const datasets: any[] = [
-    { type: 'bar' as const, label: 'OK', data: ok, backgroundColor: '#22c55e', stack: 'h', yAxisID: 'y', order: 3 },
-    { type: 'bar' as const, label: 'Repair', data: repair, backgroundColor: '#f59e0b', stack: 'h', yAxisID: 'y', order: 3 },
-    { type: 'bar' as const, label: 'NG', data: ng, backgroundColor: '#dc2626', stack: 'h', yAxisID: 'y', order: 3 },
+    {
+      type: 'bar' as const, label: 'OK', stack: 'h', yAxisID: 'y', order: 3,
+      data: labels.map((_, i) => (i < real ? ok[i] : skeleton)),
+      backgroundColor: labels.map((_, i) => (i < real ? '#22c55e' : GHOST)),
+    },
+    { type: 'bar' as const, label: 'Repair', data: pad(repair), backgroundColor: '#f59e0b', stack: 'h', yAxisID: 'y', order: 3 },
+    { type: 'bar' as const, label: 'NG', data: pad(ng), backgroundColor: '#dc2626', stack: 'h', yAxisID: 'y', order: 3 },
     {
       type: 'line' as const,
       label: 'Kumulatif',
-      data: cumulative,
+      data: pad(cumulative),
       borderColor: '#60a5fa',
       backgroundColor: '#60a5fa',
       borderWidth: 2,
@@ -38,7 +53,7 @@ export function HourlyChart({ hourlyData, target }: HourlyChartProps) {
     datasets.push({
       type: 'line' as const,
       label: 'Target',
-      data: hours.map(() => target),
+      data: labels.map((_, i) => (i < hours.length ? target : null)),
       borderColor: ct.tick,
       borderDash: [6, 4],
       borderWidth: 1,
@@ -51,7 +66,7 @@ export function HourlyChart({ hourlyData, target }: HourlyChartProps) {
   return (
     <Chart
       type="bar"
-      data={{ labels: hours, datasets }}
+      data={{ labels, datasets }}
       options={{
         responsive: true,
         maintainAspectRatio: false,

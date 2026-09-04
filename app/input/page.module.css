@@ -50,6 +50,13 @@
   font-family: inherit;
 }
 
+/* Target fields hold small numbers — keep them narrow so all three
+   (BC / Camshaft / Crankshaft) stay on one row with the other toolbar fields. */
+.targetInput {
+  width: 80px;
+  padding-right: 6px;
+}
+
 .progressGroups {
   display: flex;
   flex-direction: column;

@@ -231,7 +231,7 @@ export default function InputPage() {
         <label className={styles.toolbarGroup}>
           <span className={styles.toolbarLabel}>Target BC</span>
           <input
-            type="number" className={styles.toolbarInput} min={0}
+            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
             value={targetBcField.value}
             onChange={targetBcField.onChange} onBlur={targetBcField.onBlur} onKeyDown={targetBcField.onKeyDown}
           />
@@ -239,7 +239,7 @@ export default function InputPage() {
         <label className={styles.toolbarGroup}>
           <span className={styles.toolbarLabel}>Target Camshaft</span>
           <input
-            type="number" className={styles.toolbarInput} min={0}
+            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
             value={targetCamField.value}
             onChange={targetCamField.onChange} onBlur={targetCamField.onBlur} onKeyDown={targetCamField.onKeyDown}
           />
@@ -247,7 +247,7 @@ export default function InputPage() {
         <label className={styles.toolbarGroup}>
           <span className={styles.toolbarLabel}>Target Crankshaft</span>
           <input
-            type="number" className={styles.toolbarInput} min={0}
+            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
             value={targetCrankField.value}
             onChange={targetCrankField.onChange} onBlur={targetCrankField.onBlur} onKeyDown={targetCrankField.onKeyDown}
           />

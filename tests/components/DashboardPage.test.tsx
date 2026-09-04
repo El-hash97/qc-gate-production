@@ -6,6 +6,7 @@ vi.mock('@/hooks/useProductionState', () => ({
   useProductionState: () => ({
     state: {
       date: '5 Agustus 2026', shift: 'Shift Red', operator: 'Budi', target: 100,
+      targetBc: 100, targetCam: 100, targetCrank: 100,
       ok1: 40, repair1: 2, ng1: 1, ok2: 30, repair2: 1, ng2: 0,
       ok3: 8, repair3: 1, ng3: 1, ok4: 0, repair4: 0, ng4: 0,
       defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {},

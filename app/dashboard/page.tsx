@@ -21,6 +21,7 @@ import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
+  targetBc: 0, targetCam: 0, targetCrank: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
   pic: '',
@@ -65,8 +66,14 @@ export default function DashboardPage() {
   const repair = getRepairTotal(current, scope);
   const ng = getNgTotal(current, scope);
   const rates = getRates(current, scope);
-  const achievement = getAchievementPercent(current, current.target, scope);
-  const progress = getProgressPercent(current, current.target, scope);
+  // "Semua" measures against the whole-shift target; each scoped view uses that
+  // product group's own target (see the split Target fields on the Input page).
+  const scopedTarget = view === 'all' ? current.target
+    : view === 'bc' ? (current.targetBc ?? 0)
+    : view === 'camshaft' ? (current.targetCam ?? 0)
+    : (current.targetCrank ?? 0);
+  const achievement = getAchievementPercent(current, scopedTarget, scope);
+  const progress = getProgressPercent(current, scopedTarget, scope);
 
   // Memoised so an unchanged background poll (react-query keeps the same
   // `current` reference via structural sharing) doesn't hand the charts a new

@@ -87,6 +87,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
           defect_data = '{}'::jsonb, repair_data = '{}'::jsonb, hourly_data = '{}'::jsonb,
           defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
+          hourly_data_cam = '{}'::jsonb, hourly_data_crank = '{}'::jsonb,
           hourly_target_bc = '{}'::jsonb, hourly_target_cam = '{}'::jsonb, hourly_target_crank = '{}'::jsonb,
           entry_logs = '[]'::jsonb, line_stops = '[]'::jsonb,
           saved_at = now()

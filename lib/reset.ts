@@ -54,6 +54,7 @@ export async function resetProductionState(): Promise<ProductionState> {
            defect_data, repair_data, hourly_data,
            defect_data_shaft, repair_data_shaft, hourly_data_shaft,
            hourly_data_cam, hourly_data_crank,
+           hourly_target_bc, hourly_target_cam, hourly_target_crank,
            entry_logs, line_stops, saved_at)
         VALUES (
           ${current.date}, ${current.shift}, ${current.operator}, ${current.pic ?? ''}, ${current.target},
@@ -70,6 +71,9 @@ export async function resetProductionState(): Promise<ProductionState> {
           ${JSON.stringify(current.hourlyDataShaft ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyDataCam ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyDataCrank ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyTargetBc ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyTargetCam ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyTargetCrank ?? {})}::jsonb,
           ${JSON.stringify(current.entryLogs)}::jsonb,
           ${JSON.stringify(current.lineStops ?? [])}::jsonb,
           now()
@@ -83,6 +87,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
           defect_data = '{}'::jsonb, repair_data = '{}'::jsonb, hourly_data = '{}'::jsonb,
           defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
+          hourly_target_bc = '{}'::jsonb, hourly_target_cam = '{}'::jsonb, hourly_target_crank = '{}'::jsonb,
           entry_logs = '[]'::jsonb, line_stops = '[]'::jsonb,
           saved_at = now()
         WHERE id = 1
@@ -92,11 +97,13 @@ export async function resetProductionState(): Promise<ProductionState> {
     await sql`
       UPDATE production_state SET
         date = '', shift = 'Shift Red', operator = '', pic = '', target = 0,
+        target_bc = 0, target_cam = 0, target_crank = 0,
         ok1 = 0, repair1 = 0, ng1 = 0, ok2 = 0, repair2 = 0, ng2 = 0,
         ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
         defect_data = '{}'::jsonb, repair_data = '{}'::jsonb, hourly_data = '{}'::jsonb,
         defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
         hourly_data_cam = '{}'::jsonb, hourly_data_crank = '{}'::jsonb,
+        hourly_target_bc = '{}'::jsonb, hourly_target_cam = '{}'::jsonb, hourly_target_crank = '{}'::jsonb,
         entry_logs = '[]'::jsonb, line_stops = '[]'::jsonb,
         saved_at = now()
       WHERE id = 1

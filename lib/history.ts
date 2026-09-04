@@ -24,6 +24,9 @@ interface HistoryRow {
   hourly_data_shaft?: Record<string, HourlySnapshot>;
   hourly_data_cam?: Record<string, HourlySnapshot>;
   hourly_data_crank?: Record<string, HourlySnapshot>;
+  hourly_target_bc?: Record<string, number>;
+  hourly_target_cam?: Record<string, number>;
+  hourly_target_crank?: Record<string, number>;
   entry_logs: EntryLog[];
   line_stops?: LineStop[];
   saved_at: string;
@@ -52,6 +55,9 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     hourlyDataShaft: row.hourly_data_shaft ?? {},
     hourlyDataCam: row.hourly_data_cam ?? {},
     hourlyDataCrank: row.hourly_data_crank ?? {},
+    hourlyTargetBc: row.hourly_target_bc ?? {},
+    hourlyTargetCam: row.hourly_target_cam ?? {},
+    hourlyTargetCrank: row.hourly_target_crank ?? {},
     entryLogs: row.entry_logs ?? [],
     lineStops: row.line_stops ?? [],
     savedAt: row.saved_at,
@@ -114,6 +120,9 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
         hourly_data_shaft = ${JSON.stringify(row.hourly_data_shaft ?? {})}::jsonb,
         hourly_data_cam = ${JSON.stringify(row.hourly_data_cam ?? {})}::jsonb,
         hourly_data_crank = ${JSON.stringify(row.hourly_data_crank ?? {})}::jsonb,
+        hourly_target_bc = ${JSON.stringify(row.hourly_target_bc ?? {})}::jsonb,
+        hourly_target_cam = ${JSON.stringify(row.hourly_target_cam ?? {})}::jsonb,
+        hourly_target_crank = ${JSON.stringify(row.hourly_target_crank ?? {})}::jsonb,
         entry_logs = ${JSON.stringify(row.entry_logs ?? [])}::jsonb,
         line_stops = ${JSON.stringify(row.line_stops ?? [])}::jsonb,
         saved_at = now()

@@ -53,7 +53,7 @@ function bucketByLine(logs: EntryLog[], line: 3 | 4, kind: 'defect' | 'repair'):
 }
 
 export default function DashboardPage() {
-  const { state, isFetching, isError } = useProductionState();
+  const { state, isFetching, isError, updateState } = useProductionState();
   const current = state ?? EMPTY_STATE;
 
   const [view, setView] = useState<DashboardView>('all');
@@ -99,6 +99,30 @@ export default function DashboardPage() {
     if (view === 'bc') return current.entryLogs.filter((log) => (log.group ?? 'bc') === 'bc');
     return current.entryLogs.filter((log) => log.line === LINE_FOR[view]);
   }, [view, current.entryLogs]);
+
+  // Per-hour targets: each product view edits its own map; "Semua" shows the
+  // per-hour sum of the three (read-only — you set them per group).
+  const hourlyTargetKey = view === 'bc' ? 'hourlyTargetBc'
+    : view === 'camshaft' ? 'hourlyTargetCam'
+    : view === 'crankshaft' ? 'hourlyTargetCrank' : null;
+  const hourlyTarget = useMemo(() => {
+    if (hourlyTargetKey) return current[hourlyTargetKey] ?? {};
+    const bc = current.hourlyTargetBc ?? {};
+    const cam = current.hourlyTargetCam ?? {};
+    const crank = current.hourlyTargetCrank ?? {};
+    const out: Record<string, number> = {};
+    for (const h of new Set([...Object.keys(bc), ...Object.keys(cam), ...Object.keys(crank)])) {
+      out[h] = (bc[h] ?? 0) + (cam[h] ?? 0) + (crank[h] ?? 0);
+    }
+    return out;
+  }, [hourlyTargetKey, current.hourlyTargetBc, current.hourlyTargetCam, current.hourlyTargetCrank]);
+
+  function handleHourlyTarget(hour: string, value: number) {
+    // Never write before the running shift has loaded — that would POST
+    // EMPTY_STATE over live data (mirrors the Input page's load gate).
+    if (!state || !hourlyTargetKey) return;
+    updateState({ ...state, [hourlyTargetKey]: { ...(state[hourlyTargetKey] ?? {}), [hour]: value } });
+  }
 
   return (
     <main className={styles.page}>
@@ -174,7 +198,14 @@ export default function DashboardPage() {
 
         <section className={`${styles.panel} ${styles.spanTable} ${styles.hTrend}`}>
           <div className={styles.panelTitle}>Hourly (Tabel)</div>
-          <div className={styles.scrollBody}><HourlyTable hourlyData={hourlyData} /></div>
+          <div className={styles.scrollBody}>
+            <HourlyTable
+              hourlyData={hourlyData}
+              hourlyTarget={hourlyTarget}
+              editable={hourlyTargetKey !== null}
+              onTargetChange={handleHourlyTarget}
+            />
+          </div>
         </section>
 
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>

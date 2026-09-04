@@ -101,6 +101,12 @@ export interface ProductionState {
   // stays as their sum for the merged view; every read site defaults to {}.
   hourlyDataCam?: Record<string, HourlySnapshot>;
   hourlyDataCrank?: Record<string, HourlySnapshot>;
+  // Per-hour production target (pcs) per product group, keyed "HH:00". Edited in
+  // the dashboard Hourly table; the "Semua" view shows the per-hour sum of the
+  // three. Optional for back-compat; every read site defaults to {}.
+  hourlyTargetBc?: Record<string, number>;
+  hourlyTargetCam?: Record<string, number>;
+  hourlyTargetCrank?: Record<string, number>;
   entryLogs: EntryLog[];
   // Plant-wide line stops. Optional for back-compat; every read site defaults
   // a missing value to [].

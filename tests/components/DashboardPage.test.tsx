@@ -20,6 +20,7 @@ vi.mock('@/hooks/useProductionState', () => ({
     },
     isFetching: false,
     isError: false,
+    updateState: vi.fn(),
   }),
 }));
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));

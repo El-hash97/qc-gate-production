@@ -24,3 +24,15 @@
   border-bottom: 1px solid var(--border-color);
   font-variant-numeric: tabular-nums;
 }
+
+.targetInput {
+  width: 56px;
+  padding: 3px 6px;
+  text-align: center;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}

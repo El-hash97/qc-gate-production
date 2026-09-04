@@ -30,6 +30,7 @@ describe('getProductionState', () => {
       defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {},
       defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
       hourlyDataCam: {}, hourlyDataCrank: {},
+      hourlyTargetBc: {}, hourlyTargetCam: {}, hourlyTargetCrank: {},
       entryLogs: [],
       lineStops: [],
       savedAt: '2026-08-05T07:00:00.000Z',

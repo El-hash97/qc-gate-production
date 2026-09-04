@@ -113,6 +113,14 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS target_bc INTEGER NOT NULL DEFAULT 
 ALTER TABLE history ADD COLUMN IF NOT EXISTS target_cam INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE history ADD COLUMN IF NOT EXISTS target_crank INTEGER NOT NULL DEFAULT 0;
 
+-- Per-hour production target (pcs) per product group, keyed "HH:00".
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_target_bc    JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_target_cam   JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_bc    JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_cam   JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB NOT NULL DEFAULT '{}';
+
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())
 ON CONFLICT (id) DO NOTHING;

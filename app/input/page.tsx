@@ -146,12 +146,6 @@ export default function InputPage() {
     commit({ targetBc, targetCam, targetCrank, target: targetBc + targetCam + targetCrank });
   }
 
-  const TARGET_GROUPS: { label: string; scope: 'bc' | 3 | 4; target: number }[] = [
-    { label: 'BC (1TR + 2TR)', scope: 'bc', target: current.targetBc ?? 0 },
-    { label: 'Camshaft', scope: 3, target: current.targetCam ?? 0 },
-    { label: 'Crankshaft', scope: 4, target: current.targetCrank ?? 0 },
-  ];
-
   // Free-text toolbar fields commit on blur, not on every keystroke, so the
   // background poll can't overwrite a value mid-edit.
   const operatorField = useDraftValue(current.operator, (value) => commit({ operator: value }), {
@@ -168,6 +162,12 @@ export default function InputPage() {
   const targetBcField = useDraftValue(current.targetBc ?? 0, (v) => commitTarget({ targetBc: v }), parseTarget);
   const targetCamField = useDraftValue(current.targetCam ?? 0, (v) => commitTarget({ targetCam: v }), parseTarget);
   const targetCrankField = useDraftValue(current.targetCrank ?? 0, (v) => commitTarget({ targetCrank: v }), parseTarget);
+
+  const TARGET_GROUPS: { label: string; scope: 'bc' | 3 | 4; target: number; field: typeof targetBcField }[] = [
+    { label: 'BC (1TR + 2TR)', scope: 'bc', target: current.targetBc ?? 0, field: targetBcField },
+    { label: 'Camshaft', scope: 3, target: current.targetCam ?? 0, field: targetCamField },
+    { label: 'Crankshaft', scope: 4, target: current.targetCrank ?? 0, field: targetCrankField },
+  ];
 
   // Block the whole form until the running shift has loaded — otherwise the
   // first click/keystroke would write EMPTY_STATE over live data.
@@ -228,30 +228,6 @@ export default function InputPage() {
             {SHIFTS.map((shift) => <option key={shift} value={shift}>{shift}</option>)}
           </select>
         </label>
-        <label className={styles.toolbarGroup}>
-          <span className={styles.toolbarLabel}>Target BC</span>
-          <input
-            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
-            value={targetBcField.value}
-            onChange={targetBcField.onChange} onBlur={targetBcField.onBlur} onKeyDown={targetBcField.onKeyDown}
-          />
-        </label>
-        <label className={styles.toolbarGroup}>
-          <span className={styles.toolbarLabel}>Target Camshaft</span>
-          <input
-            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
-            value={targetCamField.value}
-            onChange={targetCamField.onChange} onBlur={targetCamField.onBlur} onKeyDown={targetCamField.onKeyDown}
-          />
-        </label>
-        <label className={styles.toolbarGroup}>
-          <span className={styles.toolbarLabel}>Target Crankshaft</span>
-          <input
-            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
-            value={targetCrankField.value}
-            onChange={targetCrankField.onChange} onBlur={targetCrankField.onBlur} onKeyDown={targetCrankField.onKeyDown}
-          />
-        </label>
       </div>
       </div>
 
@@ -261,9 +237,20 @@ export default function InputPage() {
           const achievement = getAchievementPercent(current, g.target, g.scope);
           return (
             <div className={styles.progressStrip} key={g.label}>
+              <div className={styles.targetFieldRow}>
+                <label className={styles.targetField}>
+                  <span className={styles.toolbarLabel}>Target</span>
+                  <input
+                    type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
+                    value={g.field.value}
+                    onChange={g.field.onChange} onBlur={g.field.onBlur} onKeyDown={g.field.onKeyDown}
+                  />
+                </label>
+                <span className={styles.targetProduct}>{g.label}</span>
+              </div>
               <div className={styles.progressWrapper}>
                 <div className={styles.progressLabel}>
-                  <span>{g.label}</span>
+                  <span>Progress</span>
                   <span>{progress}%</span>
                 </div>
                 <div className={styles.progressTrack}>

@@ -50,11 +50,31 @@
   font-family: inherit;
 }
 
-/* Target fields hold small numbers — keep them narrow so all three
-   (BC / Camshaft / Crankshaft) stay on one row with the other toolbar fields. */
+/* Target fields hold small numbers — keep them narrow. They live in the
+   achievement row now, one per product group. */
 .targetInput {
-  width: 80px;
+  width: 72px;
   padding-right: 6px;
+}
+
+.targetFieldRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.targetField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.targetProduct {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding-bottom: 7px;
 }
 
 .progressGroups {

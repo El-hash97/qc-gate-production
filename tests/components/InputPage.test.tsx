@@ -56,7 +56,7 @@ describe('InputPage', () => {
 
   it('commits a per-group Target field once on blur, not on every keystroke', async () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
-    const target = screen.getByLabelText('Target BC');
+    const target = screen.getAllByLabelText('Target')[0]; // BC is the first group
     await userEvent.clear(target);
     await userEvent.type(target, '250');
     expect(updateStateMock).not.toHaveBeenCalled();

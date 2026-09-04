@@ -258,8 +258,8 @@ export default function DashboardPage() {
         <section
           className={`${styles.panel} ${
             lineStops.length === 0 ? styles.spanList
-              : lineStops.length <= 4 ? `${styles.spanHalf} ${styles.hLogShort}`
-              : `${styles.spanFull} ${styles.hLogShort}`
+              : lineStops.length <= 4 ? `${styles.spanHalf} ${styles.hLog}`
+              : `${styles.spanFull} ${styles.hLog}`
           }`}
         >
           <div className={styles.panelTitle}>Line Stop</div>

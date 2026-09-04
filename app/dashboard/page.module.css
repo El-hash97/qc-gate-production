@@ -256,56 +256,72 @@
 }
 
 /* --- Print / "Export PDF": clean daily report of the active view. The export
-   handler forces the light theme first so the chart canvases stay legible. --- */
+   handler forces the light theme first so the chart canvases stay legible;
+   lib/chartSetup.ts resizes the Chart.js canvases to fit these columns on
+   `beforeprint`. --- */
 @media print {
   .page {
     padding: 0;
-    gap: 12px;
+    gap: 8px;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   /* On-screen chrome that doesn't belong in the report. */
   .toggleRow,
-  .statusBar { display: none; }
+  .statusBar { display: none !important; }
 
   .printHeader {
     display: block;
     border-bottom: 2px solid #111;
     padding-bottom: 8px;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
   }
-  .printHeader h1 {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
+  .printHeader h1 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
   .printMeta { font-size: 11px; color: #333; }
 
-  .kpiRow { gap: 8px; }
-  .kpiCard { box-shadow: none; break-inside: avoid; }
-  .progressStrip { box-shadow: none; break-inside: avoid; }
+  .kpiRow {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+    break-inside: avoid;
+  }
+  .kpiCard { box-shadow: none; }
+  .kpiValue { font-size: 20px; }
+  .progressStrip { box-shadow: none; break-inside: avoid; margin-bottom: 8px; }
 
+  /* Two panels per row; the wide ones (Hourly Production, Line Stop) span both. */
   .bento {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
   }
   .panel {
     grid-column: auto !important;
+    height: auto !important;
     break-inside: avoid;
-    box-shadow: none;
-    border: 1px solid #bbb;
+    box-shadow: none !important;
+    border: 1px solid #bbb !important;
   }
-  /* The wide panels read better across the full page. */
   .spanHero,
   .spanFull { grid-column: 1 / -1 !important; }
 
-  /* Charts need a definite box; lists expand so every row prints. */
-  .panel:has(.panelBody) { height: 230px !important; }
-  .panel:has(.scrollBody) { height: auto !important; }
+  /* Chart body keeps a definite box (Chart.js fills it after the beforeprint
+     resize); the wide chart gets a bit more height. */
+  .panelBody {
+    position: relative !important;
+    flex: none !important;
+    min-height: 0 !important;
+    height: 210px !important;
+  }
+  .spanHero .panelBody { height: 260px !important; }
+  .panelBody canvas { max-width: 100% !important; }
+
+  /* Lists print every row instead of scrolling. */
   .scrollBody {
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
+    flex: none !important;
   }
 }

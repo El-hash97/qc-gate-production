@@ -28,10 +28,12 @@ describe('HourlyChart', () => {
     expect(props.data.datasets.some((d: any) => d.label === 'Target')).toBe(false);
   });
 
-  it('adds a flat target line when a target is given', () => {
-    render(<HourlyChart hourlyData={hourly} target={100} />);
+  it('adds a per-hour dashed target line from the hourly target map', () => {
+    render(<HourlyChart hourlyData={hourly} hourlyTarget={{ '09:00': 40, '10:00': 45 }} />);
     const [props] = chartSpy.mock.calls[0];
     const target = props.data.datasets.find((d: any) => d.label === 'Target');
-    expect(target.data).toEqual([100, 100, null, null]);
+    expect(target.data).toEqual([40, 45, null, null]);
+    expect(target.borderDash).toEqual([6, 4]);
+    expect(target.yAxisID).toBe('y');
   });
 });

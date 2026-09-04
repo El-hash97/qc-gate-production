@@ -192,7 +192,7 @@ export default function DashboardPage() {
         <section className={`${styles.panel} ${styles.spanHero} ${styles.hTrend}`}>
           <div className={styles.panelTitle}>Hourly Production</div>
           <div className={styles.panelBody}>
-            <HourlyChart hourlyData={hourlyData} target={view === 'all' ? current.target : undefined} />
+            <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyTarget} />
           </div>
         </section>
 

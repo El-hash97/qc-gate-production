@@ -11,12 +11,12 @@ const GHOST = 'rgba(148, 163, 184, 0.15)';
 
 interface HourlyChartProps {
   hourlyData: Record<string, HourlySnapshot>;
-  // Shift target for the reference line. Only passed on the combined ("Semua")
-  // view — the stored target is not split per line.
-  target?: number;
+  // Per-hour production target (pcs), keyed "HH:00" — entered in the Hourly
+  // table. Drawn as a grey dashed reference line on the count axis.
+  hourlyTarget?: Record<string, number>;
 }
 
-export function HourlyChart({ hourlyData, target }: HourlyChartProps) {
+export function HourlyChart({ hourlyData, hourlyTarget = {} }: HourlyChartProps) {
   const { hours, ok, repair, ng, cumulative } = hourlySeries(hourlyData);
   const ct = useChartTheme();
 
@@ -49,16 +49,18 @@ export function HourlyChart({ hourlyData, target }: HourlyChartProps) {
     },
   ];
 
-  if (target && target > 0) {
+  const targetLine = labels.map((_, i) => (i < real ? (hourlyTarget[hours[i]] || null) : null));
+  if (targetLine.some((v) => v !== null)) {
     datasets.push({
       type: 'line' as const,
       label: 'Target',
-      data: labels.map((_, i) => (i < hours.length ? target : null)),
+      data: targetLine,
       borderColor: ct.tick,
       borderDash: [6, 4],
-      borderWidth: 1,
-      pointRadius: 0,
-      yAxisID: 'y2',
+      borderWidth: 1.5,
+      pointRadius: 2,
+      stepped: 'middle' as const,
+      yAxisID: 'y',
       order: 2,
     });
   }
@@ -77,7 +79,7 @@ export function HourlyChart({ hourlyData, target }: HourlyChartProps) {
         },
         scales: {
           x: { stacked: true, grid: { display: false }, ticks: { color: ct.tick, font: { size: 9 } } },
-          y: { stacked: true, beginAtZero: true, grid: { color: ct.grid }, ticks: { color: ct.tick, stepSize: 1 } },
+          y: { stacked: true, beginAtZero: true, grid: { color: ct.grid }, ticks: { color: ct.tick, precision: 0, maxTicksLimit: 8 } },
           y2: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { color: '#60a5fa' } },
         },
       }}

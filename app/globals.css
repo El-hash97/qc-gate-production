@@ -59,3 +59,13 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background var(--transition), color var(--transition);
 }
+
+@media print {
+  @page { margin: 12mm; }
+  body {
+    background: #fff;
+    color: #111;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

@@ -11,6 +11,11 @@
   z-index: 100;
 }
 
+/* The top nav is on-screen chrome — leave it out of printed reports. */
+@media print {
+  .header { display: none; }
+}
+
 .titleGroup {
   justify-self: start;
   min-width: 0;

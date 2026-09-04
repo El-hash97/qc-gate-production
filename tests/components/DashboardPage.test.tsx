@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/hooks/useProductionState', () => ({
@@ -44,6 +44,28 @@ describe('DashboardPage', () => {
   it('shows connection status from the hook', () => {
     render(<DashboardPage />);
     expect(screen.getByText('Real-time Connected')).toBeInTheDocument();
+  });
+
+  it('Export PDF button triggers the browser print dialog', () => {
+    vi.useFakeTimers();
+    const printSpy = vi.fn();
+    const original = window.print;
+    window.print = printSpy;
+    try {
+      render(<DashboardPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
+      vi.advanceTimersByTime(300);
+      expect(printSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.print = original;
+      vi.useRealTimers();
+    }
+  });
+
+  it('renders the printed-report header with the scoped product label', () => {
+    render(<DashboardPage />);
+    expect(screen.getByText('Laporan Harian Produksi')).toBeInTheDocument();
+    expect(screen.getByText('Produk: Semua Produk')).toBeInTheDocument();
   });
 
   it('scopes the numbers to Block Cylinder when B/C is selected', async () => {

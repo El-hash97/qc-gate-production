@@ -16,6 +16,8 @@ import {
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
 import { PicCard } from '@/components/production/PicCard';
+import { useTheme } from '@/hooks/useTheme';
+import { findPic } from '@/utils/constants';
 import type { EntryLog, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -39,6 +41,14 @@ const VIEW_OPTIONS: { value: DashboardView; label: string }[] = [
   { value: 'crankshaft', label: 'Crankshaft' },
 ];
 
+// Product label spelled out for the printed report header.
+const REPORT_LABEL: Record<DashboardView, string> = {
+  all: 'Semua Produk',
+  bc: 'BC 1TR + BC 2TR',
+  camshaft: 'Camshaft',
+  crankshaft: 'Crankshaft',
+};
+
 // Camshaft = line 3, Crankshaft = line 4. Their defect/repair tallies share
 // one stored bucket (defectDataShaft), so per-product breakdowns are summed
 // from the line-tagged entry logs instead.
@@ -54,7 +64,9 @@ function bucketByLine(logs: EntryLog[], line: 3 | 4, kind: 'defect' | 'repair'):
 
 export default function DashboardPage() {
   const { state, isFetching, isError, updateState } = useProductionState();
+  const { theme, setTheme } = useTheme();
   const current = state ?? EMPTY_STATE;
+  const [printedAt, setPrintedAt] = useState('');
 
   const [view, setView] = useState<DashboardView>('all');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
@@ -126,8 +138,35 @@ export default function DashboardPage() {
     updateState({ ...state, [hourlyTargetKey]: { ...(state[hourlyTargetKey] ?? {}), [hour]: value } });
   }
 
+  // Export the current view as a PDF via the browser's print-to-PDF. Chart
+  // canvases can't be recoloured by the print stylesheet, so force the light
+  // palette first, let the charts redraw, print, then restore the theme.
+  function handleExportPdf() {
+    setPrintedAt(new Date().toLocaleString('id-ID'));
+    const previous = theme;
+    if (previous !== 'light') setTheme('light');
+    window.setTimeout(() => {
+      window.print();
+      if (previous !== 'light') setTheme(previous);
+    }, 300);
+  }
+
+  const reportPic = findPic(current.pic);
+
   return (
     <main className={styles.page}>
+      <div className={styles.printHeader} aria-hidden="true">
+        <h1>Laporan Harian Produksi</h1>
+        <div className={styles.printMeta}>
+          <span>Tanggal: {current.date || '—'}</span>
+          <span>Shift: {current.shift}</span>
+          <span>Operator: {current.operator || '—'}</span>
+          {reportPic && <span>PIC: {reportPic.name}</span>}
+          <span>Produk: {REPORT_LABEL[view]}</span>
+          {printedAt && <span>Dicetak: {printedAt}</span>}
+        </div>
+      </div>
+
       <div className={styles.statusBar}>
         {current.pic && <PicCard pic={current.pic} />}
         <span className={styles.statusRight}>
@@ -140,18 +179,23 @@ export default function DashboardPage() {
         </span>
       </div>
 
-      <div className={styles.viewToggle} role="group" aria-label="Filter produk">
-        {VIEW_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={view === option.value ? styles.viewButtonActive : styles.viewButton}
-            aria-pressed={view === option.value}
-            onClick={() => setView(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className={styles.toggleRow}>
+        <div className={styles.viewToggle} role="group" aria-label="Filter produk">
+          {VIEW_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={view === option.value ? styles.viewButtonActive : styles.viewButton}
+              aria-pressed={view === option.value}
+              onClick={() => setView(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" className={styles.exportBtn} onClick={handleExportPdf}>
+          Export PDF
+        </button>
       </div>
 
       <div className={styles.kpiRow}>

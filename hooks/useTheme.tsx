@@ -17,9 +17,10 @@ export const THEME_STORAGE_KEY = 'qc-theme';
 // <html> before the first render — no flash of the dark theme.
 export const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}`;
 
-const ThemeContext = createContext<{ theme: Theme; toggle: () => void }>({
+const ThemeContext = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Theme) => void }>({
   theme: 'dark',
   toggle: () => {},
+  setTheme: () => {},
 });
 
 function readStoredTheme(): Theme {
@@ -59,7 +60,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
-  return <ThemeContext.Provider value={{ theme, toggle }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggle, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

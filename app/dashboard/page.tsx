@@ -253,15 +253,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Width grows with the number of stops; an empty shift keeps it small
-            instead of a full-width box holding one line of placeholder text. */}
-        <section
-          className={`${styles.panel} ${
-            lineStops.length === 0 ? styles.spanList
-              : lineStops.length <= 4 ? `${styles.spanHalf} ${styles.hLogShort}`
-              : `${styles.spanFull} ${styles.hLogShort}`
-          }`}
-        >
+        <section className={`${styles.panel} ${styles.spanFull} ${styles.hLogShort}`}>
           <div className={styles.panelTitle}>Line Stop</div>
           <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
         </section>

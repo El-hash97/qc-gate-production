@@ -25,6 +25,7 @@ import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', pic: '', target: 0,
+  targetBc: 0, targetCam: 0, targetCrank: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
   defectData: {}, repairData: {}, hourlyData: {},
@@ -134,9 +135,22 @@ export default function InputPage() {
     setRepairTarget(null);
   }
 
-  const achievement = getAchievementPercent(current, current.target);
-  const progress = getProgressPercent(current, current.target);
   const rates = getRates(current);
+
+  // Per-product-group targets. `target` is kept as their sum so the History
+  // table, Excel export and the dashboard "Semua" view stay unchanged.
+  function commitTarget(patch: { targetBc?: number; targetCam?: number; targetCrank?: number }) {
+    const targetBc = patch.targetBc ?? current.targetBc ?? 0;
+    const targetCam = patch.targetCam ?? current.targetCam ?? 0;
+    const targetCrank = patch.targetCrank ?? current.targetCrank ?? 0;
+    commit({ targetBc, targetCam, targetCrank, target: targetBc + targetCam + targetCrank });
+  }
+
+  const TARGET_GROUPS: { label: string; scope: 'bc' | 3 | 4; target: number }[] = [
+    { label: 'BC (1TR + 2TR)', scope: 'bc', target: current.targetBc ?? 0 },
+    { label: 'Camshaft', scope: 3, target: current.targetCam ?? 0 },
+    { label: 'Crankshaft', scope: 4, target: current.targetCrank ?? 0 },
+  ];
 
   // Free-text toolbar fields commit on blur, not on every keystroke, so the
   // background poll can't overwrite a value mid-edit.
@@ -144,13 +158,16 @@ export default function InputPage() {
     parse: (raw) => raw,
     format: (value) => value,
   });
-  const targetField = useDraftValue(current.target, (value) => commit({ target: value }), {
-    parse: (raw) => {
+  const parseTarget = {
+    parse: (raw: string) => {
       const n = parseInt(raw, 10);
       return Number.isNaN(n) ? 0 : Math.max(0, n);
     },
-    format: (value) => String(value),
-  });
+    format: (value: number) => String(value),
+  };
+  const targetBcField = useDraftValue(current.targetBc ?? 0, (v) => commitTarget({ targetBc: v }), parseTarget);
+  const targetCamField = useDraftValue(current.targetCam ?? 0, (v) => commitTarget({ targetCam: v }), parseTarget);
+  const targetCrankField = useDraftValue(current.targetCrank ?? 0, (v) => commitTarget({ targetCrank: v }), parseTarget);
 
   // Block the whole form until the running shift has loaded — otherwise the
   // first click/keystroke would write EMPTY_STATE over live data.
@@ -212,31 +229,51 @@ export default function InputPage() {
           </select>
         </label>
         <label className={styles.toolbarGroup}>
-          <span className={styles.toolbarLabel}>Target</span>
+          <span className={styles.toolbarLabel}>Target BC</span>
           <input
-            type="number"
-            className={styles.toolbarInput}
-            value={targetField.value}
-            min={0}
-            onChange={targetField.onChange}
-            onBlur={targetField.onBlur}
-            onKeyDown={targetField.onKeyDown}
+            type="number" className={styles.toolbarInput} min={0}
+            value={targetBcField.value}
+            onChange={targetBcField.onChange} onBlur={targetBcField.onBlur} onKeyDown={targetBcField.onKeyDown}
+          />
+        </label>
+        <label className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>Target Camshaft</span>
+          <input
+            type="number" className={styles.toolbarInput} min={0}
+            value={targetCamField.value}
+            onChange={targetCamField.onChange} onBlur={targetCamField.onBlur} onKeyDown={targetCamField.onKeyDown}
+          />
+        </label>
+        <label className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>Target Crankshaft</span>
+          <input
+            type="number" className={styles.toolbarInput} min={0}
+            value={targetCrankField.value}
+            onChange={targetCrankField.onChange} onBlur={targetCrankField.onBlur} onKeyDown={targetCrankField.onKeyDown}
           />
         </label>
       </div>
       </div>
 
-      <div className={styles.progressStrip}>
-        <div className={styles.progressWrapper}>
-          <div className={styles.progressLabel}>
-            <span>Progress</span>
-            <span>{progress}%</span>
-          </div>
-          <div className={styles.progressTrack}>
-            <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-        <div className={styles.achievementBadge}>Achievement: {achievement}%</div>
+      <div className={styles.progressGroups}>
+        {TARGET_GROUPS.map((g) => {
+          const progress = getProgressPercent(current, g.target, g.scope);
+          const achievement = getAchievementPercent(current, g.target, g.scope);
+          return (
+            <div className={styles.progressStrip} key={g.label}>
+              <div className={styles.progressWrapper}>
+                <div className={styles.progressLabel}>
+                  <span>{g.label}</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className={styles.progressTrack}>
+                  <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+              <div className={styles.achievementBadge}>Achievement: {achievement}%</div>
+            </div>
+          );
+        })}
       </div>
 
       <section className={styles.productSection}>

@@ -50,6 +50,12 @@
   font-family: inherit;
 }
 
+.progressGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .progressStrip {
   display: flex;
   align-items: center;

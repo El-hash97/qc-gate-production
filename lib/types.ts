@@ -63,7 +63,14 @@ export interface ProductionState {
   // PIC / Group Leader key: 'suryo' | 'koewatno' | ''. Optional for
   // back-compat; every read site defaults a missing value to ''.
   pic?: string;
+  // Grand-shift target (kept as targetBc + targetCam + targetCrank). Older
+  // rows without the per-group columns below still read this as the total.
   target: number;
+  // Per-product-group targets: BC = BC 1TR + BC 2TR, Cam = Camshaft, Crank =
+  // Crankshaft. Optional for back-compat; every read site defaults to 0.
+  targetBc?: number;
+  targetCam?: number;
+  targetCrank?: number;
   ok1: number;
   repair1: number;
   ng1: number;

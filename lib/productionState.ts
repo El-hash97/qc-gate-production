@@ -7,6 +7,9 @@ interface ProductionStateRow {
   operator: string;
   pic?: string;
   target: number;
+  target_bc?: number;
+  target_cam?: number;
+  target_crank?: number;
   ok1: number;
   repair1: number;
   ng1: number;
@@ -39,6 +42,9 @@ function rowToState(row: ProductionStateRow): ProductionState {
     operator: row.operator,
     pic: row.pic ?? '',
     target: row.target,
+    targetBc: row.target_bc ?? 0,
+    targetCam: row.target_cam ?? 0,
+    targetCrank: row.target_crank ?? 0,
     ok1: row.ok1,
     repair1: row.repair1,
     ng1: row.ng1,
@@ -91,6 +97,9 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       operator = ${state.operator ?? ''},
       pic = ${state.pic ?? ''},
       target = ${state.target ?? 0},
+      target_bc = ${state.targetBc ?? 0},
+      target_cam = ${state.targetCam ?? 0},
+      target_crank = ${state.targetCrank ?? 0},
       ok1 = ${state.ok1 ?? 0},
       repair1 = ${state.repair1 ?? 0},
       ng1 = ${state.ng1 ?? 0},

@@ -9,6 +9,9 @@ interface HistoryRow {
   operator: string;
   pic?: string;
   target: number;
+  target_bc?: number;
+  target_cam?: number;
+  target_crank?: number;
   ok1: number; repair1: number; ng1: number;
   ok2: number; repair2: number; ng2: number;
   ok3?: number; repair3?: number; ng3?: number;
@@ -34,6 +37,9 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     operator: row.operator,
     pic: row.pic ?? '',
     target: row.target,
+    targetBc: row.target_bc ?? 0,
+    targetCam: row.target_cam ?? 0,
+    targetCrank: row.target_crank ?? 0,
     ok1: row.ok1, repair1: row.repair1, ng1: row.ng1,
     ok2: row.ok2, repair2: row.repair2, ng2: row.ng2,
     ok3: row.ok3 ?? 0, repair3: row.repair3 ?? 0, ng3: row.ng3 ?? 0,
@@ -95,6 +101,7 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
     sql`
       UPDATE production_state SET
         date = ${row.date}, shift = ${row.shift}, operator = ${row.operator}, pic = ${row.pic ?? ''}, target = ${row.target},
+        target_bc = ${row.target_bc ?? 0}, target_cam = ${row.target_cam ?? 0}, target_crank = ${row.target_crank ?? 0},
         ok1 = ${row.ok1}, repair1 = ${row.repair1}, ng1 = ${row.ng1},
         ok2 = ${row.ok2}, repair2 = ${row.repair2}, ng2 = ${row.ng2},
         ok3 = ${row.ok3 ?? 0}, repair3 = ${row.repair3 ?? 0}, ng3 = ${row.ng3 ?? 0},

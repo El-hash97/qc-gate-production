@@ -24,6 +24,7 @@ describe('getProductionState', () => {
     const result = await getProductionState();
     expect(result).toEqual({
       date: '2026-08-05', shift: 'Shift Red', operator: 'Budi', pic: '', target: 100,
+      targetBc: 0, targetCam: 0, targetCrank: 0,
       ok1: 10, repair1: 1, ng1: 0, ok2: 5, repair2: 0, ng2: 1,
       ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
       defectData: { 'Gas Hole Cope': 1 }, repairData: {}, hourlyData: {},

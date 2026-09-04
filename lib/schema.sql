@@ -104,6 +104,15 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS line_stops JSONB NOT NULL DEFAULT '
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS pic TEXT NOT NULL DEFAULT '';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS pic TEXT NOT NULL DEFAULT '';
 
+-- Per-product-group targets. target stays as their sum for the History table,
+-- Excel export and the dashboard "Semua" view.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS target_bc INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS target_cam INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS target_crank INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS target_bc INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS target_cam INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS target_crank INTEGER NOT NULL DEFAULT 0;
+
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())
 ON CONFLICT (id) DO NOTHING;

@@ -54,15 +54,16 @@ describe('InputPage', () => {
     expect(updateStateMock).not.toHaveBeenCalled();
   });
 
-  it('commits the Target field once on blur, not on every keystroke', async () => {
+  it('commits a per-group Target field once on blur, not on every keystroke', async () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
-    const target = screen.getByLabelText('Target');
+    const target = screen.getByLabelText('Target BC');
     await userEvent.clear(target);
     await userEvent.type(target, '250');
     expect(updateStateMock).not.toHaveBeenCalled();
     await userEvent.tab();
     expect(updateStateMock).toHaveBeenCalledTimes(1);
-    expect(updateStateMock).toHaveBeenCalledWith(expect.objectContaining({ target: 250 }));
+    // target stays the sum of the three group targets (Cam + Crank are 0 here)
+    expect(updateStateMock).toHaveBeenCalledWith(expect.objectContaining({ targetBc: 250, target: 250 }));
   });
 
   it('opens the reset confirmation modal from the Reset button', async () => {
@@ -73,8 +74,8 @@ describe('InputPage', () => {
 
   it('renders Camshaft and Crankshaft sections using the Shaft defect list', async () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
-    expect(screen.getByText('Camshaft')).toBeInTheDocument();
-    expect(screen.getByText('Crankshaft')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Camshaft' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Crankshaft' })).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
     expect(screen.getByText('Ireboshi')).toBeInTheDocument();
   });

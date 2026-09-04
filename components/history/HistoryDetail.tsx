@@ -18,11 +18,11 @@ export function HistoryDetail({ record }: { record: HistoryRecord }) {
       <div className={styles.chartsGrid}>
         <div>
           <div className={styles.chartTitle}>Pareto Defect (NG)</div>
-          <div className={styles.chartWrapper}><ParetoChart data={defectData} color="#dc2626" /></div>
+          <div className={styles.chartWrapper}><ParetoChart data={defectData} /></div>
         </div>
         <div>
           <div className={styles.chartTitle}>Pareto Repair</div>
-          <div className={styles.chartWrapper}><ParetoChart data={repairData} color="#f59e0b" /></div>
+          <div className={styles.chartWrapper}><ParetoChart data={repairData} /></div>
         </div>
       </div>
       <EntryLogList title="Lot / Flask Log" logs={record.entryLogs} />

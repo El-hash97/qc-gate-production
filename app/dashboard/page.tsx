@@ -179,12 +179,12 @@ export default function DashboardPage() {
 
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
           <div className={styles.panelTitle}>Pareto Defect (NG)</div>
-          <div className={styles.panelBody}><ParetoChart data={defectData} color="#dc2626" /></div>
+          <div className={styles.panelBody}><ParetoChart data={defectData} /></div>
         </section>
 
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
           <div className={styles.panelTitle}>Pareto Repair</div>
-          <div className={styles.panelBody}><ParetoChart data={repairData} color="#f59e0b" /></div>
+          <div className={styles.panelBody}><ParetoChart data={repairData} /></div>
         </section>
 
         <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>

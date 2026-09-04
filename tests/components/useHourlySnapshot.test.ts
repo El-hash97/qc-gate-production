@@ -46,6 +46,35 @@ describe('useHourlySnapshot', () => {
     expect(arg.hourlyDataShaft).toEqual({ '14:00': { ok: 6, repair: 1, ng: 1 } });
   });
 
+  it('stores only the net produced during the current hour', () => {
+    const updateState = vi.fn();
+    // 20 OK already booked to 13:00; shift total is now 32 → this hour = 12
+    const state = {
+      ...baseState,
+      ok1: 20, repair1: 0, ng1: 0, ok2: 12, repair2: 0, ng2: 0,
+      hourlyData: { '13:00': { ok: 20, repair: 0, ng: 0 } },
+    };
+    renderHook(() => useHourlySnapshot(state, updateState));
+
+    vi.advanceTimersByTime(5 * 60 * 1000);
+
+    const [arg] = updateState.mock.calls[0];
+    expect(arg.hourlyData['14:00']).toEqual({ ok: 12, repair: 0, ng: 0 });
+    expect(arg.hourlyData['13:00']).toEqual({ ok: 20, repair: 0, ng: 0 }); // untouched
+  });
+
+  it('records 0 for an hour with no production', () => {
+    const updateState = vi.fn();
+    // the whole BC total (8/1/1) is already booked to 13:00 — nothing new
+    const state = { ...baseState, hourlyData: { '13:00': { ok: 8, repair: 1, ng: 1 } } };
+    renderHook(() => useHourlySnapshot(state, updateState));
+
+    vi.advanceTimersByTime(5 * 60 * 1000);
+
+    const [arg] = updateState.mock.calls[0];
+    expect(arg.hourlyData['14:00']).toEqual({ ok: 0, repair: 0, ng: 0 });
+  });
+
   it('does not record a snapshot while totals are still 0', () => {
     const updateState = vi.fn();
     const empty = { ...baseState, ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0 };

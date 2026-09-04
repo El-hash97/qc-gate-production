@@ -24,18 +24,51 @@ function sameSnapshot(a: HourlySnapshot | undefined, b: HourlySnapshot): boolean
   return a !== undefined && a.ok === b.ok && a.repair === b.repair && a.ng === b.ng;
 }
 
+// Sum of every stored hour except `exceptKey` — everything already attributed
+// to the other hours of the shift.
+function sumExcept(map: Record<string, HourlySnapshot>, exceptKey: string): HourlySnapshot {
+  const total = { ok: 0, repair: 0, ng: 0 };
+  for (const [key, snap] of Object.entries(map)) {
+    if (key === exceptKey) continue;
+    total.ok += snap.ok;
+    total.repair += snap.repair;
+    total.ng += snap.ng;
+  }
+  return total;
+}
+
+// Net produced during this hour = shift total now − what's already booked to
+// the other hours. Clamped at 0 so a counter correction can't make a bar go
+// negative (the small under-count just isn't reflected in the hourly view).
+function netSnapshot(cumulative: HourlySnapshot, prior: HourlySnapshot): HourlySnapshot {
+  return {
+    ok: Math.max(0, cumulative.ok - prior.ok),
+    repair: Math.max(0, cumulative.repair - prior.repair),
+    ng: Math.max(0, cumulative.ng - prior.ng),
+  };
+}
+
+type HourlyKey = 'hourlyData' | 'hourlyDataShaft' | 'hourlyDataCam' | 'hourlyDataCrank';
+const GROUPS: [HourlyKey, RateScope][] = [
+  ['hourlyData', 'bc'],
+  ['hourlyDataShaft', 'shaft'],
+  ['hourlyDataCam', 3],
+  ['hourlyDataCrank', 4],
+];
+
 /**
- * Records hourly OK/Repair/NG snapshots keyed by the current hour (e.g.
- * "14:00"), split per product: Block Cylinder totals land in `hourlyData`,
- * Camshaft+Crankshaft combined in `hourlyDataShaft`, and each shaft line on
- * its own in `hourlyDataCam` (line 3) / `hourlyDataCrank` (line 4). A snapshot
- * is written immediately on every state change and then refreshed on a
- * 5-minute interval, so the Hourly Production table always has data for the
- * active hour as soon as counters are incremented. Skipped while all totals
- * are still 0 so idle hours don't pollute the table. Uses refs (not effect
- * dependencies) so the interval is set up exactly once and always reads the
- * freshest state/updateState, avoiding a stale-closure bug where a snapshot
- * would revert unrelated fields to whatever they were at mount.
+ * Records **net** OK/Repair/NG produced during the current hour (e.g. "14:00"),
+ * split per product: Block Cylinder in `hourlyData`, Camshaft+Crankshaft
+ * combined in `hourlyDataShaft`, and each shaft line on its own in
+ * `hourlyDataCam` (line 3) / `hourlyDataCrank` (line 4). The value stored for an
+ * hour is the shift total at that moment minus everything already booked to the
+ * other hours, so each bar shows just that hour's output and an idle hour shows
+ * 0. Derived from the persisted maps, so it survives a mid-shift page reload.
+ *
+ * A snapshot is written immediately on every state change and refreshed on a
+ * 5-minute interval, so the Hourly table always has a row for the active hour.
+ * Skipped while all totals are still 0. Uses refs (not effect dependencies) so
+ * the interval is set up once and always reads the freshest state/updateState.
  */
 export function useHourlySnapshot(
   current: ProductionState,
@@ -43,10 +76,9 @@ export function useHourlySnapshot(
 ): void {
   const currentRef = useRef(current);
   const updateStateRef = useRef(updateState);
-  const lastBcRef = useRef<Record<string, HourlySnapshot>>({});
-  const lastShaftRef = useRef<Record<string, HourlySnapshot>>({});
-  const lastCamRef = useRef<Record<string, HourlySnapshot>>({});
-  const lastCrankRef = useRef<Record<string, HourlySnapshot>>({});
+  const lastWriteRef = useRef<Record<HourlyKey, Record<string, HourlySnapshot>>>({
+    hourlyData: {}, hourlyDataShaft: {}, hourlyDataCam: {}, hourlyDataCrank: {},
+  });
 
   useEffect(() => { currentRef.current = current; }, [current]);
   useEffect(() => { updateStateRef.current = updateState; }, [updateState]);
@@ -54,27 +86,23 @@ export function useHourlySnapshot(
   function record(state: ProductionState, update: (next: ProductionState) => void) {
     if (getGrandTotal(state) === 0) return;
     const key = hourKey();
-    const bc = groupSnapshot(state, 'bc');
-    const shaft = groupSnapshot(state, 'shaft');
-    const cam = groupSnapshot(state, 3);
-    const crank = groupSnapshot(state, 4);
-    const bcChanged = !sameSnapshot(lastBcRef.current[key], bc);
-    const shaftChanged = !sameSnapshot(lastShaftRef.current[key], shaft);
-    const camChanged = !sameSnapshot(lastCamRef.current[key], cam);
-    const crankChanged = !sameSnapshot(lastCrankRef.current[key], crank);
-    if (!bcChanged && !shaftChanged && !camChanged && !crankChanged) return;
 
-    lastBcRef.current = { ...lastBcRef.current, [key]: bc };
-    lastShaftRef.current = { ...lastShaftRef.current, [key]: shaft };
-    lastCamRef.current = { ...lastCamRef.current, [key]: cam };
-    lastCrankRef.current = { ...lastCrankRef.current, [key]: crank };
-    update({
-      ...state,
-      hourlyData: { ...state.hourlyData, [key]: bc },
-      hourlyDataShaft: { ...(state.hourlyDataShaft ?? {}), [key]: shaft },
-      hourlyDataCam: { ...(state.hourlyDataCam ?? {}), [key]: cam },
-      hourlyDataCrank: { ...(state.hourlyDataCrank ?? {}), [key]: crank },
-    });
+    const nets = {} as Record<HourlyKey, HourlySnapshot>;
+    let changed = false;
+    for (const [dataKey, scope] of GROUPS) {
+      const stored = state[dataKey] ?? {};
+      const net = netSnapshot(groupSnapshot(state, scope), sumExcept(stored, key));
+      nets[dataKey] = net;
+      if (!sameSnapshot(lastWriteRef.current[dataKey][key], net)) changed = true;
+    }
+    if (!changed) return;
+
+    const patch = {} as Record<HourlyKey, Record<string, HourlySnapshot>>;
+    for (const [dataKey] of GROUPS) {
+      patch[dataKey] = { ...(state[dataKey] ?? {}), [key]: nets[dataKey] };
+      lastWriteRef.current[dataKey] = { ...lastWriteRef.current[dataKey], [key]: nets[dataKey] };
+    }
+    update({ ...state, ...patch });
   }
 
   useEffect(() => {

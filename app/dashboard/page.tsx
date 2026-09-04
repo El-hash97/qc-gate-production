@@ -192,7 +192,9 @@ export default function DashboardPage() {
         <section className={`${styles.panel} ${styles.spanHero} ${styles.hTrend}`}>
           <div className={styles.panelTitle}>Hourly Production</div>
           <div className={styles.panelBody}>
-            <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyTarget} />
+            {/* On "Semua" the target is a sum of the three groups — a line there
+                misleads, so only the per-group views get the reference line. */}
+            <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyTargetKey ? hourlyTarget : undefined} />
           </div>
         </section>
 

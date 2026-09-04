@@ -117,6 +117,8 @@ export default function DashboardPage() {
     return out;
   }, [hourlyTargetKey, current.hourlyTargetBc, current.hourlyTargetCam, current.hourlyTargetCrank]);
 
+  const lineStops = current.lineStops ?? [];
+
   function handleHourlyTarget(hour: string, value: number) {
     // Never write before the running shift has loaded — that would POST
     // EMPTY_STATE over live data (mirrors the Input page's load gate).
@@ -251,9 +253,17 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className={`${styles.panel} ${styles.spanFull} ${styles.hLog}`}>
+        {/* Width grows with the number of stops; an empty shift keeps it small
+            instead of a full-width box holding one line of placeholder text. */}
+        <section
+          className={`${styles.panel} ${
+            lineStops.length === 0 ? styles.spanList
+              : lineStops.length <= 4 ? `${styles.spanHalf} ${styles.hLog}`
+              : `${styles.spanFull} ${styles.hLog}`
+          }`}
+        >
           <div className={styles.panelTitle}>Line Stop</div>
-          <div className={styles.scrollBody}><LineStopTable stops={current.lineStops ?? []} /></div>
+          <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
         </section>
       </div>
     </main>

@@ -205,6 +205,7 @@
 .hPareto { height: 300px; }
 .hDetail { height: 260px; }
 .hLog { height: 300px; }
+.hLogShort { height: 240px; }
 
 @media (max-width: 1100px) {
   .spanDonut, .spanHero, .spanTable, .spanList { grid-column: span 6; }

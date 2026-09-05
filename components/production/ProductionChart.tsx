@@ -24,7 +24,7 @@ export function ProductionChart({ ok, repair, ng }: ProductionChartProps) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: '100%' }}>
-      <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0, height: '100%' }}>
+      <div style={{ position: 'relative', flex: '0 1 auto', minWidth: 0, maxWidth: '100%', height: '100%', aspectRatio: '1' }}>
         <Doughnut
           data={{
             labels: ['OK', 'Repair', 'NG'],

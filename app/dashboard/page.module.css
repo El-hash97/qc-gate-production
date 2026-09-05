@@ -313,9 +313,10 @@
     flex: none !important;
     min-height: 0 !important;
     height: 210px !important;
+    overflow: hidden !important;
   }
   .spanHero .panelBody { height: 260px !important; }
-  .panelBody canvas { max-width: 100% !important; }
+  .panelBody canvas { max-width: 100% !important; max-height: 100% !important; }
 
   /* Lists print every row instead of scrolling. */
   .scrollBody {

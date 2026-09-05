@@ -4,6 +4,9 @@ import {
   isPhotoGroup, isPhotoChartType,
 } from '@/lib/defectPhotos';
 
+// See app/api/defect-photos/route.ts — same stale-GET caching issue applies here.
+export const dynamic = 'force-dynamic';
+
 function parseParams(group: string, chartType: string) {
   if (!isPhotoGroup(group) || !isPhotoChartType(chartType)) return null;
   return { group, chartType };

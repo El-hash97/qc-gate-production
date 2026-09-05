@@ -19,7 +19,10 @@ const FLAGS_KEY = ['defectPhotoFlags'] as const;
 const FLAGS_POLL_MS = 5000;
 
 async function fetchFlags(): Promise<Set<string>> {
-  const res = await fetch('/api/defect-photos');
+  // no-store: a plain GET like this can get cached by the browser (confirmed
+  // in testing — right after an upload, a default fetch() still served the
+  // pre-upload empty list). This must always hit the server.
+  const res = await fetch('/api/defect-photos', { cache: 'no-store' });
   const json: FlagsResponse = await res.json();
   if (!json.success) throw new Error(json.error ?? 'Failed to load photo flags');
   return new Set(json.data.map((f) => `${f.group}:${f.chartType}`));
@@ -39,7 +42,7 @@ export function useDefectPhoto(group: PhotoGroup, chartType: PhotoChartType, ena
   return useQuery({
     queryKey: ['defectPhoto', group, chartType],
     queryFn: async () => {
-      const res = await fetch(`/api/defect-photos/${group}/${chartType}`);
+      const res = await fetch(`/api/defect-photos/${group}/${chartType}`, { cache: 'no-store' });
       const json: PhotoResponse = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Failed to load photo');
       return json.data;

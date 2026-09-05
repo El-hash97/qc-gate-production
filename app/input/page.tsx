@@ -12,7 +12,7 @@ import { ResetModal } from '@/components/production/ResetModal';
 import { LineStopSection } from '@/components/production/LineStopSection';
 import { PicCard } from '@/components/production/PicCard';
 import {
-  getRates, getAchievementPercent, getProgressPercent, isNgAlarmActive,
+  getRates, getAchievementPercent, getProgressPercent,
 } from '@/utils/rates';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
@@ -88,11 +88,6 @@ export default function InputPage() {
     if (isLoading) return;
     const next = { ...current, ...patch };
     updateState(next);
-
-    if (isNgAlarmActive(next)) {
-      const { ngRate } = getRates(next);
-      showToast(`⚠️ WARNING: NG Rate ${ngRate}% — melebihi batas 5%!`, 'error');
-    }
   }
 
   function increment(field: CounterField) {

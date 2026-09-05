@@ -122,15 +122,37 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_cam   JSONB NOT NULL 
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB NOT NULL DEFAULT '{}';
 
 -- Current-defect photo per Pareto chart (NG/Repair) x product group (bc/
--- camshaft/crankshaft). Live-only: cleared on every shift reset, never
--- archived to history. One photo per slot — a re-upload overwrites it.
+-- camshaft/crankshaft) x defect type. Live-only: cleared on every shift reset,
+-- never archived to history. One photo per bar — a re-upload overwrites it.
 CREATE TABLE IF NOT EXISTS defect_photos (
-  group_key  TEXT NOT NULL,
-  chart_type TEXT NOT NULL,
-  image_data TEXT NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (group_key, chart_type)
+  group_key   TEXT NOT NULL,
+  chart_type  TEXT NOT NULL,
+  defect_type TEXT NOT NULL DEFAULT '',
+  image_data  TEXT NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_key, chart_type, defect_type)
 );
+
+-- Migration for existing DBs that were created with the old 2-column PK.
+ALTER TABLE defect_photos ADD COLUMN IF NOT EXISTS defect_type TEXT NOT NULL DEFAULT '';
+DO $$
+BEGIN
+  -- If the old PK (group_key, chart_type) still exists, replace it with the new 3-column PK.
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'defect_photos_pkey'
+    AND contype = 'p'
+    AND conrelid = 'defect_photos'::regclass
+  ) THEN
+    -- Check if PK is still the old 2-column version (by counting key columns)
+    IF (SELECT count(*) FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+        WHERE c.conname = 'defect_photos_pkey') = 2 THEN
+      ALTER TABLE defect_photos DROP CONSTRAINT defect_photos_pkey;
+      ALTER TABLE defect_photos ADD PRIMARY KEY (group_key, chart_type, defect_type);
+    END IF;
+  END IF;
+END $$;
 
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())

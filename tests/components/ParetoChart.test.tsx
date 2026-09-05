@@ -33,9 +33,8 @@ describe('ParetoChart', () => {
     ]);
     // y axis ticks render as percentages
     expect(props.options.scales.y.ticks.callback(50)).toBe('50%');
-    // pcs count above each real bar; the top-offender bar also hints it's
-    // the upload/view button for a defect photo (➕ = no photo yet)
-    expect(props.options.plugins.datalabels.formatter(75, { dataIndex: 0 })).toBe('6 pcs ➕');
+    // pcs count above each real bar; without a click handler no icon is shown
+    expect(props.options.plugins.datalabels.formatter(75, { dataIndex: 0 })).toBe('6 pcs');
     expect(props.options.plugins.datalabels.formatter(25, { dataIndex: 1 })).toBe('2 pcs');
   });
 
@@ -48,32 +47,41 @@ describe('ParetoChart', () => {
   });
 
   it('shows a camera icon on the top bar once a photo exists', () => {
-    render(<ParetoChart data={{ Kake: 6 }} hasPhoto />);
+    render(<ParetoChart data={{ Kake: 6 }} hasPhoto={() => true} onBarClick={vi.fn()} />);
     const [props] = chartSpy.mock.calls[0];
     expect(props.options.plugins.datalabels.formatter(100, { dataIndex: 0 })).toBe('6 pcs 📷');
   });
 
-  it('clicking the leftmost real bar fires onFirstBarClick', () => {
-    const onFirstBarClick = vi.fn();
-    render(<ParetoChart data={{ Kake: 6 }} onFirstBarClick={onFirstBarClick} />);
+  it('shows plus icon on every bar without photo', () => {
+    render(<ParetoChart data={{ Kake: 6, 'Gomi Drag': 2 }} hasPhoto={() => false} onBarClick={vi.fn()} />);
     const [props] = chartSpy.mock.calls[0];
-    props.options.onClick({}, [{ index: 0 }]);
-    expect(onFirstBarClick).toHaveBeenCalledTimes(1);
+    expect(props.options.plugins.datalabels.formatter(100, { dataIndex: 0 })).toBe('6 pcs ➕');
+    expect(props.options.plugins.datalabels.formatter(100, { dataIndex: 1 })).toBe('2 pcs ➕');
   });
 
-  it('clicking any other bar does not fire onFirstBarClick', () => {
-    const onFirstBarClick = vi.fn();
-    render(<ParetoChart data={{ Kake: 6, 'Gomi Drag': 2 }} onFirstBarClick={onFirstBarClick} />);
+  it('clicking any real bar fires onBarClick with defect name', () => {
+    const onBarClick = vi.fn();
+    render(<ParetoChart data={{ Kake: 6, 'Gomi Drag': 2 }} onBarClick={onBarClick} />);
     const [props] = chartSpy.mock.calls[0];
+    props.options.onClick({}, [{ index: 0 }]);
+    expect(onBarClick).toHaveBeenCalledWith('Kake');
+    onBarClick.mockClear();
     props.options.onClick({}, [{ index: 1 }]);
-    expect(onFirstBarClick).not.toHaveBeenCalled();
+    expect(onBarClick).toHaveBeenCalledWith('Gomi Drag');
   });
 
-  it('clicking the leftmost slot does not fire onFirstBarClick when it is only a ghost bar', () => {
-    const onFirstBarClick = vi.fn();
-    render(<ParetoChart data={{}} onFirstBarClick={onFirstBarClick} />);
+  it('clicking a ghost bar does not fire onBarClick', () => {
+    const onBarClick = vi.fn();
+    render(<ParetoChart data={{}} onBarClick={onBarClick} />);
     const [props] = chartSpy.mock.calls[0];
     props.options.onClick({}, [{ index: 0 }]);
-    expect(onFirstBarClick).not.toHaveBeenCalled();
+    expect(onBarClick).not.toHaveBeenCalled();
+  });
+
+  it('clicking without onBarClick does nothing', () => {
+    render(<ParetoChart data={{ Kake: 6 }} />);
+    const [props] = chartSpy.mock.calls[0];
+    // should not throw
+    expect(() => props.options.onClick({}, [{ index: 0 }])).not.toThrow();
   });
 });

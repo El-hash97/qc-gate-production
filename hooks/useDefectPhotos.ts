@@ -5,7 +5,7 @@ import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
 
 interface FlagsResponse {
   success: boolean;
-  data: { group: PhotoGroup; chartType: PhotoChartType; updatedAt: string }[];
+  data: { group: PhotoGroup; chartType: PhotoChartType; defectType: string; updatedAt: string }[];
   error?: string;
 }
 
@@ -18,6 +18,10 @@ interface PhotoResponse {
 const FLAGS_KEY = ['defectPhotoFlags'] as const;
 const FLAGS_POLL_MS = 5000;
 
+function flagKey(group: PhotoGroup, chartType: PhotoChartType, defectType: string): string {
+  return `${group}:${chartType}:${defectType}`;
+}
+
 async function fetchFlags(): Promise<Set<string>> {
   // no-store: a plain GET like this can get cached by the browser (confirmed
   // in testing — right after an upload, a default fetch() still served the
@@ -25,47 +29,48 @@ async function fetchFlags(): Promise<Set<string>> {
   const res = await fetch('/api/defect-photos', { cache: 'no-store' });
   const json: FlagsResponse = await res.json();
   if (!json.success) throw new Error(json.error ?? 'Failed to load photo flags');
-  return new Set(json.data.map((f) => `${f.group}:${f.chartType}`));
+  return new Set(json.data.map((f) => flagKey(f.group, f.chartType, f.defectType)));
 }
 
-// Which of the 6 (group x NG/repair) slots currently have a photo — lightweight,
+// Which of the N (group x NG/repair x defect) slots currently have a photo — lightweight,
 // polled independently of the actual image bytes.
 export function useDefectPhotoFlags() {
   const query = useQuery({ queryKey: FLAGS_KEY, queryFn: fetchFlags, refetchInterval: FLAGS_POLL_MS });
   return {
-    hasPhoto: (group: PhotoGroup, chartType: PhotoChartType) => query.data?.has(`${group}:${chartType}`) ?? false,
+    hasPhoto: (group: PhotoGroup, chartType: PhotoChartType, defectType: string) =>
+      query.data?.has(flagKey(group, chartType, defectType)) ?? false,
   };
 }
 
 // Fetches one slot's actual image — only enabled while its modal is open.
-export function useDefectPhoto(group: PhotoGroup, chartType: PhotoChartType, enabled: boolean) {
+export function useDefectPhoto(group: PhotoGroup, chartType: PhotoChartType, defectType: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['defectPhoto', group, chartType],
+    queryKey: ['defectPhoto', group, chartType, defectType],
     queryFn: async () => {
-      const res = await fetch(`/api/defect-photos/${group}/${chartType}`, { cache: 'no-store' });
+      const res = await fetch(`/api/defect-photos/${group}/${chartType}?defect=${encodeURIComponent(defectType)}`, { cache: 'no-store' });
       const json: PhotoResponse = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Failed to load photo');
       return json.data;
     },
-    enabled,
+    enabled: enabled && !!defectType,
   });
 }
 
 export function useUploadDefectPhoto() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ group, chartType, imageData }: { group: PhotoGroup; chartType: PhotoChartType; imageData: string }) => {
-      const res = await fetch(`/api/defect-photos/${group}/${chartType}`, {
+    mutationFn: async ({ group, chartType, defectType, imageData }: { group: PhotoGroup; chartType: PhotoChartType; defectType: string; imageData: string }) => {
+      const res = await fetch(`/api/defect-photos/${group}/${chartType}?defect=${encodeURIComponent(defectType)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData }),
+        body: JSON.stringify({ imageData, defectType }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Gagal upload foto');
     },
-    onSuccess: (_data, { group, chartType }) => {
+    onSuccess: (_data, { group, chartType, defectType }) => {
       queryClient.invalidateQueries({ queryKey: FLAGS_KEY });
-      queryClient.invalidateQueries({ queryKey: ['defectPhoto', group, chartType] });
+      queryClient.invalidateQueries({ queryKey: ['defectPhoto', group, chartType, defectType] });
     },
   });
 }
@@ -73,14 +78,14 @@ export function useUploadDefectPhoto() {
 export function useDeleteDefectPhoto() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ group, chartType }: { group: PhotoGroup; chartType: PhotoChartType }) => {
-      const res = await fetch(`/api/defect-photos/${group}/${chartType}`, { method: 'DELETE' });
+    mutationFn: async ({ group, chartType, defectType }: { group: PhotoGroup; chartType: PhotoChartType; defectType: string }) => {
+      const res = await fetch(`/api/defect-photos/${group}/${chartType}?defect=${encodeURIComponent(defectType)}`, { method: 'DELETE' });
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Gagal hapus foto');
     },
-    onSuccess: (_data, { group, chartType }) => {
+    onSuccess: (_data, { group, chartType, defectType }) => {
       queryClient.invalidateQueries({ queryKey: FLAGS_KEY });
-      queryClient.invalidateQueries({ queryKey: ['defectPhoto', group, chartType] });
+      queryClient.invalidateQueries({ queryKey: ['defectPhoto', group, chartType, defectType] });
     },
   });
 }

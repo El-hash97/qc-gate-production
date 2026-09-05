@@ -12,14 +12,25 @@ function parseParams(group: string, chartType: string) {
   return { group, chartType };
 }
 
+function getDefectType(request: NextRequest, bodyDefectType?: string): string | null {
+  const fromQuery = request.nextUrl.searchParams.get('defect');
+  const raw = (fromQuery ?? bodyDefectType ?? '').trim();
+  // Legacy call without defect param -> treat as invalid for per-bar model.
+  // We require defectType for every photo slot now.
+  if (!raw) return null;
+  return raw;
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { group: string; chartType: string } },
 ) {
   const parsed = parseParams(params.group, params.chartType);
   if (!parsed) return NextResponse.json({ success: false, error: 'Slot tidak valid' }, { status: 400 });
+  const defectType = getDefectType(request);
+  if (!defectType) return NextResponse.json({ success: false, error: 'defect wajib diisi' }, { status: 400 });
   try {
-    const data = await getDefectPhoto(parsed.group, parsed.chartType);
+    const data = await getDefectPhoto(parsed.group, parsed.chartType, defectType);
     return NextResponse.json({ success: true, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -36,8 +47,10 @@ export async function POST(
   try {
     const body = await request.json();
     const imageData = typeof body?.imageData === 'string' ? body.imageData : '';
+    const defectType = getDefectType(request, typeof body?.defectType === 'string' ? body.defectType : undefined);
     if (!imageData) return NextResponse.json({ success: false, error: 'imageData wajib diisi' }, { status: 400 });
-    await saveDefectPhoto(parsed.group, parsed.chartType, imageData);
+    if (!defectType) return NextResponse.json({ success: false, error: 'defect wajib diisi' }, { status: 400 });
+    await saveDefectPhoto(parsed.group, parsed.chartType, defectType, imageData);
     return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -46,13 +59,15 @@ export async function POST(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { group: string; chartType: string } },
 ) {
   const parsed = parseParams(params.group, params.chartType);
   if (!parsed) return NextResponse.json({ success: false, error: 'Slot tidak valid' }, { status: 400 });
+  const defectType = getDefectType(request);
+  if (!defectType) return NextResponse.json({ success: false, error: 'defect wajib diisi' }, { status: 400 });
   try {
-    await deleteDefectPhoto(parsed.group, parsed.chartType);
+    await deleteDefectPhoto(parsed.group, parsed.chartType, defectType);
     return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

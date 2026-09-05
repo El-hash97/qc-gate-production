@@ -14,13 +14,14 @@ interface DefectPhotoModalProps {
   onClose: () => void;
   group: PhotoGroup;
   chartType: PhotoChartType;
+  defectType: string;
   title: string;
 }
 
-export function DefectPhotoModal({ isOpen, onClose, group, chartType, title }: DefectPhotoModalProps) {
+export function DefectPhotoModal({ isOpen, onClose, group, chartType, defectType, title }: DefectPhotoModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
-  const photoQuery = useDefectPhoto(group, chartType, isOpen);
+  const photoQuery = useDefectPhoto(group, chartType, defectType, isOpen);
   const upload = useUploadDefectPhoto();
   const remove = useDeleteDefectPhoto();
 
@@ -39,7 +40,7 @@ export function DefectPhotoModal({ isOpen, onClose, group, chartType, title }: D
     try {
       const imageData = await compressImageFile(file);
       upload.mutate(
-        { group, chartType, imageData },
+        { group, chartType, defectType, imageData },
         {
           onSuccess: () => showToast('Foto berhasil diupload', 'success'),
           onError: (err) => showToast(err instanceof Error ? err.message : 'Gagal upload foto', 'error'),
@@ -52,7 +53,7 @@ export function DefectPhotoModal({ isOpen, onClose, group, chartType, title }: D
 
   function handleDelete() {
     remove.mutate(
-      { group, chartType },
+      { group, chartType, defectType },
       {
         onSuccess: () => showToast('Foto dihapus', 'success'),
         onError: (err) => showToast(err instanceof Error ? err.message : 'Gagal hapus foto', 'error'),

@@ -73,10 +73,10 @@ export default function DashboardPage() {
 
   const [view, setView] = useState<DashboardView>('all');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
-  // Defect photos are per product group — "Semua" mixes 3 groups' data so it
-  // has no slot of its own; the Pareto bars aren't clickable there.
+  // Defect photos are per product group + chart type + defect name — "Semua"
+  // mixes 3 groups' data so it has no slot of its own; the Pareto bars aren't clickable there.
   const photoGroup: PhotoGroup | null = view === 'all' ? null : view;
-  const [photoModalChart, setPhotoModalChart] = useState<PhotoChartType | null>(null);
+  const [photoModal, setPhotoModal] = useState<{ chartType: PhotoChartType; defectType: string } | null>(null);
   const { hasPhoto } = useDefectPhotoFlags();
   // Scope passed to the rate helpers: undefined = all, 'bc' = lines 1-2,
   // 3/4 = a single shaft line.
@@ -275,8 +275,8 @@ export default function DashboardPage() {
           <div className={styles.panelBody}>
             <ParetoChart
               data={defectData}
-              hasPhoto={photoGroup ? hasPhoto(photoGroup, 'ng') : false}
-              onFirstBarClick={photoGroup ? () => setPhotoModalChart('ng') : undefined}
+              hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'ng', defectType) : undefined}
+              onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'ng', defectType }) : undefined}
             />
           </div>
         </section>
@@ -286,8 +286,8 @@ export default function DashboardPage() {
           <div className={styles.panelBody}>
             <ParetoChart
               data={repairData}
-              hasPhoto={photoGroup ? hasPhoto(photoGroup, 'repair') : false}
-              onFirstBarClick={photoGroup ? () => setPhotoModalChart('repair') : undefined}
+              hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'repair', defectType) : undefined}
+              onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'repair', defectType }) : undefined}
             />
           </div>
         </section>
@@ -329,13 +329,14 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {photoGroup && photoModalChart && (
+      {photoGroup && photoModal && (
         <DefectPhotoModal
           isOpen
-          onClose={() => setPhotoModalChart(null)}
+          onClose={() => setPhotoModal(null)}
           group={photoGroup}
-          chartType={photoModalChart}
-          title={`Foto Defect — ${REPORT_LABEL[view]} / ${photoModalChart === 'ng' ? 'NG' : 'Repair'}`}
+          chartType={photoModal.chartType}
+          defectType={photoModal.defectType}
+          title={`Foto Defect — ${REPORT_LABEL[view]} / ${photoModal.chartType === 'ng' ? 'NG' : 'Repair'} — ${photoModal.defectType}`}
         />
       )}
     </main>

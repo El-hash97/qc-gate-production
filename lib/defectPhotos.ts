@@ -9,6 +9,7 @@ export type PhotoChartType = (typeof PHOTO_CHART_TYPES)[number];
 export interface DefectPhotoFlag {
   group: PhotoGroup;
   chartType: PhotoChartType;
+  defectType: string;
   updatedAt: string;
 }
 
@@ -32,24 +33,27 @@ export function isPhotoChartType(value: string): value is PhotoChartType {
 // Lightweight — no image_data — safe for the dashboard's polled state so it
 // can show "has photo" without re-downloading every photo on every poll.
 export async function listDefectPhotoFlags(): Promise<DefectPhotoFlag[]> {
-  const rows = await sql`SELECT group_key, chart_type, updated_at FROM defect_photos`;
+  const rows = await sql`SELECT group_key, chart_type, defect_type, updated_at FROM defect_photos`;
   return (rows as any[]).map((row) => ({
     group: row.group_key,
     chartType: row.chart_type,
+    defectType: row.defect_type ?? '',
     updatedAt: new Date(row.updated_at).toISOString(),
   }));
 }
 
-export async function getDefectPhoto(group: PhotoGroup, chartType: PhotoChartType): Promise<DefectPhoto | null> {
+export async function getDefectPhoto(group: PhotoGroup, chartType: PhotoChartType, defectType: string): Promise<DefectPhoto | null> {
+  // Legacy rows have defect_type = '' ; new per-bar rows have the actual defect name.
   const rows = await sql`
-    SELECT group_key, chart_type, image_data, updated_at FROM defect_photos
-    WHERE group_key = ${group} AND chart_type = ${chartType}
+    SELECT group_key, chart_type, defect_type, image_data, updated_at FROM defect_photos
+    WHERE group_key = ${group} AND chart_type = ${chartType} AND defect_type = ${defectType}
   `;
   const row = (rows as any[])[0];
   if (!row) return null;
   return {
     group: row.group_key,
     chartType: row.chart_type,
+    defectType: row.defect_type,
     imageData: row.image_data,
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -58,6 +62,7 @@ export async function getDefectPhoto(group: PhotoGroup, chartType: PhotoChartTyp
 export async function saveDefectPhoto(
   group: PhotoGroup,
   chartType: PhotoChartType,
+  defectType: string,
   imageData: string,
 ): Promise<void> {
   if (!imageData.startsWith('data:image/')) {
@@ -66,16 +71,19 @@ export async function saveDefectPhoto(
   if (imageData.length > MAX_IMAGE_DATA_LENGTH) {
     throw new Error('Ukuran foto terlalu besar');
   }
+  if (!defectType || typeof defectType !== 'string') {
+    throw new Error('defectType wajib diisi');
+  }
   await sql`
-    INSERT INTO defect_photos (group_key, chart_type, image_data, updated_at)
-    VALUES (${group}, ${chartType}, ${imageData}, now())
-    ON CONFLICT (group_key, chart_type)
+    INSERT INTO defect_photos (group_key, chart_type, defect_type, image_data, updated_at)
+    VALUES (${group}, ${chartType}, ${defectType}, ${imageData}, now())
+    ON CONFLICT (group_key, chart_type, defect_type)
     DO UPDATE SET image_data = ${imageData}, updated_at = now()
   `;
 }
 
-export async function deleteDefectPhoto(group: PhotoGroup, chartType: PhotoChartType): Promise<void> {
-  await sql`DELETE FROM defect_photos WHERE group_key = ${group} AND chart_type = ${chartType}`;
+export async function deleteDefectPhoto(group: PhotoGroup, chartType: PhotoChartType, defectType: string): Promise<void> {
+  await sql`DELETE FROM defect_photos WHERE group_key = ${group} AND chart_type = ${chartType} AND defect_type = ${defectType}`;
 }
 
 // Used by resetProductionState() — photos are live-only, wiped on every reset.

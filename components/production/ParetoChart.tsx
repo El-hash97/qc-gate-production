@@ -13,17 +13,17 @@ const PARETO_COLORS = ['#dc2626', '#eab308', '#f97316', '#f59e0b', '#fb923c', '#
 
 interface ParetoChartProps {
   data: Record<string, number>;
-  // Leftmost bar (today's top offender) doubles as an upload/view button for
-  // a "what does this defect look like right now" photo — see onFirstBarClick.
-  hasPhoto?: boolean;
-  onFirstBarClick?: () => void;
+  // Every real bar doubles as an upload/view button for a per-defect photo.
+  // hasPhoto is checked per defect label; onBarClick receives the defect name.
+  hasPhoto?: (defectType: string) => boolean;
+  onBarClick?: (defectType: string) => void;
 }
 
 // Vertical Pareto bar chart: one bar per defect/repair type, tallest (most
 // frequent) on the left. Bar height is that type's share of the total (y axis
 // in %); the raw pcs count sits above each bar. Sparse data is padded with
 // faint grey skeleton bars so 1-2 types don't render as giant blocks.
-export function ParetoChart({ data, hasPhoto = false, onFirstBarClick }: ParetoChartProps) {
+export function ParetoChart({ data, hasPhoto, onBarClick }: ParetoChartProps) {
   const { labels, counts } = pareto(data);
   const ct = useChartTheme();
 
@@ -37,6 +37,9 @@ export function ParetoChart({ data, hasPhoto = false, onFirstBarClick }: ParetoC
   const barColor = paddedLabels.map((_, i) =>
     i < real ? (PARETO_COLORS[i] ?? PARETO_COLORS[PARETO_COLORS.length - 1]) : GHOST,
   );
+
+  // Leave hasPhoto/onBarClick undefined when view === 'all' (no photo slot).
+  const clickable = typeof onBarClick === 'function';
 
   return (
     <Chart
@@ -57,15 +60,17 @@ export function ParetoChart({ data, hasPhoto = false, onFirstBarClick }: ParetoC
         maintainAspectRatio: false,
         // No animation on refresh — keeps the chart steady while the dashboard polls.
         animation: false,
-        // Leftmost real bar (today's top offender) opens the defect-photo
-        // upload/view modal; ghost/skeleton bars (no real data yet) do nothing.
+        // Any real bar opens its defect-photo upload/view modal; ghost/skeleton bars do nothing.
         onClick: (_event, elements) => {
-          if (real > 0 && elements[0]?.index === 0) onFirstBarClick?.();
+          const idx = elements[0]?.index;
+          if (idx == null || idx >= real || !clickable) return;
+          onBarClick?.(labels[idx]);
         },
         onHover: (event, elements) => {
           const target = event.native?.target as HTMLElement | undefined;
           if (!target) return;
-          target.style.cursor = real > 0 && elements[0]?.index === 0 ? 'pointer' : 'default';
+          const idx = elements[0]?.index;
+          target.style.cursor = idx != null && idx < real && clickable ? 'pointer' : 'default';
         },
         plugins: {
           legend: { display: false },
@@ -81,9 +86,14 @@ export function ParetoChart({ data, hasPhoto = false, onFirstBarClick }: ParetoC
             align: 'top',
             offset: 2,
             font: { weight: 'bold', size: 11 },
-            // Camera icon on the top-offender bar hints it's clickable, and
-            // shows at a glance whether that defect already has a photo.
-            formatter: (_v, c) => `${counts[c.dataIndex]} pcs${c.dataIndex === 0 ? (hasPhoto ? ' 📷' : ' ➕') : ''}`,
+            // Camera/plus icon per bar hints it's clickable and whether that defect already has a photo.
+            formatter: (_v, c) => {
+              if (c.dataIndex >= real) return '';
+              const label = labels[c.dataIndex];
+              const has = hasPhoto?.(label) ?? false;
+              const icon = clickable ? (has ? ' 📷' : ' ➕') : '';
+              return `${counts[c.dataIndex]} pcs${icon}`;
+            },
           },
         },
         scales: {

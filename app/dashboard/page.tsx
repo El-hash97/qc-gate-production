@@ -175,6 +175,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {current.pic && (
+        <div className={styles.printPicCard} aria-hidden="true">
+          <PicCard pic={current.pic} />
+        </div>
+      )}
+
       <div className={styles.statusBar}>
         {current.pic && <PicCard pic={current.pic} />}
         <span className={styles.statusRight}>

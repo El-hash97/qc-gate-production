@@ -68,6 +68,10 @@
 /* Report header — only rendered on paper. */
 .printHeader { display: none; }
 
+/* PIC photo card — already shown on screen inside .statusBar; repeated here,
+   print-only, just below the report header. */
+.printPicCard { display: none; }
+
 .printMeta {
   display: flex;
   flex-wrap: wrap;
@@ -280,6 +284,8 @@
   .printHeader h1 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
   .printMeta { font-size: 11px; color: #333; }
 
+  .printPicCard { display: block; margin-bottom: 8px; }
+
   .kpiRow {
     display: grid !important;
     grid-template-columns: repeat(4, 1fr);
@@ -291,7 +297,7 @@
   .kpiValue { font-size: 20px; }
   .progressStrip { box-shadow: none; break-inside: avoid; margin-bottom: 8px; }
 
-  /* Two panels per row; the wide ones (Hourly Production, Line Stop) span both. */
+  /* Two panels per row; the wide ones (Hourly Tabel, Line Stop) span both. */
   .bento {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
@@ -303,8 +309,15 @@
     box-shadow: none !important;
     border: 1px solid #bbb !important;
   }
-  .spanHero,
+  .spanTable,
   .spanFull { grid-column: 1 / -1 !important; }
+
+  /* Production Distribution + Hourly Production side by side, 1:1, in their
+     own row; Hourly (Tabel) then gets the full-width row right below (see
+     .spanTable above) so its 24 rows stay legible instead of squeezed to
+     half width. */
+  .spanDonut { grid-column: 1 !important; }
+  .spanHero { grid-column: 2 !important; }
 
   /* Chart body keeps a definite box (Chart.js fills it after the beforeprint
      resize); the wide chart gets a bit more height. */

@@ -1,5 +1,6 @@
 import { sql } from './db';
 import { getProductionState } from './productionState';
+import { deleteAllDefectPhotos } from './defectPhotos';
 import type { ProductionState } from './types';
 
 export class InvalidResetPasswordError extends Error {
@@ -110,6 +111,10 @@ export async function resetProductionState(): Promise<ProductionState> {
       WHERE id = 1
     `;
   }
+
+  // Defect photos are live-only (never archived) — wipe all slots on every
+  // reset so a new shift doesn't inherit yesterday's "current defect" photo.
+  await deleteAllDefectPhotos();
 
   const fresh = await getProductionState();
   if (!fresh) {

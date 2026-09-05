@@ -121,6 +121,17 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_bc    JSONB NOT NULL 
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_cam   JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB NOT NULL DEFAULT '{}';
 
+-- Current-defect photo per Pareto chart (NG/Repair) x product group (bc/
+-- camshaft/crankshaft). Live-only: cleared on every shift reset, never
+-- archived to history. One photo per slot — a re-upload overwrites it.
+CREATE TABLE IF NOT EXISTS defect_photos (
+  group_key  TEXT NOT NULL,
+  chart_type TEXT NOT NULL,
+  image_data TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_key, chart_type)
+);
+
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())
 ON CONFLICT (id) DO NOTHING;

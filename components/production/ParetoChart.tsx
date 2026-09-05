@@ -13,13 +13,17 @@ const PARETO_COLORS = ['#dc2626', '#eab308', '#f97316', '#f59e0b', '#fb923c', '#
 
 interface ParetoChartProps {
   data: Record<string, number>;
+  // Leftmost bar (today's top offender) doubles as an upload/view button for
+  // a "what does this defect look like right now" photo — see onFirstBarClick.
+  hasPhoto?: boolean;
+  onFirstBarClick?: () => void;
 }
 
 // Vertical Pareto bar chart: one bar per defect/repair type, tallest (most
 // frequent) on the left. Bar height is that type's share of the total (y axis
 // in %); the raw pcs count sits above each bar. Sparse data is padded with
 // faint grey skeleton bars so 1-2 types don't render as giant blocks.
-export function ParetoChart({ data }: ParetoChartProps) {
+export function ParetoChart({ data, hasPhoto = false, onFirstBarClick }: ParetoChartProps) {
   const { labels, counts } = pareto(data);
   const ct = useChartTheme();
 
@@ -53,6 +57,16 @@ export function ParetoChart({ data }: ParetoChartProps) {
         maintainAspectRatio: false,
         // No animation on refresh — keeps the chart steady while the dashboard polls.
         animation: false,
+        // Leftmost real bar (today's top offender) opens the defect-photo
+        // upload/view modal; ghost/skeleton bars (no real data yet) do nothing.
+        onClick: (_event, elements) => {
+          if (real > 0 && elements[0]?.index === 0) onFirstBarClick?.();
+        },
+        onHover: (event, elements) => {
+          const target = event.native?.target as HTMLElement | undefined;
+          if (!target) return;
+          target.style.cursor = real > 0 && elements[0]?.index === 0 ? 'pointer' : 'default';
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -67,7 +81,9 @@ export function ParetoChart({ data }: ParetoChartProps) {
             align: 'top',
             offset: 2,
             font: { weight: 'bold', size: 11 },
-            formatter: (_v, c) => `${counts[c.dataIndex]} pcs`,
+            // Camera icon on the top-offender bar hints it's clickable, and
+            // shows at a glance whether that defect already has a photo.
+            formatter: (_v, c) => `${counts[c.dataIndex]} pcs${c.dataIndex === 0 ? (hasPhoto ? ' 📷' : ' ➕') : ''}`,
           },
         },
         scales: {

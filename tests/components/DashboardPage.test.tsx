@@ -25,6 +25,9 @@ vi.mock('@/hooks/useProductionState', () => ({
 }));
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
 vi.mock('@/lib/chartSetup', () => ({}));
+vi.mock('@/hooks/useDefectPhotos', () => ({
+  useDefectPhotoFlags: () => ({ hasPhoto: () => false }),
+}));
 
 import DashboardPage from '@/app/dashboard/page';
 

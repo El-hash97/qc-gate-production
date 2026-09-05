@@ -87,6 +87,7 @@ describe('resetProductionState', () => {
     await resetProductionState();
 
     expect(mockSql.transaction).not.toHaveBeenCalled();
-    expect(mockSql).toHaveBeenCalledTimes(1);
+    // UPDATE production_state + DELETE FROM defect_photos (live-only, wiped on every reset).
+    expect(mockSql).toHaveBeenCalledTimes(2);
   });
 });

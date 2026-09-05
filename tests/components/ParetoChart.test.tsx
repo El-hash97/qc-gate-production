@@ -33,8 +33,10 @@ describe('ParetoChart', () => {
     ]);
     // y axis ticks render as percentages
     expect(props.options.scales.y.ticks.callback(50)).toBe('50%');
-    // pcs count above each real bar
-    expect(props.options.plugins.datalabels.formatter(75, { dataIndex: 0 })).toBe('6 pcs');
+    // pcs count above each real bar; the top-offender bar also hints it's
+    // the upload/view button for a defect photo (➕ = no photo yet)
+    expect(props.options.plugins.datalabels.formatter(75, { dataIndex: 0 })).toBe('6 pcs ➕');
+    expect(props.options.plugins.datalabels.formatter(25, { dataIndex: 1 })).toBe('2 pcs');
   });
 
   it('renders a grey 4-slot wireframe when there is no data', () => {
@@ -43,5 +45,35 @@ describe('ParetoChart', () => {
     expect(props.data.labels.length).toBe(4);
     expect(props.data.datasets[0].backgroundColor).toEqual([GHOST, GHOST, GHOST, GHOST]);
     expect(props.data.datasets[0].data).toEqual([40, 40, 40, 40]);
+  });
+
+  it('shows a camera icon on the top bar once a photo exists', () => {
+    render(<ParetoChart data={{ Kake: 6 }} hasPhoto />);
+    const [props] = chartSpy.mock.calls[0];
+    expect(props.options.plugins.datalabels.formatter(100, { dataIndex: 0 })).toBe('6 pcs 📷');
+  });
+
+  it('clicking the leftmost real bar fires onFirstBarClick', () => {
+    const onFirstBarClick = vi.fn();
+    render(<ParetoChart data={{ Kake: 6 }} onFirstBarClick={onFirstBarClick} />);
+    const [props] = chartSpy.mock.calls[0];
+    props.options.onClick({}, [{ index: 0 }]);
+    expect(onFirstBarClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking any other bar does not fire onFirstBarClick', () => {
+    const onFirstBarClick = vi.fn();
+    render(<ParetoChart data={{ Kake: 6, 'Gomi Drag': 2 }} onFirstBarClick={onFirstBarClick} />);
+    const [props] = chartSpy.mock.calls[0];
+    props.options.onClick({}, [{ index: 1 }]);
+    expect(onFirstBarClick).not.toHaveBeenCalled();
+  });
+
+  it('clicking the leftmost slot does not fire onFirstBarClick when it is only a ghost bar', () => {
+    const onFirstBarClick = vi.fn();
+    render(<ParetoChart data={{}} onFirstBarClick={onFirstBarClick} />);
+    const [props] = chartSpy.mock.calls[0];
+    props.options.onClick({}, [{ index: 0 }]);
+    expect(onFirstBarClick).not.toHaveBeenCalled();
   });
 });

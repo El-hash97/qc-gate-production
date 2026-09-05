@@ -11,6 +11,9 @@ import { LotDefectChart } from '@/components/production/LotDefectChart';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
 import { EntryLogList } from '@/components/production/EntryLogList';
 import { LineStopTable } from '@/components/production/LineStopTable';
+import { DefectPhotoModal } from '@/components/production/DefectPhotoModal';
+import { useDefectPhotoFlags } from '@/hooks/useDefectPhotos';
+import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
 import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
@@ -70,6 +73,11 @@ export default function DashboardPage() {
 
   const [view, setView] = useState<DashboardView>('all');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
+  // Defect photos are per product group — "Semua" mixes 3 groups' data so it
+  // has no slot of its own; the Pareto bars aren't clickable there.
+  const photoGroup: PhotoGroup | null = view === 'all' ? null : view;
+  const [photoModalChart, setPhotoModalChart] = useState<PhotoChartType | null>(null);
+  const { hasPhoto } = useDefectPhotoFlags();
   // Scope passed to the rate helpers: undefined = all, 'bc' = lines 1-2,
   // 3/4 = a single shaft line.
   const scope = view === 'all' ? undefined : view === 'bc' ? 'bc' : LINE_FOR[view];
@@ -258,12 +266,24 @@ export default function DashboardPage() {
 
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
           <div className={styles.panelTitle}>Pareto Defect (NG)</div>
-          <div className={styles.panelBody}><ParetoChart data={defectData} /></div>
+          <div className={styles.panelBody}>
+            <ParetoChart
+              data={defectData}
+              hasPhoto={photoGroup ? hasPhoto(photoGroup, 'ng') : false}
+              onFirstBarClick={photoGroup ? () => setPhotoModalChart('ng') : undefined}
+            />
+          </div>
         </section>
 
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
           <div className={styles.panelTitle}>Pareto Repair</div>
-          <div className={styles.panelBody}><ParetoChart data={repairData} /></div>
+          <div className={styles.panelBody}>
+            <ParetoChart
+              data={repairData}
+              hasPhoto={photoGroup ? hasPhoto(photoGroup, 'repair') : false}
+              onFirstBarClick={photoGroup ? () => setPhotoModalChart('repair') : undefined}
+            />
+          </div>
         </section>
 
         <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
@@ -302,6 +322,16 @@ export default function DashboardPage() {
           <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
         </section>
       </div>
+
+      {photoGroup && photoModalChart && (
+        <DefectPhotoModal
+          isOpen
+          onClose={() => setPhotoModalChart(null)}
+          group={photoGroup}
+          chartType={photoModalChart}
+          title={`Foto Defect — ${REPORT_LABEL[view]} / ${photoModalChart === 'ng' ? 'NG' : 'Repair'}`}
+        />
+      )}
     </main>
   );
 }

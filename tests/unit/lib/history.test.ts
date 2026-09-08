@@ -36,6 +36,7 @@ describe('getHistory', () => {
       defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
       hourlyDataCam: {}, hourlyDataCrank: {},
       hourlyTargetBc: {}, hourlyTargetCam: {}, hourlyTargetCrank: {},
+      cycleTimeBc: 50,
       entryLogs: [],
       lineStops: [],
       savedAt: '2026-08-04T19:00:00.000Z',

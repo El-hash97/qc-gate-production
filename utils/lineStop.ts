@@ -10,7 +10,9 @@ export function lineStopMinutes(start: string, end: string): number {
   return e >= s ? e - s : e + 1440 - s;
 }
 
-function toMinutes(hhmm: string): number | null {
+// "HH:MM" (24h) as minutes since midnight, or null when malformed. Exported
+// so the OEE helpers can bucket a stop by the hours it spans.
+export function toMinutes(hhmm: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
   if (!m) return null;
   const h = Number(m[1]);

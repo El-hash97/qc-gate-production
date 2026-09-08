@@ -44,4 +44,26 @@ describe('HourlyTable', () => {
     await userEvent.tab();
     expect(onTargetChange).toHaveBeenCalledWith('07:00', 50);
   });
+
+  it('leaves out the OEE columns when no factors are supplied', () => {
+    render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }} />);
+    expect(screen.queryByRole('columnheader', { name: 'OEE' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'AV' })).not.toBeInTheDocument();
+  });
+
+  it('renders AV/PE/RQ/OEE as percentages when factors are supplied', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 60, repair: 8, ng: 4 } }}
+        oee={{ '07:00': { av: 1, pe: 0.8333, rq: 0.8333, oee: 0.6944 } }}
+      />,
+    );
+    for (const header of ['AV', 'PE', 'RQ', 'OEE']) {
+      expect(screen.getByRole('columnheader', { name: header })).toBeInTheDocument();
+    }
+    const row = screen.getByRole('row', { name: /07:00/ });
+    expect(row).toHaveTextContent('100%');
+    expect(row).toHaveTextContent('83%');
+    expect(row).toHaveTextContent('69%');
+  });
 });

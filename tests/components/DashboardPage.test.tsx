@@ -44,6 +44,15 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Achievement: 84%')).toBeInTheDocument();
   });
 
+  it('hides the OEE card on the mixed "Semua" view and shows it for B/C', async () => {
+    render(<DashboardPage />);
+    expect(screen.queryByText(/^OEE \(CT/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'B/C' }));
+    // Falls back to the default 50 s cycle time when the shift has none stored.
+    expect(screen.getByText('OEE (CT 50s)')).toBeInTheDocument();
+  });
+
   it('shows connection status from the hook', () => {
     render(<DashboardPage />);
     expect(screen.getByText('Real-time Connected')).toBeInTheDocument();

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS production_state (
   hourly_data_shaft JSONB NOT NULL DEFAULT '{}',
   hourly_data_cam   JSONB NOT NULL DEFAULT '{}',
   hourly_data_crank JSONB NOT NULL DEFAULT '{}',
+  cycle_time_bc     INTEGER NOT NULL DEFAULT 50,
   entry_logs        JSONB NOT NULL DEFAULT '[]',
   line_stops        JSONB NOT NULL DEFAULT '[]',
   saved_at          TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS history (
   hourly_data_shaft JSONB NOT NULL DEFAULT '{}',
   hourly_data_cam   JSONB NOT NULL DEFAULT '{}',
   hourly_data_crank JSONB NOT NULL DEFAULT '{}',
+  cycle_time_bc     INTEGER NOT NULL DEFAULT 50,
   entry_logs        JSONB NOT NULL DEFAULT '[]',
   line_stops        JSONB NOT NULL DEFAULT '[]',
   saved_at          TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -120,6 +122,11 @@ ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB 
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_bc    JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_cam   JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB NOT NULL DEFAULT '{}';
+
+-- Cycle time (seconds per piece) for Block Cylinder, the basis of the OEE
+-- availability factor: 3600 / cycle_time_bc = pcs an uninterrupted hour yields.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFAULT 50;
+ALTER TABLE history ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFAULT 50;
 
 -- Current-defect photo per Pareto chart (NG/Repair) x product group (bc/
 -- camshaft/crankshaft) x defect type. Live-only: cleared on every shift reset,

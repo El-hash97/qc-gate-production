@@ -1,4 +1,5 @@
 import { sql } from './db';
+import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { getProductionState } from './productionState';
 import { deleteAllDefectPhotos } from './defectPhotos';
 import type { ProductionState } from './types';
@@ -56,7 +57,7 @@ export async function resetProductionState(): Promise<ProductionState> {
            defect_data_shaft, repair_data_shaft, hourly_data_shaft,
            hourly_data_cam, hourly_data_crank,
            hourly_target_bc, hourly_target_cam, hourly_target_crank,
-           entry_logs, line_stops, saved_at)
+           cycle_time_bc, entry_logs, line_stops, saved_at)
         VALUES (
           ${current.date}, ${current.shift}, ${current.operator}, ${current.pic ?? ''}, ${current.target},
           ${current.targetBc ?? 0}, ${current.targetCam ?? 0}, ${current.targetCrank ?? 0},
@@ -75,6 +76,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           ${JSON.stringify(current.hourlyTargetBc ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyTargetCam ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyTargetCrank ?? {})}::jsonb,
+          ${current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC},
           ${JSON.stringify(current.entryLogs)}::jsonb,
           ${JSON.stringify(current.lineStops ?? [])}::jsonb,
           now()

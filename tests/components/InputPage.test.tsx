@@ -66,6 +66,22 @@ describe('InputPage', () => {
     expect(updateStateMock).toHaveBeenCalledWith(expect.objectContaining({ targetBc: 250, target: 250 }));
   });
 
+  it('defaults the cycle time to 50 s and shows the hourly capacity it implies', () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    expect(screen.getByText('CT B/C — 72 pcs/jam')).toBeInTheDocument();
+    expect(screen.getByLabelText(/CT B\/C/)).toHaveValue(50);
+  });
+
+  it('commits an edited cycle time on blur', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    const input = screen.getByLabelText(/CT B\/C/);
+    await userEvent.clear(input);
+    await userEvent.type(input, '45');
+    expect(updateStateMock).not.toHaveBeenCalled();
+    await userEvent.tab();
+    expect(updateStateMock).toHaveBeenCalledWith(expect.objectContaining({ cycleTimeBc: 45 }));
+  });
+
   it('opens the reset confirmation modal from the Reset button', async () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Reset' }));

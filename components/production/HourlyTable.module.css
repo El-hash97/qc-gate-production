@@ -36,3 +36,12 @@
   border-radius: var(--radius-sm);
   color: var(--text-primary);
 }
+
+/* --- AV / PE / RQ / OEE cells: green from 85%, amber from 60%, red below --- */
+.rateGood, .rateWarn, .rateBad {
+  font-weight: 600;
+}
+
+.rateGood { color: var(--accent-green); }
+.rateWarn { color: var(--accent-orange); }
+.rateBad { color: var(--accent-red); }

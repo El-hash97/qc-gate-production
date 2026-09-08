@@ -31,6 +31,7 @@ describe('getProductionState', () => {
       defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
       hourlyDataCam: {}, hourlyDataCrank: {},
       hourlyTargetBc: {}, hourlyTargetCam: {}, hourlyTargetCrank: {},
+      cycleTimeBc: 50,
       entryLogs: [],
       lineStops: [],
       savedAt: '2026-08-05T07:00:00.000Z',

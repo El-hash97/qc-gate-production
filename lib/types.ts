@@ -107,6 +107,11 @@ export interface ProductionState {
   hourlyTargetBc?: Record<string, number>;
   hourlyTargetCam?: Record<string, number>;
   hourlyTargetCrank?: Record<string, number>;
+  // Cycle time in seconds for Block Cylinder, the basis of the OEE
+  // availability factor (3600 / ct = pcs an uninterrupted hour yields).
+  // Optional for back-compat; every read site falls back to
+  // DEFAULT_CYCLE_TIME_SEC.
+  cycleTimeBc?: number;
   entryLogs: EntryLog[];
   // Plant-wide line stops. Optional for back-compat; every read site defaults
   // a missing value to [].

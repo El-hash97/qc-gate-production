@@ -147,12 +147,15 @@
   border-radius: 99px;
 }
 
-/* --- KPI cards: Total / OK / Repair / NG, each with its percentage below --- */
+/* --- KPI cards: Total / OK / Repair / NG, each with its percentage below.
+   The B/C view adds a fifth card for OEE. --- */
 .kpiRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
+
+.kpiRowOee { grid-template-columns: repeat(5, 1fr); }
 
 .kpiCard {
   background: var(--bg-card);
@@ -167,6 +170,7 @@
 .kpiOk { border-left-color: var(--accent-green); }
 .kpiRepair { border-left-color: var(--accent-orange); }
 .kpiNg { border-left-color: var(--accent-red); }
+.kpiOee { border-left-color: var(--accent-cyan); }
 
 .kpiLabel {
   font-size: 11px;
@@ -293,6 +297,7 @@
     margin-bottom: 8px;
     break-inside: avoid;
   }
+  .kpiRowOee { grid-template-columns: repeat(5, 1fr); }
   .kpiCard { box-shadow: none; }
   .kpiValue { font-size: 20px; }
   .progressStrip { box-shadow: none; break-inside: avoid; margin-bottom: 8px; }

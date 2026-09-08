@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
@@ -18,6 +18,11 @@ import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
+import {
+  DEFAULT_CYCLE_TIME_SEC, elapsedMinutesInHour, hourlyOee, peMinutesByHour,
+  shiftOee, toPercent,
+} from '@/utils/oee';
+import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
 import { useTheme } from '@/hooks/useTheme';
 import { findPic } from '@/utils/constants';
@@ -139,6 +144,36 @@ export default function DashboardPage() {
 
   const lineStops = current.lineStops ?? [];
 
+  // OEE needs a cycle time to measure availability against, and only Block
+  // Cylinder has one so far — the other views (and "Semua", which mixes three
+  // products) show no OEE at all rather than a misleading number.
+  const showOee = view === 'bc';
+  const cycleTime = current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC;
+
+  // The running hour is measured against the minutes gone by, so it has to be
+  // recomputed as the clock moves even when no new production comes in.
+  const [minuteTick, setMinuteTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setMinuteTick(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const oeeByHour = useMemo(() => {
+    if (!showOee) return undefined;
+    const peByHour = peMinutesByHour(current.lineStops);
+    const now = new Date(minuteTick);
+    const out: Record<string, OeeBreakdown> = {};
+    for (const [hour, snapshot] of Object.entries(hourlyData)) {
+      out[hour] = hourlyOee(snapshot, peByHour[hour] ?? 0, cycleTime, elapsedMinutesInHour(hour, now));
+    }
+    return out;
+  }, [showOee, hourlyData, current.lineStops, cycleTime, minuteTick]);
+
+  const oeeShift = useMemo(
+    () => (showOee ? shiftOee(hourlyData, current.lineStops, cycleTime, new Date(minuteTick)) : null),
+    [showOee, hourlyData, current.lineStops, cycleTime, minuteTick],
+  );
+
   function handleHourlyTarget(hour: string, value: number) {
     // Never write before the running shift has loaded — that would POST
     // EMPTY_STATE over live data (mirrors the Input page's load gate).
@@ -212,7 +247,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div className={styles.kpiRow}>
+      <div className={oeeShift ? `${styles.kpiRow} ${styles.kpiRowOee}` : styles.kpiRow}>
         <div className={`${styles.kpiCard} ${styles.kpiTotal}`}>
           <div className={styles.kpiLabel}>Total Produksi</div>
           <div className={styles.kpiValue}>{ok + repair + ng}</div>
@@ -233,6 +268,15 @@ export default function DashboardPage() {
           <div className={styles.kpiValue}>{ng}</div>
           <div className={styles.kpiPct}>{rates.ngRate}%</div>
         </div>
+        {oeeShift && (
+          <div className={`${styles.kpiCard} ${styles.kpiOee}`}>
+            <div className={styles.kpiLabel}>OEE (CT {cycleTime}s)</div>
+            <div className={styles.kpiValue}>{toPercent(oeeShift.oee)}%</div>
+            <div className={styles.kpiPct}>
+              AV {toPercent(oeeShift.av)}% &middot; PE {toPercent(oeeShift.pe)}% &middot; RQ {toPercent(oeeShift.rq)}%
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={styles.progressStrip}>
@@ -266,6 +310,7 @@ export default function DashboardPage() {
               hourlyTarget={hourlyTarget}
               editable={hourlyTargetKey !== null}
               onTargetChange={handleHourlyTarget}
+              oee={oeeByHour}
             />
           </div>
         </section>

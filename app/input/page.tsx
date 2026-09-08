@@ -14,6 +14,7 @@ import { PicCard } from '@/components/production/PicCard';
 import {
   getRates, getAchievementPercent, getProgressPercent,
 } from '@/utils/rates';
+import { DEFAULT_CYCLE_TIME_SEC, hourCapacity } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
 import {
@@ -154,6 +155,19 @@ export default function InputPage() {
     },
     format: (value: number) => String(value),
   };
+  // Cycle time drives the OEE availability factor on the dashboard: an hour
+  // yields 3600 / ct pieces. Blank or nonsensical input falls back to the
+  // default rather than dividing production by zero.
+  const parseCycleTime = {
+    parse: (raw: string) => {
+      const n = parseInt(raw, 10);
+      return Number.isNaN(n) || n <= 0 ? DEFAULT_CYCLE_TIME_SEC : n;
+    },
+    format: (value: number) => String(value),
+  };
+  const cycleTime = current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC;
+  const cycleTimeField = useDraftValue(cycleTime, (v) => commit({ cycleTimeBc: v }), parseCycleTime);
+
   const targetBcField = useDraftValue(current.targetBc ?? 0, (v) => commitTarget({ targetBc: v }), parseTarget);
   const targetCamField = useDraftValue(current.targetCam ?? 0, (v) => commitTarget({ targetCam: v }), parseTarget);
   const targetCrankField = useDraftValue(current.targetCrank ?? 0, (v) => commitTarget({ targetCrank: v }), parseTarget);
@@ -222,6 +236,20 @@ export default function InputPage() {
           >
             {SHIFTS.map((shift) => <option key={shift} value={shift}>{shift}</option>)}
           </select>
+        </label>
+        <label className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>
+            CT B/C — {Math.round(hourCapacity(cycleTime))} pcs/jam
+          </span>
+          <input
+            type="number"
+            min={1}
+            className={`${styles.toolbarInput} ${styles.targetInput}`}
+            value={cycleTimeField.value}
+            onChange={cycleTimeField.onChange}
+            onBlur={cycleTimeField.onBlur}
+            onKeyDown={cycleTimeField.onKeyDown}
+          />
         </label>
       </div>
       </div>

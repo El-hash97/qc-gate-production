@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/hooks/useProductionState', () => ({
@@ -46,11 +46,16 @@ describe('DashboardPage', () => {
 
   it('hides the OEE card on the mixed "Semua" view and shows it for B/C', async () => {
     render(<DashboardPage />);
-    expect(screen.queryByText(/^OEE \(CT/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /OEE/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'B/C' }));
+    const card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
+    expect(card.getByRole('img', { name: /^OEE \d+ persen$/ })).toBeInTheDocument();
+    for (const factor of ['AV', 'PE', 'RQ']) {
+      expect(card.getByText(factor)).toBeInTheDocument();
+    }
     // Falls back to the default 50 s cycle time when the shift has none stored.
-    expect(screen.getByText('OEE (CT 50s)')).toBeInTheDocument();
+    expect(card.getByText(/CT 50 dtk/)).toBeInTheDocument();
   });
 
   it('shows connection status from the hook', () => {

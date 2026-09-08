@@ -15,6 +15,11 @@
   flex-wrap: wrap;
 }
 
+.oeeSlot {
+  margin-inline: auto;
+  align-self: flex-start;
+}
+
 .statusRight {
   margin-left: auto;
   align-self: center;
@@ -148,14 +153,12 @@
 }
 
 /* --- KPI cards: Total / OK / Repair / NG, each with its percentage below.
-   The B/C view adds a fifth card for OEE. --- */
+   OEE has its own card up in the status row. --- */
 .kpiRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
-
-.kpiRowOee { grid-template-columns: repeat(5, 1fr); }
 
 .kpiCard {
   background: var(--bg-card);
@@ -170,7 +173,6 @@
 .kpiOk { border-left-color: var(--accent-green); }
 .kpiRepair { border-left-color: var(--accent-orange); }
 .kpiNg { border-left-color: var(--accent-red); }
-.kpiOee { border-left-color: var(--accent-cyan); }
 
 .kpiLabel {
   font-size: 11px;
@@ -275,9 +277,13 @@
     -webkit-print-color-adjust: exact;
   }
 
-  /* On-screen chrome that doesn't belong in the report. */
-  .toggleRow,
-  .statusBar { display: none !important; }
+  /* On-screen chrome that doesn't belong in the report. The status row stays
+     because the OEE card sits in it; its other children are already repeated
+     in the report header above. */
+  .toggleRow { display: none !important; }
+  .statusBar { justify-content: center; margin-bottom: 8px; }
+  .statusBar > *:not(.oeeSlot) { display: none !important; }
+  .oeeSlot { break-inside: avoid; }
 
   .printHeader {
     display: block;
@@ -297,7 +303,6 @@
     margin-bottom: 8px;
     break-inside: avoid;
   }
-  .kpiRowOee { grid-template-columns: repeat(5, 1fr); }
   .kpiCard { box-shadow: none; }
   .kpiValue { font-size: 20px; }
   .progressStrip { box-shadow: none; break-inside: avoid; margin-bottom: 8px; }

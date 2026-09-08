@@ -1,0 +1,106 @@
+/* OEE block for the dashboard status row: gauge on top, the three factors it
+   multiplies below it. Sized to sit level with the PIC card beside it. */
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.gaugeWrap {
+  position: relative;
+  width: 92px;
+  height: 92px;
+}
+
+.gauge {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.track,
+.value {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.track { stroke: var(--border-color); }
+
+/* The centred readout sits on top of the gauge; the ring's bottom gap leaves
+   room for the "OEE" caption. */
+.gaugeCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.gaugeValue {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.gaugeLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.factors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.factor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.factorLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.factorValue {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.caption {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* Green from 85%, amber from 60%, red below — matching the Hourly table. The
+   arc takes its stroke from the same class, the numbers their text colour. */
+.good { color: var(--accent-green); stroke: var(--accent-green); }
+.warn { color: var(--accent-orange); stroke: var(--accent-orange); }
+.bad { color: var(--accent-red); stroke: var(--accent-red); }

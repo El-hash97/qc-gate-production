@@ -12,6 +12,7 @@ import { DefectRepairSummary } from '@/components/production/DefectRepairSummary
 import { EntryLogList } from '@/components/production/EntryLogList';
 import { LineStopTable } from '@/components/production/LineStopTable';
 import { DefectPhotoModal } from '@/components/production/DefectPhotoModal';
+import { OeeCard } from '@/components/production/OeeCard';
 import { useDefectPhotoFlags } from '@/hooks/useDefectPhotos';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
 import {
@@ -19,8 +20,7 @@ import {
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
 import {
-  DEFAULT_CYCLE_TIME_SEC, elapsedMinutesInHour, hourlyOee, peMinutesByHour,
-  shiftOee, toPercent,
+  DEFAULT_CYCLE_TIME_SEC, elapsedMinutesInHour, hourlyOee, peMinutesByHour, shiftOee,
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
@@ -218,6 +218,11 @@ export default function DashboardPage() {
 
       <div className={styles.statusBar}>
         {current.pic && <PicCard pic={current.pic} />}
+        {oeeShift && (
+          <div className={styles.oeeSlot}>
+            <OeeCard oee={oeeShift} cycleTime={cycleTime} />
+          </div>
+        )}
         <span className={styles.statusRight}>
           <span>{current.date || '—'}</span>
           <span>{current.operator || 'Belum ada operator'}</span>
@@ -247,7 +252,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div className={oeeShift ? `${styles.kpiRow} ${styles.kpiRowOee}` : styles.kpiRow}>
+      <div className={styles.kpiRow}>
         <div className={`${styles.kpiCard} ${styles.kpiTotal}`}>
           <div className={styles.kpiLabel}>Total Produksi</div>
           <div className={styles.kpiValue}>{ok + repair + ng}</div>
@@ -268,15 +273,6 @@ export default function DashboardPage() {
           <div className={styles.kpiValue}>{ng}</div>
           <div className={styles.kpiPct}>{rates.ngRate}%</div>
         </div>
-        {oeeShift && (
-          <div className={`${styles.kpiCard} ${styles.kpiOee}`}>
-            <div className={styles.kpiLabel}>OEE (CT {cycleTime}s)</div>
-            <div className={styles.kpiValue}>{toPercent(oeeShift.oee)}%</div>
-            <div className={styles.kpiPct}>
-              AV {toPercent(oeeShift.av)}% &middot; PE {toPercent(oeeShift.pe)}% &middot; RQ {toPercent(oeeShift.rq)}%
-            </div>
-          </div>
-        )}
       </div>
 
       <div className={styles.progressStrip}>

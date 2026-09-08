@@ -23,3 +23,6 @@
 
 # local db backup
 qcgate.db.backup
+
+# editor
+.obsidian/

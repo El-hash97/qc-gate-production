@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HourlyTable } from '@/components/production/HourlyTable';
 
@@ -76,6 +76,32 @@ describe('HourlyTable', () => {
     expect(onWindowChange).not.toHaveBeenCalled();
     fireEvent.blur(end);
     expect(onWindowChange).toHaveBeenCalledWith('07:00', { start: '07:00', end: '07:45' });
+  });
+
+  it('shows Actual as the hour total (OK + Repair + NG)', () => {
+    render(<HourlyTable hourlyData={{ '07:00': { ok: 40, repair: 3, ng: 2 } }} />);
+    expect(screen.getByRole('columnheader', { name: 'Plan' })).toBeInTheDocument();
+    const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
+    // Jam, OK, Repair, NG, Plan, Actual
+    expect(cells[5]).toHaveTextContent('45');
+  });
+
+  it('flags Actual when it falls short of Plan, leaves it plain with no plan', () => {
+    render(
+      <HourlyTable
+        hourlyData={{
+          '07:00': { ok: 20, repair: 0, ng: 0 }, // short of 45
+          '08:00': { ok: 46, repair: 0, ng: 0 }, // meets 45
+          '09:00': { ok: 10, repair: 0, ng: 0 }, // no plan
+        }}
+        hourlyTarget={{ '07:00': 45, '08:00': 45 }}
+      />,
+    );
+    const rows = screen.getAllByRole('row').slice(1);
+    const actual = (i: number) => within(rows[i]).getAllByRole('cell')[5];
+    expect(actual(0).className).toMatch(/rateBad/);
+    expect(actual(1).className).toMatch(/rateGood/);
+    expect(actual(2).className).toBe('');
   });
 
   it('leaves out the OEE columns when no factors are supplied', () => {

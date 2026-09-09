@@ -91,6 +91,16 @@ function rateClass(percent: number): string {
   return styles.rateBad;
 }
 
+// Actual vs Plan for the hour: green on/above plan, amber within 10%, red below.
+// A red cell here lines up with a lower AV that row — fewer pieces against the
+// same capacity. Uncoloured when no plan is set for the hour.
+function actualClass(actual: number, plan: number): string {
+  if (plan <= 0) return '';
+  if (actual >= plan) return styles.rateGood;
+  if (actual >= plan * 0.9) return styles.rateWarn;
+  return styles.rateBad;
+}
+
 function RateCell({ ratio }: { ratio: number }) {
   const percent = toPercent(ratio);
   return <td className={rateClass(percent)}>{percent}%</td>;
@@ -106,7 +116,7 @@ export function HourlyTable({
     <table className={styles.table}>
       <thead>
         <tr>
-          <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th><th>Target</th>
+          <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th><th>Plan</th><th>Actual</th>
           {oee && <><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
         </tr>
       </thead>
@@ -114,6 +124,9 @@ export function HourlyTable({
         {sortedHours.map((hour) => {
           const factors = oee?.[hour];
           const win = hourlyWindow[hour] ?? defaultWindow(hour);
+          const snap = hourlyData[hour];
+          const actual = snap.ok + snap.repair + snap.ng;
+          const plan = hourlyTarget[hour] ?? 0;
           return (
             <tr key={hour}>
               <td>
@@ -123,16 +136,17 @@ export function HourlyTable({
                   `${win.start}–${win.end}`
                 )}
               </td>
-              <td>{hourlyData[hour].ok}</td>
-              <td>{hourlyData[hour].repair}</td>
-              <td>{hourlyData[hour].ng}</td>
+              <td>{snap.ok}</td>
+              <td>{snap.repair}</td>
+              <td>{snap.ng}</td>
               <td>
                 {editable && onTargetChange ? (
-                  <TargetCell value={hourlyTarget[hour] ?? 0} onCommit={(v) => onTargetChange(hour, v)} />
+                  <TargetCell value={plan} onCommit={(v) => onTargetChange(hour, v)} />
                 ) : (
-                  hourlyTarget[hour] || '—'
+                  plan || '—'
                 )}
               </td>
+              <td className={actualClass(actual, plan)}>{actual}</td>
               {oee && factors && (
                 <>
                   <RateCell ratio={factors.av} />

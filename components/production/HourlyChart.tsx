@@ -53,7 +53,7 @@ export function HourlyChart({ hourlyData, hourlyTarget = {} }: HourlyChartProps)
   if (targetLine.some((v) => v !== null)) {
     datasets.push({
       type: 'line' as const,
-      label: 'Target',
+      label: 'Plan',
       data: targetLine,
       borderColor: ct.tick,
       borderDash: [6, 4],

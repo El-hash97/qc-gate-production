@@ -25,13 +25,13 @@ describe('HourlyChart', () => {
     expect(props.data.labels.slice(0, 2)).toEqual(['09:00', '10:00']);
     const cumulative = props.data.datasets.find((d: any) => d.label === 'Kumulatif');
     expect(cumulative.data).toEqual([10, 16, null, null]);
-    expect(props.data.datasets.some((d: any) => d.label === 'Target')).toBe(false);
+    expect(props.data.datasets.some((d: any) => d.label === 'Plan')).toBe(false);
   });
 
-  it('adds a per-hour dashed target line from the hourly target map', () => {
+  it('adds a per-hour dashed plan line from the hourly target map', () => {
     render(<HourlyChart hourlyData={hourly} hourlyTarget={{ '09:00': 40, '10:00': 45 }} />);
     const [props] = chartSpy.mock.calls[0];
-    const target = props.data.datasets.find((d: any) => d.label === 'Target');
+    const target = props.data.datasets.find((d: any) => d.label === 'Plan');
     expect(target.data).toEqual([40, 45, null, null]);
     expect(target.borderDash).toEqual([6, 4]);
     expect(target.yAxisID).toBe('y');

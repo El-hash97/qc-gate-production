@@ -323,7 +323,7 @@ export default function DashboardPage() {
         </section>
 
         {oeeByHour && (
-          <section className={`${styles.panel} ${styles.spanList} ${styles.hPareto}`}>
+          <section className={`${styles.panel} ${styles.oeeChartPanel} ${styles.hPareto}`}>
             <div className={styles.panelTitle}>OEE per Jam</div>
             <div className={styles.panelBody}><HourlyOeeChart oee={oeeByHour} /></div>
           </section>

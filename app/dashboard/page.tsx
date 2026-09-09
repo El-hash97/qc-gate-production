@@ -6,6 +6,7 @@ import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
 import { HourlyChart } from '@/components/production/HourlyChart';
 import { HourlyTable } from '@/components/production/HourlyTable';
+import { HourlyOeeChart } from '@/components/production/HourlyOeeChart';
 import { DefectHeatmap } from '@/components/production/DefectHeatmap';
 import { LotDefectChart } from '@/components/production/LotDefectChart';
 import { DefectRepairSummary } from '@/components/production/DefectRepairSummary';
@@ -324,6 +325,13 @@ export default function DashboardPage() {
             />
           </div>
         </section>
+
+        {oeeByHour && (
+          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+            <div className={styles.panelTitle}>OEE per Jam</div>
+            <div className={styles.panelBody}><HourlyOeeChart oee={oeeByHour} /></div>
+          </section>
+        )}
 
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
           <div className={styles.panelTitle}>Pareto Defect (NG)</div>

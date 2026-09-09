@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  hourlySeries, pareto, flaskTypeMatrix, cavityTypeMatrix, expandCavities, lotDefectData, padLabels,
+  hourlySeries, hourlyOeeSeries, pareto, flaskTypeMatrix, cavityTypeMatrix, expandCavities, lotDefectData, padLabels,
 } from '@/utils/charts';
 import type { EntryLog } from '@/lib/types';
 
@@ -86,6 +86,24 @@ describe('cavityTypeMatrix', () => {
     // cavity 1 gets both entries (2 + 3), cavity 7 only the 1-8 entry (3)
     expect(cells).toContainEqual({ x: 'Dross', y: '1', v: 5, lots: ['L1', 'L2'] });
     expect(cells).toContainEqual({ x: 'Dross', y: '7', v: 3, lots: ['L2'] });
+  });
+});
+
+describe('hourlyOeeSeries', () => {
+  it('sorts hours and converts each factor to a whole percentage', () => {
+    const series = hourlyOeeSeries({
+      '08:00': { av: 0.5, pe: 1, rq: 0.8333, oee: 0.4167 },
+      '07:00': { av: 1, pe: 0.8333, rq: 0.9, oee: 0.75 },
+    });
+    expect(series.hours).toEqual(['07:00', '08:00']);
+    expect(series.av).toEqual([100, 50]);
+    expect(series.pe).toEqual([83, 100]);
+    expect(series.rq).toEqual([90, 83]);
+    expect(series.oee).toEqual([75, 42]);
+  });
+
+  it('is empty for no recorded hours', () => {
+    expect(hourlyOeeSeries({})).toEqual({ hours: [], av: [], pe: [], rq: [], oee: [] });
   });
 });
 

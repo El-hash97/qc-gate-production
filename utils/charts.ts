@@ -1,4 +1,6 @@
 import type { EntryLog, HourlySnapshot, ProductLine } from '@/lib/types';
+import type { OeeBreakdown } from '@/utils/oee';
+import { toPercent } from '@/utils/oee';
 
 // Minimum category slots a bar chart / heatmap axis is laid out over. With only
 // 1-2 real categories the chart would otherwise draw a couple of oversized bars;
@@ -34,6 +36,29 @@ export function hourlySeries(hourly: Record<string, HourlySnapshot>): HourlySeri
     series.repair.push(snap.repair);
     series.ng.push(snap.ng);
     series.cumulative.push(running);
+  }
+  return series;
+}
+
+// --- Hourly OEE line chart: AV / PE / RQ / OEE per hour, as whole percentages ---
+
+export interface HourlyOeeSeries {
+  hours: string[];
+  av: number[];
+  pe: number[];
+  rq: number[];
+  oee: number[];
+}
+
+export function hourlyOeeSeries(oee: Record<string, OeeBreakdown>): HourlyOeeSeries {
+  const hours = Object.keys(oee).sort();
+  const series: HourlyOeeSeries = { hours, av: [], pe: [], rq: [], oee: [] };
+  for (const hour of hours) {
+    const f = oee[hour];
+    series.av.push(toPercent(f.av));
+    series.pe.push(toPercent(f.pe));
+    series.rq.push(toPercent(f.rq));
+    series.oee.push(toPercent(f.oee));
   }
   return series;
 }

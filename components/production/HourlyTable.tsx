@@ -1,7 +1,7 @@
 'use client';
 
 import { useDraftValue } from '@/hooks/useDraftValue';
-import type { ProductionState } from '@/lib/types';
+import type { HourWindow, ProductionState } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
 import styles from './HourlyTable.module.css';
@@ -10,10 +10,14 @@ interface HourlyTableProps {
   hourlyData: ProductionState['hourlyData'];
   // Per-hour target (pcs) for the active product group, keyed "HH:00".
   hourlyTarget?: Record<string, number>;
-  // When true each row's target is an editable field; otherwise it's shown
-  // read-only (the "Semua" view, where the target is a sum of the groups).
+  // Actual worked window per hour, keyed "HH:00". An hour with no entry falls
+  // back to the full clock hour (HH:00 -> HH+1:00).
+  hourlyWindow?: Record<string, HourWindow>;
+  // When true each row's target and time window are editable fields; otherwise
+  // they're shown read-only (the "Semua" view).
   editable?: boolean;
   onTargetChange?: (hour: string, value: number) => void;
+  onWindowChange?: (hour: string, win: HourWindow) => void;
   // Per-hour OEE factors, keyed "HH:00". Supplied only for a view that has a
   // cycle time to measure against (B/C today); without it the AV/PE/RQ/OEE
   // columns aren't rendered at all.
@@ -27,6 +31,22 @@ const parseTarget = {
   },
   format: (value: number) => (value > 0 ? String(value) : ''),
 };
+
+const identityTime = {
+  parse: (raw: string) => raw,
+  format: (value: string) => value,
+};
+
+// "07:00" -> "08:00"; "23:00" -> "00:00". The default window of an hour is the
+// clock hour itself, shown until the operator narrows it for a break.
+function nextHour(hour: string): string {
+  const h = parseInt(hour.slice(0, 2), 10);
+  return `${String((Number.isNaN(h) ? 0 : h + 1) % 24).padStart(2, '0')}:00`;
+}
+
+function defaultWindow(hour: string): HourWindow {
+  return { start: hour, end: nextHour(hour) };
+}
 
 function TargetCell({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
   const field = useDraftValue(value, onCommit, parseTarget);
@@ -44,6 +64,25 @@ function TargetCell({ value, onCommit }: { value: number; onCommit: (v: number) 
   );
 }
 
+// Two time fields; either one committing sends the whole {start,end} back up.
+function WindowCell({ win, onCommit }: { win: HourWindow; onCommit: (w: HourWindow) => void }) {
+  const start = useDraftValue(win.start, (v) => onCommit({ start: v, end: win.end }), identityTime);
+  const end = useDraftValue(win.end, (v) => onCommit({ start: win.start, end: v }), identityTime);
+  return (
+    <span className={styles.windowCell}>
+      <input
+        type="time" aria-label="Jam mulai" className={styles.timeInput}
+        value={start.value} onChange={start.onChange} onBlur={start.onBlur} onKeyDown={start.onKeyDown}
+      />
+      <span className={styles.windowDash}>–</span>
+      <input
+        type="time" aria-label="Jam selesai" className={styles.timeInput}
+        value={end.value} onChange={end.onChange} onBlur={end.onBlur} onKeyDown={end.onKeyDown}
+      />
+    </span>
+  );
+}
+
 // Green from 85%, amber from 60%, red below — a glance down the column shows
 // which hour cost the shift its OEE.
 function rateClass(percent: number): string {
@@ -58,7 +97,8 @@ function RateCell({ ratio }: { ratio: number }) {
 }
 
 export function HourlyTable({
-  hourlyData, hourlyTarget = {}, editable = false, onTargetChange, oee,
+  hourlyData, hourlyTarget = {}, hourlyWindow = {}, editable = false,
+  onTargetChange, onWindowChange, oee,
 }: HourlyTableProps) {
   const sortedHours = Object.keys(hourlyData).sort();
 
@@ -73,9 +113,16 @@ export function HourlyTable({
       <tbody>
         {sortedHours.map((hour) => {
           const factors = oee?.[hour];
+          const win = hourlyWindow[hour] ?? defaultWindow(hour);
           return (
             <tr key={hour}>
-              <td>{hour}</td>
+              <td>
+                {editable && onWindowChange ? (
+                  <WindowCell win={win} onCommit={(w) => onWindowChange(hour, w)} />
+                ) : (
+                  `${win.start}–${win.end}`
+                )}
+              </td>
               <td>{hourlyData[hour].ok}</td>
               <td>{hourlyData[hour].repair}</td>
               <td>{hourlyData[hour].ng}</td>

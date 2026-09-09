@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HourlyTable } from '@/components/production/HourlyTable';
 
@@ -43,6 +43,39 @@ describe('HourlyTable', () => {
     expect(onTargetChange).not.toHaveBeenCalled();
     await userEvent.tab();
     expect(onTargetChange).toHaveBeenCalledWith('07:00', 50);
+  });
+
+  it('auto-generates a one-hour range in the Jam column when read-only', () => {
+    render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 }, '23:00': { ok: 1, repair: 0, ng: 0 } }} />);
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('07:00–08:00');
+    expect(rows[1]).toHaveTextContent('23:00–00:00');
+  });
+
+  it('shows the stored window instead of the default when one is set', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '12:00': { ok: 5, repair: 0, ng: 0 } }}
+        hourlyWindow={{ '12:00': { start: '12:00', end: '12:45' } }}
+      />,
+    );
+    expect(screen.getByRole('row', { name: /12:00/ })).toHaveTextContent('12:00–12:45');
+  });
+
+  it('commits an edited window on blur', () => {
+    const onWindowChange = vi.fn();
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
+        editable
+        onWindowChange={onWindowChange}
+      />,
+    );
+    const end = screen.getByLabelText('Jam selesai');
+    fireEvent.change(end, { target: { value: '07:45' } });
+    expect(onWindowChange).not.toHaveBeenCalled();
+    fireEvent.blur(end);
+    expect(onWindowChange).toHaveBeenCalledWith('07:00', { start: '07:00', end: '07:45' });
   });
 
   it('leaves out the OEE columns when no factors are supplied', () => {

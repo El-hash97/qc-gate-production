@@ -37,6 +37,29 @@
   color: var(--text-primary);
 }
 
+/* --- "Jam" column: start/end time fields for the actual worked window --- */
+.windowCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.windowDash {
+  color: var(--text-secondary);
+}
+
+.timeInput {
+  width: 74px;
+  padding: 3px 4px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
 /* --- AV / PE / RQ / OEE cells: green from 85%, amber from 60%, red below --- */
 .rateGood, .rateWarn, .rateBad {
   font-weight: 600;

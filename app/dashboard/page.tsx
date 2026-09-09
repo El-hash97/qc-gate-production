@@ -21,7 +21,8 @@ import {
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
 import {
-  DEFAULT_CYCLE_TIME_SEC, workedMinutesInHour, hourlyOee, peMinutesByHour, shiftOee,
+  DEFAULT_CYCLE_TIME_SEC, hourCapacity, windowMinutes, workedMinutesInHour,
+  hourlyOee, peMinutesByHour, shiftOee,
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
@@ -127,23 +128,6 @@ export default function DashboardPage() {
     return current.entryLogs.filter((log) => log.line === LINE_FOR[view]);
   }, [view, current.entryLogs]);
 
-  // Per-hour targets: each product view edits its own map; "Semua" shows the
-  // per-hour sum of the three (read-only — you set them per group).
-  const hourlyTargetKey = view === 'bc' ? 'hourlyTargetBc'
-    : view === 'camshaft' ? 'hourlyTargetCam'
-    : view === 'crankshaft' ? 'hourlyTargetCrank' : null;
-  const hourlyTarget = useMemo(() => {
-    if (hourlyTargetKey) return current[hourlyTargetKey] ?? {};
-    const bc = current.hourlyTargetBc ?? {};
-    const cam = current.hourlyTargetCam ?? {};
-    const crank = current.hourlyTargetCrank ?? {};
-    const out: Record<string, number> = {};
-    for (const h of new Set([...Object.keys(bc), ...Object.keys(cam), ...Object.keys(crank)])) {
-      out[h] = (bc[h] ?? 0) + (cam[h] ?? 0) + (crank[h] ?? 0);
-    }
-    return out;
-  }, [hourlyTargetKey, current.hourlyTargetBc, current.hourlyTargetCam, current.hourlyTargetCrank]);
-
   // Worked window per hour ("HH:00" -> {start,end}). Plant-wide — a break hits
   // every line — so all views share the one map; each per-group view can edit it.
   const hourlyWindow = useMemo(() => current.hourlyWindow ?? {}, [current.hourlyWindow]);
@@ -155,6 +139,19 @@ export default function DashboardPage() {
   // products) show no OEE at all rather than a misleading number.
   const showOee = view === 'bc';
   const cycleTime = current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC;
+
+  // Plan per hour = pieces the worked window allows at the cycle time:
+  // round(3600/ct * windowMinutes/60), so a full hour at 50 s is 72 pcs and a
+  // 45-minute window is 54. B/C only — the other views have no cycle time.
+  const hourlyPlan = useMemo(() => {
+    if (!showOee) return undefined;
+    const capacity = hourCapacity(cycleTime);
+    const out: Record<string, number> = {};
+    for (const hour of Object.keys(hourlyData)) {
+      out[hour] = Math.round(capacity * windowMinutes(hour, hourlyWindow) / 60);
+    }
+    return out;
+  }, [showOee, hourlyData, hourlyWindow, cycleTime]);
 
   // The running hour is measured against the minutes gone by, so it has to be
   // recomputed as the clock moves even when no new production comes in.
@@ -180,15 +177,9 @@ export default function DashboardPage() {
     [showOee, hourlyData, hourlyWindow, current.lineStops, cycleTime, minuteTick],
   );
 
-  function handleHourlyTarget(hour: string, value: number) {
-    // Never write before the running shift has loaded — that would POST
-    // EMPTY_STATE over live data (mirrors the Input page's load gate).
-    if (!state || !hourlyTargetKey) return;
-    updateState({ ...state, [hourlyTargetKey]: { ...(state[hourlyTargetKey] ?? {}), [hour]: value } });
-  }
-
   // Plant-wide worked window, so it writes the same `hourlyWindow` map from any
-  // view. Never write before the running shift has loaded (see handleHourlyTarget).
+  // view. Never write before the running shift has loaded — that would POST
+  // EMPTY_STATE over live data (mirrors the Input page's load gate).
   function handleHourlyWindow(hour: string, win: HourWindow) {
     if (!state) return;
     updateState({ ...state, hourlyWindow: { ...(state.hourlyWindow ?? {}), [hour]: win } });
@@ -305,9 +296,9 @@ export default function DashboardPage() {
         <section className={`${styles.panel} ${styles.spanHero} ${styles.hTrend}`}>
           <div className={styles.panelTitle}>Hourly Production</div>
           <div className={styles.panelBody}>
-            {/* On "Semua" the target is a sum of the three groups — a line there
-                misleads, so only the per-group views get the reference line. */}
-            <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyTargetKey ? hourlyTarget : undefined} />
+            {/* The Plan line is the formula plan per hour — B/C only (elsewhere
+                there's no cycle time), so hourlyPlan is undefined and no line shows. */}
+            <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyPlan} />
           </div>
         </section>
 
@@ -322,10 +313,9 @@ export default function DashboardPage() {
           <div className={styles.scrollBody}>
             <HourlyTable
               hourlyData={hourlyData}
-              hourlyTarget={hourlyTarget}
               hourlyWindow={hourlyWindow}
-              editable={hourlyTargetKey !== null}
-              onTargetChange={handleHourlyTarget}
+              hourlyPlan={hourlyPlan}
+              editable={view !== 'all'}
               onWindowChange={handleHourlyWindow}
               oee={oeeByHour}
             />

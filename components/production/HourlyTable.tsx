@@ -8,29 +8,22 @@ import styles from './HourlyTable.module.css';
 
 interface HourlyTableProps {
   hourlyData: ProductionState['hourlyData'];
-  // Per-hour target (pcs) for the active product group, keyed "HH:00".
-  hourlyTarget?: Record<string, number>;
   // Actual worked window per hour, keyed "HH:00". An hour with no entry falls
   // back to the full clock hour (HH:00 -> HH+1:00).
   hourlyWindow?: Record<string, HourWindow>;
-  // When true each row's target and time window are editable fields; otherwise
-  // they're shown read-only (the "Semua" view).
+  // Per-hour plan (pcs), keyed "HH:00" — the pieces the worked window allows at
+  // the cycle time, computed by the caller. Supplied only alongside `oee` (B/C);
+  // the Plan and Actual columns show only when it's present.
+  hourlyPlan?: Record<string, number>;
+  // When true each row's time window is an editable field; otherwise it's shown
+  // read-only (the "Semua" view).
   editable?: boolean;
-  onTargetChange?: (hour: string, value: number) => void;
   onWindowChange?: (hour: string, win: HourWindow) => void;
   // Per-hour OEE factors, keyed "HH:00". Supplied only for a view that has a
-  // cycle time to measure against (B/C today); without it the AV/PE/RQ/OEE
-  // columns aren't rendered at all.
+  // cycle time to measure against (B/C today); without it the Plan/Actual and
+  // AV/PE/RQ/OEE columns aren't rendered at all.
   oee?: Record<string, OeeBreakdown>;
 }
-
-const parseTarget = {
-  parse: (raw: string) => {
-    const n = parseInt(raw, 10);
-    return Number.isNaN(n) ? 0 : Math.max(0, n);
-  },
-  format: (value: number) => (value > 0 ? String(value) : ''),
-};
 
 const identityTime = {
   parse: (raw: string) => raw,
@@ -46,22 +39,6 @@ function nextHour(hour: string): string {
 
 function defaultWindow(hour: string): HourWindow {
   return { start: hour, end: nextHour(hour) };
-}
-
-function TargetCell({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
-  const field = useDraftValue(value, onCommit, parseTarget);
-  return (
-    <input
-      type="number"
-      min={0}
-      className={styles.targetInput}
-      placeholder="—"
-      value={field.value}
-      onChange={field.onChange}
-      onBlur={field.onBlur}
-      onKeyDown={field.onKeyDown}
-    />
-  );
 }
 
 // Two time fields; either one committing sends the whole {start,end} back up.
@@ -93,7 +70,7 @@ function rateClass(percent: number): string {
 
 // Actual vs Plan for the hour: green on/above plan, amber within 10%, red below.
 // A red cell here lines up with a lower AV that row — fewer pieces against the
-// same capacity. Uncoloured when no plan is set for the hour.
+// same capacity. Uncoloured when there's no plan for the hour.
 function actualClass(actual: number, plan: number): string {
   if (plan <= 0) return '';
   if (actual >= plan) return styles.rateGood;
@@ -107,8 +84,7 @@ function RateCell({ ratio }: { ratio: number }) {
 }
 
 export function HourlyTable({
-  hourlyData, hourlyTarget = {}, hourlyWindow = {}, editable = false,
-  onTargetChange, onWindowChange, oee,
+  hourlyData, hourlyWindow = {}, hourlyPlan = {}, editable = false, onWindowChange, oee,
 }: HourlyTableProps) {
   const sortedHours = Object.keys(hourlyData).sort();
 
@@ -116,8 +92,8 @@ export function HourlyTable({
     <table className={styles.table}>
       <thead>
         <tr>
-          <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th><th>Plan</th><th>Actual</th>
-          {oee && <><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
+          <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th>
+          {oee && <><th>Plan</th><th>Actual</th><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
         </tr>
       </thead>
       <tbody>
@@ -126,7 +102,7 @@ export function HourlyTable({
           const win = hourlyWindow[hour] ?? defaultWindow(hour);
           const snap = hourlyData[hour];
           const actual = snap.ok + snap.repair + snap.ng;
-          const plan = hourlyTarget[hour] ?? 0;
+          const plan = hourlyPlan[hour] ?? 0;
           return (
             <tr key={hour}>
               <td>
@@ -139,16 +115,10 @@ export function HourlyTable({
               <td>{snap.ok}</td>
               <td>{snap.repair}</td>
               <td>{snap.ng}</td>
-              <td>
-                {editable && onTargetChange ? (
-                  <TargetCell value={plan} onCommit={(v) => onTargetChange(hour, v)} />
-                ) : (
-                  plan || '—'
-                )}
-              </td>
-              <td className={actualClass(actual, plan)}>{actual}</td>
               {oee && factors && (
                 <>
+                  <td>{plan || '—'}</td>
+                  <td className={actualClass(actual, plan)}>{actual}</td>
                   <RateCell ratio={factors.av} />
                   <RateCell ratio={factors.pe} />
                   <RateCell ratio={factors.rq} />

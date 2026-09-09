@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { HourlyTable } from '@/components/production/HourlyTable';
+
+const factors = { av: 1, pe: 1, rq: 1, oee: 1 };
 
 describe('HourlyTable', () => {
   it('renders rows sorted by hour', () => {
@@ -14,35 +15,6 @@ describe('HourlyTable', () => {
   it('renders an empty body when there is no hourly data', () => {
     render(<HourlyTable hourlyData={{}} />);
     expect(screen.getAllByRole('row')).toHaveLength(1); // header row only
-  });
-
-  it('shows the per-hour target read-only when not editable', () => {
-    render(
-      <HourlyTable
-        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
-        hourlyTarget={{ '07:00': 40 }}
-      />,
-    );
-    expect(screen.getByRole('row', { name: /07:00/ })).toHaveTextContent('40');
-    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
-  });
-
-  it('commits an edited per-hour target on blur', async () => {
-    const onTargetChange = vi.fn();
-    render(
-      <HourlyTable
-        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
-        hourlyTarget={{ '07:00': 40 }}
-        editable
-        onTargetChange={onTargetChange}
-      />,
-    );
-    const input = screen.getByRole('spinbutton');
-    await userEvent.clear(input);
-    await userEvent.type(input, '50');
-    expect(onTargetChange).not.toHaveBeenCalled();
-    await userEvent.tab();
-    expect(onTargetChange).toHaveBeenCalledWith('07:00', 50);
   });
 
   it('auto-generates a one-hour range in the Jam column when read-only', () => {
@@ -78,36 +50,45 @@ describe('HourlyTable', () => {
     expect(onWindowChange).toHaveBeenCalledWith('07:00', { start: '07:00', end: '07:45' });
   });
 
-  it('shows Actual as the hour total (OK + Repair + NG)', () => {
-    render(<HourlyTable hourlyData={{ '07:00': { ok: 40, repair: 3, ng: 2 } }} />);
-    expect(screen.getByRole('columnheader', { name: 'Plan' })).toBeInTheDocument();
-    const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
-    // Jam, OK, Repair, NG, Plan, Actual
-    expect(cells[5]).toHaveTextContent('45');
+  it('leaves out the Plan/Actual and OEE columns when no factors are supplied', () => {
+    render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }} hourlyPlan={{ '07:00': 72 }} />);
+    for (const header of ['Plan', 'Actual', 'AV', 'OEE']) {
+      expect(screen.queryByRole('columnheader', { name: header })).not.toBeInTheDocument();
+    }
   });
 
-  it('flags Actual when it falls short of Plan, leaves it plain with no plan', () => {
+  it('shows the formula Plan and the Actual total when factors are supplied', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 40, repair: 3, ng: 2 } }}
+        hourlyPlan={{ '07:00': 72 }}
+        oee={{ '07:00': factors }}
+      />,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Plan' })).toBeInTheDocument();
+    const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
+    // Jam, OK, Repair, NG, Plan, Actual, AV, PE, RQ, OEE
+    expect(cells[4]).toHaveTextContent('72');
+    expect(cells[5]).toHaveTextContent('45'); // 40 + 3 + 2
+  });
+
+  it('colours Actual against Plan: red below, amber within 10%, green on target', () => {
     render(
       <HourlyTable
         hourlyData={{
-          '07:00': { ok: 20, repair: 0, ng: 0 }, // short of 45
-          '08:00': { ok: 46, repair: 0, ng: 0 }, // meets 45
-          '09:00': { ok: 10, repair: 0, ng: 0 }, // no plan
+          '07:00': { ok: 40, repair: 0, ng: 0 }, // 40 / 72 -> red
+          '08:00': { ok: 66, repair: 0, ng: 0 }, // 66 / 72 -> amber (>= 90%)
+          '09:00': { ok: 72, repair: 0, ng: 0 }, // 72 / 72 -> green
         }}
-        hourlyTarget={{ '07:00': 45, '08:00': 45 }}
+        hourlyPlan={{ '07:00': 72, '08:00': 72, '09:00': 72 }}
+        oee={{ '07:00': factors, '08:00': factors, '09:00': factors }}
       />,
     );
     const rows = screen.getAllByRole('row').slice(1);
     const actual = (i: number) => within(rows[i]).getAllByRole('cell')[5];
     expect(actual(0).className).toMatch(/rateBad/);
-    expect(actual(1).className).toMatch(/rateGood/);
-    expect(actual(2).className).toBe('');
-  });
-
-  it('leaves out the OEE columns when no factors are supplied', () => {
-    render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }} />);
-    expect(screen.queryByRole('columnheader', { name: 'OEE' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'AV' })).not.toBeInTheDocument();
+    expect(actual(1).className).toMatch(/rateWarn/);
+    expect(actual(2).className).toMatch(/rateGood/);
   });
 
   it('renders AV/PE/RQ/OEE as percentages when factors are supplied', () => {

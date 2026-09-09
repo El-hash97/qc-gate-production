@@ -113,6 +113,7 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
-    expect(screen.getByText('09:00')).toBeInTheDocument();
+    // The 09:00 row from hourlyDataCam — its worked-window start field.
+    expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
   });
 });

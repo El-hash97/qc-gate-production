@@ -239,10 +239,12 @@
 /* Column spans (desktop, 12-col) */
 .spanDonut { grid-column: span 4; }
 .spanHero  { grid-column: span 5; }
-.spanTable { grid-column: span 3; }
 .spanHalf  { grid-column: span 6; }
 .spanList  { grid-column: span 3; }
 .spanFull  { grid-column: span 12; }
+/* Hourly (Tabel): same footprint as a .spanHalf panel on screen; the print
+   stylesheet gives it the full width so its ~24 rows stay legible. */
+.hourlyTablePanel { grid-column: span 6; }
 
 /* Row heights — varied by content */
 .hTrend { height: 300px; }
@@ -252,7 +254,7 @@
 .hLogShort { height: 240px; }
 
 @media (max-width: 1100px) {
-  .spanDonut, .spanHero, .spanTable, .spanList { grid-column: span 6; }
+  .spanDonut, .spanHero, .spanList { grid-column: span 6; }
   .spanHalf { grid-column: span 12; }
 }
 
@@ -319,13 +321,13 @@
     box-shadow: none !important;
     border: 1px solid #bbb !important;
   }
-  .spanTable,
+  .hourlyTablePanel,
   .spanFull { grid-column: 1 / -1 !important; }
 
   /* Production Distribution + Hourly Production side by side, 1:1, in their
      own row; Hourly (Tabel) then gets the full-width row right below (see
-     .spanTable above) so its 24 rows stay legible instead of squeezed to
-     half width. */
+     .hourlyTablePanel above) so its 24 rows stay legible instead of squeezed
+     to half width. */
   .spanDonut { grid-column: 1 !important; }
   .spanHero { grid-column: 2 !important; }
 

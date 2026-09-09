@@ -20,13 +20,13 @@ import {
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
 import {
-  DEFAULT_CYCLE_TIME_SEC, elapsedMinutesInHour, hourlyOee, peMinutesByHour, shiftOee,
+  DEFAULT_CYCLE_TIME_SEC, workedMinutesInHour, hourlyOee, peMinutesByHour, shiftOee,
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
 import { useTheme } from '@/hooks/useTheme';
 import { findPic } from '@/utils/constants';
-import type { EntryLog, ProductionState } from '@/lib/types';
+import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
@@ -37,6 +37,7 @@ const EMPTY_STATE: ProductionState = {
   pic: '',
   defectData: {}, repairData: {}, hourlyData: {},
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+  hourlyWindow: {},
   entryLogs: [], lineStops: [], savedAt: '',
 };
 
@@ -142,6 +143,10 @@ export default function DashboardPage() {
     return out;
   }, [hourlyTargetKey, current.hourlyTargetBc, current.hourlyTargetCam, current.hourlyTargetCrank]);
 
+  // Worked window per hour ("HH:00" -> {start,end}). Plant-wide — a break hits
+  // every line — so all views share the one map; each per-group view can edit it.
+  const hourlyWindow = useMemo(() => current.hourlyWindow ?? {}, [current.hourlyWindow]);
+
   const lineStops = current.lineStops ?? [];
 
   // OEE needs a cycle time to measure availability against, and only Block
@@ -164,14 +169,14 @@ export default function DashboardPage() {
     const now = new Date(minuteTick);
     const out: Record<string, OeeBreakdown> = {};
     for (const [hour, snapshot] of Object.entries(hourlyData)) {
-      out[hour] = hourlyOee(snapshot, peByHour[hour] ?? 0, cycleTime, elapsedMinutesInHour(hour, now));
+      out[hour] = hourlyOee(snapshot, peByHour[hour] ?? 0, cycleTime, workedMinutesInHour(hour, hourlyWindow, now));
     }
     return out;
-  }, [showOee, hourlyData, current.lineStops, cycleTime, minuteTick]);
+  }, [showOee, hourlyData, hourlyWindow, current.lineStops, cycleTime, minuteTick]);
 
   const oeeShift = useMemo(
-    () => (showOee ? shiftOee(hourlyData, current.lineStops, cycleTime, new Date(minuteTick)) : null),
-    [showOee, hourlyData, current.lineStops, cycleTime, minuteTick],
+    () => (showOee ? shiftOee(hourlyData, current.lineStops, cycleTime, new Date(minuteTick), hourlyWindow) : null),
+    [showOee, hourlyData, hourlyWindow, current.lineStops, cycleTime, minuteTick],
   );
 
   function handleHourlyTarget(hour: string, value: number) {
@@ -179,6 +184,13 @@ export default function DashboardPage() {
     // EMPTY_STATE over live data (mirrors the Input page's load gate).
     if (!state || !hourlyTargetKey) return;
     updateState({ ...state, [hourlyTargetKey]: { ...(state[hourlyTargetKey] ?? {}), [hour]: value } });
+  }
+
+  // Plant-wide worked window, so it writes the same `hourlyWindow` map from any
+  // view. Never write before the running shift has loaded (see handleHourlyTarget).
+  function handleHourlyWindow(hour: string, win: HourWindow) {
+    if (!state) return;
+    updateState({ ...state, hourlyWindow: { ...(state.hourlyWindow ?? {}), [hour]: win } });
   }
 
   // Export the current view as a PDF via the browser's print-to-PDF. Chart
@@ -298,14 +310,16 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className={`${styles.panel} ${styles.spanTable} ${styles.hTrend}`}>
+        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
           <div className={styles.panelTitle}>Hourly (Tabel)</div>
           <div className={styles.scrollBody}>
             <HourlyTable
               hourlyData={hourlyData}
               hourlyTarget={hourlyTarget}
+              hourlyWindow={hourlyWindow}
               editable={hourlyTargetKey !== null}
               onTargetChange={handleHourlyTarget}
+              onWindowChange={handleHourlyWindow}
               oee={oeeByHour}
             />
           </div>

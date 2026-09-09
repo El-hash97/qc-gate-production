@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import type { LineStop } from '@/lib/types';
 import {
   DEFAULT_CYCLE_TIME_SEC, hourCapacity, peMinutesByHour,
-  elapsedMinutesInHour, hourlyOee, shiftOee, toPercent,
+  elapsedMinutesInHour, windowMinutes, workedMinutesInHour,
+  hourlyOee, shiftOee, toPercent,
 } from '@/utils/oee';
 
 const stop = (start: string, end: string, category: LineStop['category']): LineStop =>
@@ -78,6 +79,45 @@ describe('elapsedMinutesInHour', () => {
 
   it('treats an hour from earlier in a night shift as complete', () => {
     expect(elapsedMinutesInHour('23:00', at(1, 30))).toBe(60);
+  });
+});
+
+describe('windowMinutes', () => {
+  it('is a full 60 when the hour has no window', () => {
+    expect(windowMinutes('07:00')).toBe(60);
+    expect(windowMinutes('07:00', {})).toBe(60);
+  });
+
+  it('is the span of the edited window', () => {
+    expect(windowMinutes('12:00', { '12:00': { start: '12:00', end: '12:45' } })).toBe(45);
+    expect(windowMinutes('07:00', { '07:00': { start: '07:15', end: '08:00' } })).toBe(45);
+  });
+
+  it('caps at 60 for a window wider than its hour', () => {
+    expect(windowMinutes('07:00', { '07:00': { start: '07:00', end: '09:00' } })).toBe(60);
+  });
+
+  it('falls back to a full hour for an unparseable or non-positive window', () => {
+    expect(windowMinutes('07:00', { '07:00': { start: 'oops', end: '07:30' } })).toBe(60);
+    expect(windowMinutes('07:00', { '07:00': { start: '07:30', end: '07:00' } })).toBe(60);
+    expect(windowMinutes('07:00', { '07:00': { start: '07:00', end: '07:00' } })).toBe(60);
+  });
+});
+
+describe('workedMinutesInHour', () => {
+  const at = (h: number, m: number) => new Date(2026, 8, 8, h, m);
+
+  it('is the window span for a finished hour', () => {
+    expect(workedMinutesInHour('07:00', { '07:00': { start: '07:00', end: '07:45' } }, at(9, 0))).toBe(45);
+  });
+
+  it('never exceeds the minutes actually elapsed in the running hour', () => {
+    expect(workedMinutesInHour('09:00', { '09:00': { start: '09:00', end: '09:40' } }, at(9, 24))).toBe(24);
+  });
+
+  it('falls back to the elapsed minutes when there is no window', () => {
+    expect(workedMinutesInHour('09:00', {}, at(9, 24))).toBe(24);
+    expect(workedMinutesInHour('07:00', {}, at(9, 24))).toBe(60);
   });
 });
 
@@ -187,6 +227,15 @@ describe('shiftOee', () => {
 
   it('is all zeros before the shift has recorded anything', () => {
     expect(shiftOee({}, [], ct, now)).toEqual({ av: 0, pe: 0, rq: 0, oee: 0 });
+  });
+
+  it('measures a part-break hour against its worked window, not a full 60', () => {
+    const hourly = { '07:00': { ok: 36, repair: 0, ng: 0 } };
+    // Full hour: 36 / 72 = 50% availability.
+    expect(toPercent(shiftOee(hourly, [], ct, now).av)).toBe(50);
+    // Half the hour was a break: 36 pcs against 36 of capacity = 100%.
+    const windows = { '07:00': { start: '07:00', end: '07:30' } };
+    expect(toPercent(shiftOee(hourly, [], ct, now, windows).av)).toBe(100);
   });
 });
 

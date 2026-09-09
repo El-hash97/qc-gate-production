@@ -1,4 +1,4 @@
-import type { HourlySnapshot, LineStop } from '@/lib/types';
+import type { HourlySnapshot, HourWindow, LineStop } from '@/lib/types';
 import { toMinutes } from '@/utils/lineStop';
 
 // Seconds per piece when nothing is set. Block Cylinder runs at 50 s, which is
@@ -68,6 +68,32 @@ export function elapsedMinutesInHour(hour: string, now: Date = new Date()): numb
   return Math.max(1, now.getMinutes());
 }
 
+// Minutes of an hour that were actually worked, per the operator-edited window
+// ({start,end} as "HH:MM"). No window, or an unparseable / non-positive one,
+// means the full 60. A break at the start, end, or middle of the hour is
+// recorded by narrowing the range, so the span itself is the worked time.
+// Capped at 60 — a window wider than its hour doesn't add capacity.
+export function windowMinutes(hour: string, windows: Record<string, HourWindow> = {}): number {
+  const w = windows[hour];
+  if (!w) return 60;
+  const start = toMinutes(w.start);
+  const end = toMinutes(w.end);
+  if (start === null || end === null || end <= start) return 60;
+  return Math.min(60, end - start);
+}
+
+// How many minutes of an hour count toward OEE capacity: the worked window,
+// but never more than the minutes that have actually elapsed (so the running
+// hour still shortens as the clock moves). Never 0, so capacity stays
+// divisible.
+export function workedMinutesInHour(
+  hour: string,
+  windows: Record<string, HourWindow> = {},
+  now: Date = new Date(),
+): number {
+  return Math.max(1, Math.min(elapsedMinutesInHour(hour, now), windowMinutes(hour, windows)));
+}
+
 /**
  * The three factors for a single hour.
  *
@@ -104,12 +130,17 @@ export function hourlyOee(
  * Only hours present in `hourlyData` count, so PE stops logged outside the
  * running shift's hours are ignored, and a stop longer than an hour can't
  * subtract more than that hour holds.
+ *
+ * `windows` shortens any hour the operator marked as partly break time, so a
+ * shift with a 45-minute lunch inside the 12:00 hour is measured against 15
+ * minutes of capacity there, not 60.
  */
 export function shiftOee(
   hourlyData: Record<string, HourlySnapshot>,
   stops: LineStop[] = [],
   cycleTimeSec: number = DEFAULT_CYCLE_TIME_SEC,
   now: Date = new Date(),
+  windows: Record<string, HourWindow> = {},
 ): OeeBreakdown {
   const hours = Object.keys(hourlyData);
   if (hours.length === 0) return ZERO;
@@ -125,7 +156,7 @@ export function shiftOee(
 
   for (const hour of hours) {
     const snapshot = hourlyData[hour];
-    const elapsed = elapsedMinutesInHour(hour, now);
+    const elapsed = workedMinutesInHour(hour, windows, now);
     produced += snapshot.ok + snapshot.repair + snapshot.ng;
     ok += snapshot.ok;
     capacity += perHourCapacity * (elapsed / 60);

@@ -311,6 +311,12 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {/* Fills the top row's remaining 3 columns; spans the full width in print. */}
+        <section className={`${styles.panel} ${styles.spanList} ${styles.hTrend} ${styles.lineStopPanel}`}>
+          <div className={styles.panelTitle}>Line Stop</div>
+          <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
+        </section>
+
         <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
           <div className={styles.panelTitle}>Hourly (Tabel)</div>
           <div className={styles.scrollBody}>
@@ -380,15 +386,12 @@ export default function DashboardPage() {
           <div className={styles.panelBody}><LotDefectChart logs={entryLogs} /></div>
         </section>
 
-        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hLog}`}>
+        {/* Without the "OEE per Jam" panel (every view but B/C) the log would sit
+            alone on a half-empty row, so it takes the full width there instead. */}
+        <section className={`${styles.panel} ${oeeByHour ? styles.spanHalf : styles.spanFull} ${styles.hLog}`}>
           <div className={styles.scrollBody}>
             <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
           </div>
-        </section>
-
-        <section className={`${styles.panel} ${styles.spanFull} ${styles.hLogShort}`}>
-          <div className={styles.panelTitle}>Line Stop</div>
-          <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
         </section>
       </div>
 

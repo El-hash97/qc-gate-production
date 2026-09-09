@@ -245,13 +245,16 @@
 /* Hourly (Tabel): same footprint as a .spanHalf panel on screen; the print
    stylesheet gives it the full width so its ~24 rows stay legible. */
 .hourlyTablePanel { grid-column: span 6; }
+/* Line Stop: a quarter-width tile next to Hourly Production on screen; the print
+   stylesheet widens it to the full row. */
+.lineStopPanel { grid-column: span 3; }
 
-/* Row heights — varied by content */
+/* One height for every tile so rows stay aligned however the panels wrap; the
+   layout's variety comes from the column spans. */
 .hTrend { height: 300px; }
 .hPareto { height: 300px; }
-.hDetail { height: 260px; }
+.hDetail { height: 300px; }
 .hLog { height: 300px; }
-.hLogShort { height: 240px; }
 
 @media (max-width: 1100px) {
   .spanDonut, .spanHero, .spanList { grid-column: span 6; }
@@ -322,6 +325,7 @@
     border: 1px solid #bbb !important;
   }
   .hourlyTablePanel,
+  .lineStopPanel,
   .spanFull { grid-column: 1 / -1 !important; }
 
   /* Production Distribution + Hourly Production side by side, 1:1, in their

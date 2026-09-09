@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS production_state (
   hourly_data_shaft JSONB NOT NULL DEFAULT '{}',
   hourly_data_cam   JSONB NOT NULL DEFAULT '{}',
   hourly_data_crank JSONB NOT NULL DEFAULT '{}',
+  hourly_window     JSONB NOT NULL DEFAULT '{}',
   cycle_time_bc     INTEGER NOT NULL DEFAULT 50,
   entry_logs        JSONB NOT NULL DEFAULT '[]',
   line_stops        JSONB NOT NULL DEFAULT '[]',
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS history (
   hourly_data_shaft JSONB NOT NULL DEFAULT '{}',
   hourly_data_cam   JSONB NOT NULL DEFAULT '{}',
   hourly_data_crank JSONB NOT NULL DEFAULT '{}',
+  hourly_window     JSONB NOT NULL DEFAULT '{}',
   cycle_time_bc     INTEGER NOT NULL DEFAULT 50,
   entry_logs        JSONB NOT NULL DEFAULT '[]',
   line_stops        JSONB NOT NULL DEFAULT '[]',
@@ -122,6 +124,12 @@ ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB 
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_bc    JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_cam   JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_target_crank JSONB NOT NULL DEFAULT '{}';
+
+-- Actual worked window per hour, keyed "HH:00": {"07:00":{"start":"07:00","end":"07:45"}}.
+-- Plant-wide; an hour with no entry is the full clock hour. Feeds the OEE
+-- availability/performance factors for that hour.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_window JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history          ADD COLUMN IF NOT EXISTS hourly_window JSONB NOT NULL DEFAULT '{}';
 
 -- Cycle time (seconds per piece) for Block Cylinder, the basis of the OEE
 -- availability factor: 3600 / cycle_time_bc = pcs an uninterrupted hour yields.

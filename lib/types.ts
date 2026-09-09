@@ -56,6 +56,13 @@ export interface HourlySnapshot {
   ng: number;
 }
 
+// The actual worked window of one hour, start/end as "HH:MM" (24h). A break at
+// the start, end, or middle of the hour is recorded by narrowing this range.
+export interface HourWindow {
+  start: string;
+  end: string;
+}
+
 export interface ProductionState {
   date: string;
   shift: string;
@@ -107,6 +114,12 @@ export interface ProductionState {
   hourlyTargetBc?: Record<string, number>;
   hourlyTargetCam?: Record<string, number>;
   hourlyTargetCrank?: Record<string, number>;
+  // Actual worked window per hour, keyed "HH:00". Plant-wide (a break hits every
+  // line), edited in the dashboard Hourly table. An hour with no entry means the
+  // full clock hour (HH:00 -> HH+1:00). Feeds the OEE availability/performance
+  // factors: a narrower window is fewer minutes of capacity for that hour.
+  // Optional for back-compat; every read site defaults to {}.
+  hourlyWindow?: Record<string, HourWindow>;
   // Cycle time in seconds for Block Cylinder, the basis of the OEE
   // availability factor (3600 / ct = pcs an uninterrupted hour yields).
   // Optional for back-compat; every read site falls back to

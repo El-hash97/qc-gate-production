@@ -1,7 +1,7 @@
 import { sql } from './db';
 import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { getProductionState } from './productionState';
-import type { EntryLog, HourlySnapshot, LineStop, HistoryRecord, ProductionState } from './types';
+import type { EntryLog, HourlySnapshot, HourWindow, LineStop, HistoryRecord, ProductionState } from './types';
 
 interface HistoryRow {
   id: number;
@@ -28,6 +28,7 @@ interface HistoryRow {
   hourly_target_bc?: Record<string, number>;
   hourly_target_cam?: Record<string, number>;
   hourly_target_crank?: Record<string, number>;
+  hourly_window?: Record<string, HourWindow>;
   cycle_time_bc?: number;
   entry_logs: EntryLog[];
   line_stops?: LineStop[];
@@ -60,6 +61,7 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     hourlyTargetBc: row.hourly_target_bc ?? {},
     hourlyTargetCam: row.hourly_target_cam ?? {},
     hourlyTargetCrank: row.hourly_target_crank ?? {},
+    hourlyWindow: row.hourly_window ?? {},
     cycleTimeBc: row.cycle_time_bc || DEFAULT_CYCLE_TIME_SEC,
     entryLogs: row.entry_logs ?? [],
     lineStops: row.line_stops ?? [],
@@ -126,6 +128,7 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
         hourly_target_bc = ${JSON.stringify(row.hourly_target_bc ?? {})}::jsonb,
         hourly_target_cam = ${JSON.stringify(row.hourly_target_cam ?? {})}::jsonb,
         hourly_target_crank = ${JSON.stringify(row.hourly_target_crank ?? {})}::jsonb,
+        hourly_window = ${JSON.stringify(row.hourly_window ?? {})}::jsonb,
         cycle_time_bc = ${row.cycle_time_bc || DEFAULT_CYCLE_TIME_SEC},
         entry_logs = ${JSON.stringify(row.entry_logs ?? [])}::jsonb,
         line_stops = ${JSON.stringify(row.line_stops ?? [])}::jsonb,

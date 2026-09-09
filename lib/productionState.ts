@@ -1,6 +1,6 @@
 import { sql } from './db';
 import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
-import type { EntryLog, HourlySnapshot, LineStop, ProductionState } from './types';
+import type { EntryLog, HourlySnapshot, HourWindow, LineStop, ProductionState } from './types';
 
 interface ProductionStateRow {
   date: string;
@@ -34,6 +34,7 @@ interface ProductionStateRow {
   hourly_target_bc?: Record<string, number>;
   hourly_target_cam?: Record<string, number>;
   hourly_target_crank?: Record<string, number>;
+  hourly_window?: Record<string, HourWindow>;
   cycle_time_bc?: number;
   entry_logs: EntryLog[];
   line_stops?: LineStop[];
@@ -73,6 +74,7 @@ function rowToState(row: ProductionStateRow): ProductionState {
     hourlyTargetBc: row.hourly_target_bc ?? {},
     hourlyTargetCam: row.hourly_target_cam ?? {},
     hourlyTargetCrank: row.hourly_target_crank ?? {},
+    hourlyWindow: row.hourly_window ?? {},
     cycleTimeBc: row.cycle_time_bc || DEFAULT_CYCLE_TIME_SEC,
     entryLogs: row.entry_logs ?? [],
     lineStops: row.line_stops ?? [],
@@ -132,6 +134,7 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       hourly_target_bc = ${JSON.stringify(state.hourlyTargetBc ?? {})}::jsonb,
       hourly_target_cam = ${JSON.stringify(state.hourlyTargetCam ?? {})}::jsonb,
       hourly_target_crank = ${JSON.stringify(state.hourlyTargetCrank ?? {})}::jsonb,
+      hourly_window = ${JSON.stringify(state.hourlyWindow ?? {})}::jsonb,
       cycle_time_bc = ${state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC},
       entry_logs = ${JSON.stringify(state.entryLogs ?? [])}::jsonb,
       line_stops = ${JSON.stringify(state.lineStops ?? [])}::jsonb,

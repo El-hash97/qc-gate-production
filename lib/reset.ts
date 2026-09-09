@@ -57,6 +57,7 @@ export async function resetProductionState(): Promise<ProductionState> {
            defect_data_shaft, repair_data_shaft, hourly_data_shaft,
            hourly_data_cam, hourly_data_crank,
            hourly_target_bc, hourly_target_cam, hourly_target_crank,
+           hourly_window,
            cycle_time_bc, entry_logs, line_stops, saved_at)
         VALUES (
           ${current.date}, ${current.shift}, ${current.operator}, ${current.pic ?? ''}, ${current.target},
@@ -76,6 +77,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           ${JSON.stringify(current.hourlyTargetBc ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyTargetCam ?? {})}::jsonb,
           ${JSON.stringify(current.hourlyTargetCrank ?? {})}::jsonb,
+          ${JSON.stringify(current.hourlyWindow ?? {})}::jsonb,
           ${current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC},
           ${JSON.stringify(current.entryLogs)}::jsonb,
           ${JSON.stringify(current.lineStops ?? [])}::jsonb,
@@ -92,6 +94,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           defect_data_shaft = '{}'::jsonb, repair_data_shaft = '{}'::jsonb, hourly_data_shaft = '{}'::jsonb,
           hourly_data_cam = '{}'::jsonb, hourly_data_crank = '{}'::jsonb,
           hourly_target_bc = '{}'::jsonb, hourly_target_cam = '{}'::jsonb, hourly_target_crank = '{}'::jsonb,
+          hourly_window = '{}'::jsonb,
           entry_logs = '[]'::jsonb, line_stops = '[]'::jsonb,
           saved_at = now()
         WHERE id = 1

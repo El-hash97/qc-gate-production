@@ -308,7 +308,7 @@ export default function DashboardPage() {
           <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
         </section>
 
-        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
+        <section className={`${styles.panel} ${oeeByHour ? styles.spanWide : styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
           <div className={styles.panelTitle}>Hourly (Tabel)</div>
           <div className={styles.scrollBody}>
             <HourlyTable
@@ -323,7 +323,7 @@ export default function DashboardPage() {
         </section>
 
         {oeeByHour && (
-          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+          <section className={`${styles.panel} ${styles.spanList} ${styles.hPareto}`}>
             <div className={styles.panelTitle}>OEE per Jam</div>
             <div className={styles.panelBody}><HourlyOeeChart oee={oeeByHour} /></div>
           </section>

@@ -229,11 +229,12 @@
   min-height: 0;
 }
 
-/* List/table body: fixed area, scrolls internally. */
+/* List/table body: fixed area, scrolls internally (both axes, so a wide table
+   never pushes the page sideways). */
 .scrollBody {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 /* Column spans (desktop, 12-col) */
@@ -242,9 +243,11 @@
 .spanHalf  { grid-column: span 6; }
 .spanList  { grid-column: span 3; }
 .spanFull  { grid-column: span 12; }
-/* Hourly (Tabel): same footprint as a .spanHalf panel on screen; the print
-   stylesheet gives it the full width so its ~24 rows stay legible. */
+/* Hourly (Tabel): a .spanHalf tile alone (Semua/Cam/Crank, few columns), but
+   .spanWide next to the narrow OEE chart on B/C where it carries 10 columns.
+   The print stylesheet always gives it the full width. */
 .hourlyTablePanel { grid-column: span 6; }
+.spanWide { grid-column: span 9; }
 /* Line Stop: a quarter-width tile next to Hourly Production on screen; the print
    stylesheet widens it to the full row. */
 .lineStopPanel { grid-column: span 3; }
@@ -258,7 +261,7 @@
 
 @media (max-width: 1100px) {
   .spanDonut, .spanHero, .spanList { grid-column: span 6; }
-  .spanHalf { grid-column: span 12; }
+  .spanHalf, .spanWide { grid-column: span 12; }
 }
 
 @media (max-width: 640px) {

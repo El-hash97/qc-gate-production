@@ -1,16 +1,22 @@
 /* OEE block for the dashboard status row: gauge on top, the three factors it
-   multiplies below it. Sized to sit level with the PIC card beside it. */
+   multiplies below it. Fixed to the exact footprint of the PIC card beside it
+   (PicCard.module.css) — width/height match on purpose, not just a floor, so
+   the two read as a matched pair of cards rather than a tall one next to a
+   wide one. Kept in sync by hand across the two CSS modules. */
 .card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
-  /* Roughly the footprint of the PIC card beside it, so the status row reads
-     as two cards of the same size rather than a tall one next to a wide one.
-     border-box so the padding counts inside that width. */
   box-sizing: border-box;
+  /* min-width/min-height alongside width/height — see PicCard.module.css's
+     .card for why the min- pair is needed too, not just width/height. */
+  width: 256px;
+  height: 168px;
   min-width: 256px;
+  min-height: 168px;
+  flex-shrink: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-left: 3px solid var(--accent-cyan);

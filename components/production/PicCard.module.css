@@ -1,5 +1,20 @@
-/* Full card — input page, below the toolbar */
+/* Full card — input page, below the toolbar. Also sits next to the
+   dashboard's OEE card (see OeeCard.module.css), which is explicitly the
+   same fixed width/height — kept in sync by hand since the two live in
+   separate CSS modules; a size change to one needs the same change in the
+   other, or the pair no longer look like matching cards. */
 .card {
+  box-sizing: border-box;
+  /* min-width/min-height alongside width/height: a flex or grid container
+     can still shrink an item below its plain `width` when space is tight
+     (flex-shrink defaults to 1; grid's automatic minimum can undercut it
+     too) — the min- pair is the hard floor that stops that, so the card
+     never gets narrower/shorter than the OEE card beside it. */
+  width: 256px;
+  height: 168px;
+  min-width: 256px;
+  min-height: 168px;
+  flex-shrink: 0;
   align-self: flex-start;
   display: flex;
   gap: 14px;

@@ -75,6 +75,19 @@ export const SHAFT_DEFECT_TYPES = [
 
 export const SHAFT_REPAIR_TYPES = SHAFT_DEFECT_TYPES;
 
+// Repair types that need a die (mould) number recorded — one of the four
+// boring stations, each fed from a specific die, so which die the piece
+// actually came from matters for traceability beyond the station name alone.
+// Exact-list membership, not a prefix check, so a manually typed "Other"
+// value can never accidentally match.
+export const DIE_NUMBER_REPAIR_TYPES = [
+  'Mejashi Bore 1', 'Mejashi Bore 2', 'Mejashi Bore 3', 'Mejashi Bore 4',
+] as const;
+
+export function needsDieNumber(repairType: string): boolean {
+  return (DIE_NUMBER_REPAIR_TYPES as readonly string[]).includes(repairType);
+}
+
 export const SHIFTS = ['Shift Red', 'Shift White'] as const;
 
 // PIC / Group Leader per shift. `key` is what gets stored; `photo` is a

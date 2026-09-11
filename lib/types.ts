@@ -38,6 +38,10 @@ export interface EntryLog {
   qty: number;
   lot: string;
   flask: string;
+  // Die (mould) number 1-4 the piece came from. Only ever set for Mejashi
+  // Bore repairs (see DIE_NUMBER_REPAIR_TYPES in utils/constants.ts); every
+  // other entry, and every log written before this field existed, omits it.
+  die?: 1 | 2 | 3 | 4;
 }
 
 // A plant-wide line stop logged during the shift. start/end are "HH:MM"

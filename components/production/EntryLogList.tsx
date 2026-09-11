@@ -18,6 +18,7 @@ export function EntryLogList({ title, logs = [] }: { title: string; logs?: Entry
                 {product && <strong>{product}</strong>}
                 {product && ' — '}
                 {log.type} · Lot {log.lot} / {slotLabel} {log.flask}
+                {log.die ? ` · Die ${log.die}` : ''}
               </span>
               <span className={styles.count}>{log.qty}</span>
             </div>

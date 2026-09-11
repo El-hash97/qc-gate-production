@@ -116,7 +116,9 @@ export default function InputPage() {
     setDefectTarget(null);
   }
 
-  function handleSaveRepair(repairType: string, qty: number, lot: string, flask: string) {
+  function handleSaveRepair(
+    repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4,
+  ) {
     if (!repairTarget) return;
     const line = lineForTarget(repairTarget);
     const group = lineGroup(line);
@@ -125,7 +127,10 @@ export default function InputPage() {
     commit({
       [repairTarget]: (current[repairTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'repair', group, line, type: repairType, qty, lot, flask }],
+      entryLogs: [
+        ...current.entryLogs,
+        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(die ? { die } : {}) },
+      ],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');
     setRepairTarget(null);

@@ -28,6 +28,23 @@ describe('EntryLogList', () => {
     expect(screen.queryByText('BC 1TR')).not.toBeInTheDocument();
   });
 
+  it('appends the die number for Mejashi Bore repairs that have one', () => {
+    const logs: EntryLog[] = [
+      { kind: 'repair', line: 1, group: 'bc', type: 'Mejashi Bore 2', qty: 1, lot: 'L1', flask: 'F1', die: 3 },
+    ];
+    const { container } = render(<EntryLogList title="Lot / Flask Log" logs={logs} />);
+    expect(container.textContent).toContain('Mejashi Bore 2 · Lot L1 / Flask F1 · Die 3');
+  });
+
+  it('omits the die suffix when an entry has none', () => {
+    const logs: EntryLog[] = [
+      { kind: 'repair', line: 1, group: 'bc', type: 'Dakon', qty: 1, lot: 'L1', flask: 'F1' },
+    ];
+    const { container } = render(<EntryLogList title="Lot / Flask Log" logs={logs} />);
+    expect(container.textContent).toContain('Dakon · Lot L1 / Flask F1');
+    expect(container.textContent).not.toContain('Die');
+  });
+
   it('shows the empty state when there are no logs', () => {
     render(<EntryLogList title="Lot / Flask Log" logs={[]} />);
     expect(screen.getByText('Belum ada data')).toBeInTheDocument();

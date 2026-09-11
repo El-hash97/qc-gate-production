@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { DieNumberModal } from './DieNumberModal';
+import { needsDieNumber } from '@/utils/constants';
 import styles from './EntryModal.module.css';
 
 interface RepairModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (repairType: string, qty: number, lot: string, flask: string) => void;
+  onSave: (repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4) => void;
   types: readonly string[];
   flaskLabel?: string;
 }
@@ -25,12 +27,41 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   const [qtyInput, setQtyInput] = useState('1');
   const [lot, setLot] = useState('');
   const [flask, setFlask] = useState('');
+  // Which die (mould) the piece came from — only meaningful for Mejashi Bore
+  // repairs. Deliberately NOT reset after a save (mirrors repairType, which
+  // also carries over) so logging several consecutive Mejashi Bore repairs
+  // from the same die doesn't force re-picking it each time.
+  const [dieNumber, setDieNumber] = useState<1 | 2 | 3 | 4 | null>(null);
+  const [dieModalOpen, setDieModalOpen] = useState(false);
+
+  // Fires only on an actual user selection (not the initial default, and not
+  // the types-prop-changed reset above) — picking any Mejashi Bore type pops
+  // the die picker immediately, per the chosen design.
+  function handleTypeChange(value: string) {
+    setRepairType(value);
+    if (needsDieNumber(value)) {
+      setDieNumber(null);
+      setDieModalOpen(true);
+    }
+  }
 
   function handleSave() {
     const qty = parseInt(qtyInput, 10);
     const type = repairType === OTHER ? customType.trim() : repairType;
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
-    onSave(type, qty, lot.trim(), flask.trim());
+    // Safety net for paths that skip handleTypeChange entirely — e.g. the
+    // default selection (types[0] is "Mejashi Bore 1") accepted without ever
+    // touching the list. A die number is mandatory for these repairs, so
+    // block the save and surface the picker instead of silently omitting it.
+    if (needsDieNumber(type) && dieNumber === null) {
+      setDieModalOpen(true);
+      return;
+    }
+    if (dieNumber !== null) {
+      onSave(type, qty, lot.trim(), flask.trim(), dieNumber);
+    } else {
+      onSave(type, qty, lot.trim(), flask.trim());
+    }
     setQtyInput('1');
     setLot('');
     setFlask('');
@@ -45,7 +76,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
           className={styles.select}
           size={6}
           value={repairType}
-          onChange={(event) => setRepairType(event.target.value)}
+          onChange={(event) => handleTypeChange(event.target.value)}
         >
           {types.map((type) => <option key={type} value={type}>{type}</option>)}
           <option value={OTHER}>{OTHER}</option>
@@ -95,6 +126,10 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
         <button type="button" className={styles.cancelButton} onClick={onClose}>Batal</button>
         <button type="button" className={styles.saveButtonRepair} onClick={handleSave}>Simpan</button>
       </div>
+      <DieNumberModal
+        isOpen={dieModalOpen}
+        onSelect={(die) => { setDieNumber(die); setDieModalOpen(false); }}
+      />
     </Modal>
   );
 }

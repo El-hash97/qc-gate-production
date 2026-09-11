@@ -85,10 +85,6 @@
 /* Report header — only rendered on paper. */
 .printHeader { display: none; }
 
-/* PIC photo card — already shown on screen inside .statusBar; repeated here,
-   print-only, just below the report header. */
-.printPicCard { display: none; }
-
 .printMeta {
   display: flex;
   flex-wrap: wrap;
@@ -298,12 +294,28 @@
     -webkit-print-color-adjust: exact;
   }
 
-  /* On-screen chrome that doesn't belong in the report. The status row stays
-     because the OEE card sits in it; its other children are already repeated
-     in the report header above. */
+  /* On-screen chrome that doesn't belong in the report. The status row stays,
+     but only for the PIC card and OEE card — they sit side by side in it on
+     screen, and the report keeps them that way rather than stacking them.
+     statusRight's own info (date/operator/shift/connection) is already
+     repeated in the report header above, so it's the only column dropped;
+     the columns collapse to their own content width (auto auto) instead of
+     the on-screen 1fr auto 1fr, so the remaining pair sits centered as a
+     unit instead of spread across the full page width. */
   .toggleRow { display: none !important; }
-  .statusBar { justify-content: center; margin-bottom: 8px; }
-  .statusBar > *:not(.oeeSlot) { display: none !important; }
+  .statusBar {
+    grid-template-columns: auto auto;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+  /* min-width: auto (the default), not 0 — 0 would zero out this item's
+     contribution to the auto track's own size calculation, collapsing the
+     column itself to 0px and making the PIC card overflow into the OEE
+     column instead of sizing the column to fit it. auto still collapses
+     correctly when the column is genuinely empty (no PIC set), since an
+     empty div's min-content width is already 0. */
+  .statusLeft { min-width: auto; }
+  .statusRight { display: none !important; }
   .oeeSlot { break-inside: avoid; }
 
   .printHeader {
@@ -314,8 +326,6 @@
   }
   .printHeader h1 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
   .printMeta { font-size: 11px; color: #333; }
-
-  .printPicCard { display: block; margin-bottom: 8px; }
 
   .kpiRow {
     display: grid !important;

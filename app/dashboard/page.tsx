@@ -218,12 +218,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {current.pic && (
-        <div className={styles.printPicCard} aria-hidden="true">
-          <PicCard pic={current.pic} />
-        </div>
-      )}
-
       {/* Three fixed grid columns (see .statusBar) so the OEE card's position
           never depends on the width of the PIC card or the connection text —
           "Real-time Connected" / "Syncing…" / "Disconnected" all differ in

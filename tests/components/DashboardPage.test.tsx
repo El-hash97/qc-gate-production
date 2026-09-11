@@ -58,6 +58,22 @@ describe('DashboardPage', () => {
     expect(card.getByText(/CT 50 dtk/)).toBeInTheDocument();
   });
 
+  it('derives Camshaft and Crankshaft OEE capacity from the B/C cycle time', async () => {
+    render(<DashboardPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
+    let card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
+    // 1 BC = 6 camshaft: 72 x 6 = 432 pcs/jam at a 50 / 6 = 8.3 s cycle time.
+    expect(card.getByText(/CT 8,3 dtk/)).toBeInTheDocument();
+    expect(card.getByText(/432 pcs\/jam/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crankshaft' }));
+    card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
+    // 1 BC = 3 crankshaft: 72 x 3 = 216 pcs/jam.
+    expect(card.getByText(/CT 16,7 dtk/)).toBeInTheDocument();
+    expect(card.getByText(/216 pcs\/jam/)).toBeInTheDocument();
+  });
+
   it('shows connection status from the hook', () => {
     render(<DashboardPage />);
     expect(screen.getByText('Real-time Connected')).toBeInTheDocument();

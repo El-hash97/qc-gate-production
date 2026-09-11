@@ -68,7 +68,7 @@ describe('InputPage', () => {
 
   it('defaults the cycle time to 50 s and shows the hourly capacity it implies', () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
-    expect(screen.getByText('CT B/C — 72 pcs/jam')).toBeInTheDocument();
+    expect(screen.getByText('CT B/C — 72 pcs/jam · Cam 432 · Crank 216')).toBeInTheDocument();
     expect(screen.getByLabelText(/CT B\/C/)).toHaveValue(50);
   });
 

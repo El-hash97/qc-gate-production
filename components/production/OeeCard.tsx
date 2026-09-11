@@ -1,5 +1,5 @@
 import type { OeeBreakdown } from '@/utils/oee';
-import { hourCapacity, toPercent } from '@/utils/oee';
+import { formatCycleTime, hourCapacity, toPercent } from '@/utils/oee';
 import styles from './OeeCard.module.css';
 
 // A 270° gauge: the ring is drawn as a dashed circle rotated so its gap sits at
@@ -64,7 +64,7 @@ export function OeeCard({ oee, cycleTime }: OeeCardProps) {
       </div>
 
       <div className={styles.caption}>
-        CT {cycleTime} dtk &middot; {Math.round(hourCapacity(cycleTime))} pcs/jam
+        CT {formatCycleTime(cycleTime)} dtk &middot; {Math.round(hourCapacity(cycleTime))} pcs/jam
       </div>
     </div>
   );

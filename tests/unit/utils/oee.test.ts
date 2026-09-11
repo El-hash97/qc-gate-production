@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { LineStop } from '@/lib/types';
 import {
-  DEFAULT_CYCLE_TIME_SEC, hourCapacity, peMinutesByHour,
+  DEFAULT_CYCLE_TIME_SEC, PIECES_PER_BC, productCycleTime, hourCapacity, peMinutesByHour,
   elapsedMinutesInHour, windowMinutes, workedMinutesInHour,
   hourlyOee, shiftOee, toPercent,
 } from '@/utils/oee';
@@ -22,6 +22,33 @@ describe('hourCapacity', () => {
     expect(hourCapacity(0)).toBe(0);
     expect(hourCapacity(-5)).toBe(0);
     expect(hourCapacity(NaN)).toBe(0);
+  });
+});
+
+describe('productCycleTime', () => {
+  it('leaves Block Cylinder at its own cycle time', () => {
+    expect(productCycleTime('bc', 50)).toBe(50);
+  });
+
+  it('derives Camshaft and Crankshaft from the B/C cycle time by their mould ratio', () => {
+    // 1 BC = 6 camshaft = 3 crankshaft, so an hour that casts 72 BC yields
+    // 432 camshaft and 216 crankshaft.
+    expect(hourCapacity(productCycleTime('camshaft', 50))).toBeCloseTo(432, 9);
+    expect(hourCapacity(productCycleTime('crankshaft', 50))).toBeCloseTo(216, 9);
+    expect(productCycleTime('camshaft', 50)).toBeCloseTo(50 / 6, 9);
+    expect(productCycleTime('crankshaft', 50)).toBeCloseTo(50 / 3, 9);
+  });
+
+  it('follows a changed B/C cycle time', () => {
+    expect(hourCapacity(productCycleTime('camshaft', 60))).toBeCloseTo(360, 9);
+  });
+
+  it('exposes the ratios themselves', () => {
+    expect(PIECES_PER_BC).toEqual({ bc: 1, camshaft: 6, crankshaft: 3 });
+  });
+
+  it('passes an unusable B/C cycle time through as unusable', () => {
+    expect(hourCapacity(productCycleTime('camshaft', 0))).toBe(0);
   });
 });
 

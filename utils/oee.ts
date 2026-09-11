@@ -5,6 +5,28 @@ import { toMinutes } from '@/utils/lineStop';
 // the 72 pcs/hour the shift is measured against.
 export const DEFAULT_CYCLE_TIME_SEC = 50;
 
+// Each product with an OEE of its own. 'all' (the mixed dashboard view) has
+// none — three cycle times can't be blended into one.
+export type OeeProduct = 'bc' | 'camshaft' | 'crankshaft';
+
+// Pieces cast per Block Cylinder mould cycle: one BC, six camshafts, three
+// crankshafts. Camshaft and Crankshaft have no cycle time of their own — the
+// B/C cycle time drives all three, so an hour good for 72 BC is good for 432
+// camshaft and 216 crankshaft.
+export const PIECES_PER_BC: Record<OeeProduct, number> = { bc: 1, camshaft: 6, crankshaft: 3 };
+
+// Seconds per piece for a product, from the B/C cycle time and its mould
+// ratio: 50 s / 6 = 8.33 s per camshaft. Feeds hourCapacity() unchanged.
+export function productCycleTime(product: OeeProduct, cycleTimeBcSec: number): number {
+  return cycleTimeBcSec / PIECES_PER_BC[product];
+}
+
+// "50", "8,3", "16,7" — whole seconds stay whole, fractions get one decimal,
+// in the id-ID comma style the rest of the UI uses.
+export function formatCycleTime(cycleTimeSec: number): string {
+  return cycleTimeSec.toLocaleString('id-ID', { maximumFractionDigits: 1 });
+}
+
 // The three OEE factors and their product, each a 0-1 ratio. Round for display
 // with toPercent().
 export interface OeeBreakdown {

@@ -21,7 +21,7 @@ import {
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
 } from '@/utils/rates';
 import {
-  DEFAULT_CYCLE_TIME_SEC, hourCapacity, windowMinutes, workedMinutesInHour,
+  DEFAULT_CYCLE_TIME_SEC, productCycleTime, hourCapacity, windowMinutes, workedMinutesInHour,
   hourlyOee, peMinutesByHour, shiftOee,
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
@@ -134,15 +134,19 @@ export default function DashboardPage() {
 
   const lineStops = current.lineStops ?? [];
 
-  // OEE needs a cycle time to measure availability against, and only Block
-  // Cylinder has one so far — the other views (and "Semua", which mixes three
-  // products) show no OEE at all rather than a misleading number.
-  const showOee = view === 'bc';
-  const cycleTime = current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC;
+  // OEE needs a cycle time to measure availability against. The B/C cycle time
+  // drives every product (Camshaft and Crankshaft derive theirs from it by
+  // mould ratio), so each product view has one; "Semua" mixes three products
+  // and shows no OEE at all rather than a misleading blend.
+  const showOee = view !== 'all';
+  const cycleTime = productCycleTime(
+    view === 'all' ? 'bc' : view,
+    current.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC,
+  );
 
   // Plan per hour = pieces the worked window allows at the cycle time:
   // round(3600/ct * windowMinutes/60), so a full hour at 50 s is 72 pcs and a
-  // 45-minute window is 54. B/C only — the other views have no cycle time.
+  // 45-minute window is 54. Per product view — "Semua" has no cycle time.
   const hourlyPlan = useMemo(() => {
     if (!showOee) return undefined;
     const capacity = hourCapacity(cycleTime);

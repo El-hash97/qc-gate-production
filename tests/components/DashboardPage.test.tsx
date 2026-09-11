@@ -38,24 +38,31 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Shift Red')).toBeInTheDocument();
   });
 
-  it('shows combined achievement percentage by default', () => {
+  it('defaults to the B/C view and shows its achievement percentage', () => {
     render(<DashboardPage />);
+    expect(screen.getByRole('button', { name: 'B/C' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Achievement: 74%')).toBeInTheDocument();
+  });
+
+  it('shows the combined achievement percentage on the "Semua" view', async () => {
+    render(<DashboardPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Semua' }));
     // BC total 74 + Camshaft/Crankshaft total 10 = 84 against a target of 100.
     expect(screen.getByText('Achievement: 84%')).toBeInTheDocument();
   });
 
-  it('hides the OEE card on the mixed "Semua" view and shows it for B/C', async () => {
+  it('shows the OEE card by default (B/C) and hides it on the mixed "Semua" view', async () => {
     render(<DashboardPage />);
-    expect(screen.queryByRole('img', { name: /OEE/ })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'B/C' }));
-    const card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
+    let card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
     expect(card.getByRole('img', { name: /^OEE \d+ persen$/ })).toBeInTheDocument();
     for (const factor of ['AV', 'PE', 'RQ']) {
       expect(card.getByText(factor)).toBeInTheDocument();
     }
     // Falls back to the default 50 s cycle time when the shift has none stored.
     expect(card.getByText(/CT 50 dtk/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Semua' }));
+    expect(screen.queryByRole('img', { name: /OEE/ })).not.toBeInTheDocument();
   });
 
   it('derives Camshaft and Crankshaft OEE capacity from the B/C cycle time', async () => {
@@ -118,7 +125,7 @@ describe('DashboardPage', () => {
   it('renders the printed-report header with the scoped product label', () => {
     render(<DashboardPage />);
     expect(screen.getByText('Laporan Harian Produksi')).toBeInTheDocument();
-    expect(screen.getByText('Produk: Semua Produk')).toBeInTheDocument();
+    expect(screen.getByText('Produk: BC 1TR + BC 2TR')).toBeInTheDocument();
   });
 
   it('scopes the numbers to Block Cylinder when B/C is selected', async () => {

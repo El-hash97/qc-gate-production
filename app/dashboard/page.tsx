@@ -79,7 +79,7 @@ export default function DashboardPage() {
   const current = state ?? EMPTY_STATE;
   const [printedAt, setPrintedAt] = useState('');
 
-  const [view, setView] = useState<DashboardView>('all');
+  const [view, setView] = useState<DashboardView>('bc');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
   // Defect photos are per product group + chart type + defect name — "Semua"
   // mixes 3 groups' data so it has no slot of its own; the Pareto bars aren't clickable there.

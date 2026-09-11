@@ -5,23 +5,35 @@
   gap: 20px;
 }
 
+/* Fixed 3-column grid — not flex — so the centre column (the OEE card) sits
+   at a constant position regardless of how wide .statusLeft or .statusRight
+   happen to render. With flex + margin:auto centering, a longer/shorter
+   connection-status string ("Real-time Connected" vs "Syncing…" vs
+   "Disconnected") shifts the free space split and drags the OEE card
+   sideways with it; grid's outer 1fr tracks always split the *remaining*
+   width evenly, so the auto-sized centre track stays put. */
 .statusBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
   gap: 12px;
   font-size: 13px;
   color: var(--text-secondary);
-  flex-wrap: wrap;
+}
+
+.statusLeft {
+  justify-self: start;
+  /* Reserves the PIC card's width even before one is picked at the start of
+     a shift, so the OEE card doesn't jump sideways the moment a PIC is set. */
+  min-width: 256px;
 }
 
 .oeeSlot {
-  margin-inline: auto;
-  align-self: flex-start;
+  justify-self: center;
 }
 
 .statusRight {
-  margin-left: auto;
+  justify-self: end;
   align-self: center;
   display: flex;
   flex-direction: column;

@@ -224,13 +224,17 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Three fixed grid columns (see .statusBar) so the OEE card's position
+          never depends on the width of the PIC card or the connection text —
+          "Real-time Connected" / "Syncing…" / "Disconnected" all differ in
+          length, and the OEE card must not shift when that text changes. */}
       <div className={styles.statusBar}>
-        {current.pic && <PicCard pic={current.pic} />}
-        {oeeShift && (
-          <div className={styles.oeeSlot}>
-            <OeeCard oee={oeeShift} cycleTime={cycleTime} />
-          </div>
-        )}
+        <div className={styles.statusLeft}>
+          {current.pic && <PicCard pic={current.pic} />}
+        </div>
+        <div className={styles.oeeSlot}>
+          {oeeShift && <OeeCard oee={oeeShift} cycleTime={cycleTime} />}
+        </div>
         <span className={styles.statusRight}>
           <span>{current.date || '—'}</span>
           <span>{current.operator || 'Belum ada operator'}</span>

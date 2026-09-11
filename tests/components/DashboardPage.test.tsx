@@ -74,6 +74,26 @@ describe('DashboardPage', () => {
     expect(card.getByText(/216 pcs\/jam/)).toBeInTheDocument();
   });
 
+  it("puts the OEE card in its own fixed grid column, not centered by flex margins", async () => {
+    render(<DashboardPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'B/C' }));
+
+    // .statusBar is a 3-column grid (1fr auto 1fr): the OEE card's column sits
+    // between a dedicated PIC-card column and the connection-status column, so
+    // its position can't be pulled sideways by "Real-time Connected" vs
+    // "Syncing…" vs "Disconnected" changing width, or by PIC being unset —
+    // margin:auto flex-centering (the previous approach) couldn't guarantee
+    // that. This locks in the structure rather than the CSS itself.
+    const oeeSlot = screen.getByRole('group', { name: 'Ringkasan OEE' }).parentElement!;
+    expect(oeeSlot.className).toContain('oeeSlot');
+    const statusBar = oeeSlot.parentElement!;
+    expect(statusBar.className).toContain('statusBar');
+    expect(statusBar.children).toHaveLength(3);
+    expect(statusBar.children[0].className).toContain('statusLeft');
+    expect(statusBar.children[1]).toBe(oeeSlot);
+    expect(statusBar.children[2].className).toContain('statusRight');
+  });
+
   it('shows connection status from the hook', () => {
     render(<DashboardPage />);
     expect(screen.getByText('Real-time Connected')).toBeInTheDocument();

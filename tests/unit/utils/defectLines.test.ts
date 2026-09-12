@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { DefectLineMapping } from '@/lib/types';
-import { matchesDefectLine, paretoByLine } from '@/utils/defectLines';
+import { matchesDefectLine, paretoByLine, suspectLinesFor } from '@/utils/defectLines';
 
 describe('matchesDefectLine', () => {
   it('matches case-insensitively', () => {
@@ -82,5 +82,30 @@ describe('paretoByLine', () => {
     const melting = bars.find((b) => b.line === 'Melting')!;
     expect(melting.total).toBe(0);
     expect(melting.breakdown).toEqual([]);
+  });
+});
+
+describe('suspectLinesFor', () => {
+  it('returns the single matching line for a defect name', () => {
+    const mappings: DefectLineMapping[] = [{ id: 1, line: 'Melting', defectName: 'Kandama' }];
+    expect(suspectLinesFor('Kandama Front', mappings)).toEqual(['Melting']);
+  });
+
+  it('returns every matching line, in the fixed Melting/Moulding/Core Making/Finishing order', () => {
+    const mappings: DefectLineMapping[] = [
+      { id: 1, line: 'Moulding', defectName: 'Gas Hole' },
+      { id: 2, line: 'Melting', defectName: 'Gas Hole' },
+      { id: 3, line: 'Core Making', defectName: 'Gas Hole' },
+    ];
+    expect(suspectLinesFor('Gas Hole Cope', mappings)).toEqual(['Melting', 'Moulding', 'Core Making']);
+  });
+
+  it('returns an empty array when nothing matches', () => {
+    const mappings: DefectLineMapping[] = [{ id: 1, line: 'Melting', defectName: 'Kandama' }];
+    expect(suspectLinesFor('Crack', mappings)).toEqual([]);
+  });
+
+  it('returns an empty array when there are no mappings', () => {
+    expect(suspectLinesFor('Kandama Front', [])).toEqual([]);
   });
 });

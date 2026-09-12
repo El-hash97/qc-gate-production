@@ -16,6 +16,17 @@
   font-size: 12px;
 }
 
+.nameCol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lineHint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
 .count {
   font-weight: 700;
   font-variant-numeric: tabular-nums;

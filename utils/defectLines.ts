@@ -64,3 +64,14 @@ export function paretoByLine(
   }
   return bars;
 }
+
+/**
+ * Which fixed line(s) a single defect/repair name is suspect for, in the
+ * fixed Melting/Moulding/Core Making/Finishing order (never mapping order).
+ * Used by the Defect/Repair Details lists to hint "go check this line" next
+ * to each row.
+ */
+export function suspectLinesFor(name: string, mappings: DefectLineMapping[]): DefectLineName[] {
+  const matched = new Set(mappings.filter((m) => matchesDefectLine(name, m.defectName)).map((m) => m.line));
+  return DEFECT_LINE_NAMES.filter((line) => matched.has(line));
+}

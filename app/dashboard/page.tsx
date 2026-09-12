@@ -384,13 +384,17 @@ export default function DashboardPage() {
 
         {!hidden.has('defectDetails') && (
           <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
-            <div className={styles.scrollBody}><DefectRepairSummary title="Defect Details" data={defectData} /></div>
+            <div className={styles.scrollBody}>
+              <DefectRepairSummary title="Defect Details" data={defectData} mappings={defectLineMappings} />
+            </div>
           </section>
         )}
 
         {!hidden.has('repairDetails') && (
           <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
-            <div className={styles.scrollBody}><DefectRepairSummary title="Repair Details" data={repairData} /></div>
+            <div className={styles.scrollBody}>
+              <DefectRepairSummary title="Repair Details" data={repairData} mappings={defectLineMappings} />
+            </div>
           </section>
         )}
 

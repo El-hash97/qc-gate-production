@@ -136,6 +136,28 @@ ALTER TABLE history          ADD COLUMN IF NOT EXISTS hourly_window JSONB NOT NU
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFAULT 50;
 ALTER TABLE history ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFAULT 50;
 
+-- Suspect defect line master data: which foundry process stage(s) a given
+-- defect name is suspected to come from. Many-to-many — one row per
+-- (line, defect_name) pair, since e.g. "Gas Hole" is suspect for three
+-- different lines at once.
+CREATE TABLE IF NOT EXISTS defect_lines (
+  id          SERIAL PRIMARY KEY,
+  line        TEXT NOT NULL,
+  defect_name TEXT NOT NULL,
+  UNIQUE (line, defect_name)
+);
+
+INSERT INTO defect_lines (line, defect_name) VALUES
+  ('Melting', 'Kandama'), ('Melting', 'Yuzakai'), ('Melting', 'Pinhole'),
+  ('Melting', 'Gas Hole'), ('Melting', 'Ireboshi'), ('Melting', 'Dross'),
+  ('Moulding', 'Dakon'), ('Moulding', 'Youmouyo'), ('Moulding', 'Gomi'),
+  ('Moulding', 'Ihada'), ('Moulding', 'Kake'), ('Moulding', 'Kataochi'),
+  ('Moulding', 'Mikui'), ('Moulding', 'Crack'), ('Moulding', 'Gas Hole'),
+  ('Core Making', 'Mejashi'), ('Core Making', 'Vinning'), ('Core Making', 'Gyakubari'),
+  ('Core Making', 'Gomi'), ('Core Making', 'Togata Tare'), ('Core Making', 'Gas Hole'),
+  ('Finishing', 'Kake'), ('Finishing', 'Tsurikomi')
+ON CONFLICT (line, defect_name) DO NOTHING;
+
 -- Current-defect photo per Pareto chart (NG/Repair) x product group (bc/
 -- camshaft/crankshaft) x defect type. Live-only: cleared on every shift reset,
 -- never archived to history. One photo per bar — a re-upload overwrites it.

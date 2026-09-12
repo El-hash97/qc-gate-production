@@ -25,7 +25,7 @@ Cope) with shaft-style names (Ireboshi, Dross).
 ## Goals
 
 - An editable master-data list of (line, defect name) pairs, seeded with the
-  user's initial 24 pairs.
+  user's initial 23 pairs.
 - A new `/master-data` page, reachable only when logged in (mirrors
   Input/History's existing gate — no new role, the app has exactly one login).
 - A new Dashboard panel: a 4-bar chart (Melting/Moulding/Core Making/
@@ -60,16 +60,25 @@ CREATE TABLE IF NOT EXISTS defect_lines (
 );
 ```
 
-The four line names are a fixed TypeScript constant (`DEFECT_LINES = ['Melting',
-'Moulding', 'Core Making', 'Finishing']`), not stored per-row as free text
-validated against a lookup table — simplest option that still satisfies "the
-defect list is editable," and avoids a second CRUD surface for the lines
-themselves.
+The four line names are a fixed TypeScript constant (`DEFECT_LINE_NAMES =
+['Melting', 'Moulding', 'Core Making', 'Finishing']`), not stored per-row as
+free text validated against a lookup table — simplest option that still
+satisfies "the defect list is editable," and avoids a second CRUD surface for
+the lines themselves.
+
+That constant (plus the `DefectLineName` and `DefectLineMapping` types) lives
+in `lib/types.ts`, not `lib/defectLines.ts` — `lib/types.ts` has no `sql`
+import, so client components can import the constant as a *value* safely.
+`lib/defectLines.ts` imports `sql` at module scope (like every other `lib/*`
+file), so anything client-side may only `import type` from it, never a value
+— the same split this codebase already uses for `PhotoGroup`/`PHOTO_GROUPS`
+(`isPhotoGroup` and the array live in `lib/defectPhotos.ts` and are only ever
+imported from server-side API routes; client components only `import type`).
 
 Seeded once (idempotent `INSERT ... ON CONFLICT DO NOTHING`, via `lib/schema.sql`
 for new databases and a `scripts/migrate-defect-lines.mjs` one-off for the
 existing live database, matching every other schema change this project has
-made) with the user's 24 pairs:
+made) with the user's 23 pairs:
 
 - Melting: Kandama, Yuzakai, Pinhole, Gas Hole, Ireboshi, Dross
 - Moulding: Dakon, Youmouyo, Gomi, Ihada, Kake, Kataochi, Mikui, Crack, Gas Hole

@@ -139,3 +139,15 @@ export interface ProductionState {
 export interface HistoryRecord extends ProductionState {
   id: number;
 }
+
+// Suspect Defect Line master data — which foundry process stage(s) a defect
+// name is suspected to originate from. Many-to-many (see defect_lines table);
+// the four line names themselves are fixed, not part of the editable data.
+export const DEFECT_LINE_NAMES = ['Melting', 'Moulding', 'Core Making', 'Finishing'] as const;
+export type DefectLineName = (typeof DEFECT_LINE_NAMES)[number];
+
+export interface DefectLineMapping {
+  id: number;
+  line: DefectLineName;
+  defectName: string;
+}

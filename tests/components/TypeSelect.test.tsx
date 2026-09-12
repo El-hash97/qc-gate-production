@@ -18,6 +18,16 @@ describe('TypeSelect', () => {
     expect(options).toEqual(['Gomi Drag', 'Gomi Cope', OTHER_TYPE]);
   });
 
+  it('ranks a type that starts with the search text ahead of one that only contains it', async () => {
+    // Original order deliberately puts the "contains only" matches first, so
+    // a passing test proves the reordering actually happened.
+    const mixed = ['Kandama Drag', 'Gas Hole Drag', 'Drag Gomi', 'Dragon Fly'] as const;
+    render(<TypeSelect label="Jenis Defect" types={mixed} value={mixed[0]} onChange={() => {}} isOpen />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jenis Defect' }), 'drag');
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual(['Drag Gomi', 'Dragon Fly', 'Kandama Drag', 'Gas Hole Drag', OTHER_TYPE]);
+  });
+
   it('always keeps Other visible regardless of the filter', async () => {
     render(<TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />);
     await userEvent.type(screen.getByRole('textbox', { name: 'Jenis Defect' }), 'zzz-nomatch');

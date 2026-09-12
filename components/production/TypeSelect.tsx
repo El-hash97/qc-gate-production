@@ -8,6 +8,21 @@ import styles from './EntryModal.module.css';
 // string this component appends, rather than each declaring its own.
 export const OTHER_TYPE = 'Other';
 
+// Substring matches, but with the leading letters weighted first: a type
+// whose name *starts* with the query sorts ahead of one that merely contains
+// it partway through, since that's almost always the one being typed for.
+// Stable within each of those two groups — original list order otherwise.
+function rankBySearch(types: readonly string[], query: string): string[] {
+  const startsWith: string[] = [];
+  const containsOnly: string[] = [];
+  for (const type of types) {
+    const lower = type.toLowerCase();
+    if (!lower.includes(query)) continue;
+    (lower.startsWith(query) ? startsWith : containsOnly).push(type);
+  }
+  return [...startsWith, ...containsOnly];
+}
+
 interface TypeSelectProps {
   label: string;
   types: readonly string[];
@@ -38,7 +53,7 @@ export function TypeSelect({
   }, [isOpen]);
 
   const query = search.trim().toLowerCase();
-  const filtered = query ? types.filter((type) => type.toLowerCase().includes(query)) : types;
+  const filtered = query ? rankBySearch(types, query) : types;
 
   return (
     <div className={styles.field}>

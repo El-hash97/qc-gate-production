@@ -45,6 +45,7 @@ describe('TopNav', () => {
     expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Input' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'History' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Master Data' })).not.toBeInTheDocument();
     expect(screen.getByAltText('Toyota')).toHaveAttribute('src', '/logo.png');
     expect(screen.getByText('QC Gate Production')).toBeInTheDocument();
   });
@@ -55,12 +56,13 @@ describe('TopNav', () => {
     expect(mockAuth.openLoginModal).toHaveBeenCalledTimes(1);
   });
 
-  it('renders links to all three routes once logged in', () => {
+  it('renders links to all four routes once logged in', () => {
     mockAuth.authed = true;
     render(<TopNav />);
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: 'Input' })).toHaveAttribute('href', '/input');
     expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', '/history');
+    expect(screen.getByRole('link', { name: 'Master Data' })).toHaveAttribute('href', '/master-data');
     expect(screen.queryByAltText('Toyota')).not.toBeInTheDocument();
   });
 

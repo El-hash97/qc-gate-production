@@ -40,6 +40,12 @@ describe('AuthGate', () => {
     expect(screen.queryByText('History content')).not.toBeInTheDocument();
   });
 
+  it('blocks Master Data when not logged in', () => {
+    pathname = '/master-data';
+    render(<AuthGate><div>Master Data content</div></AuthGate>);
+    expect(screen.queryByText('Master Data content')).not.toBeInTheDocument();
+  });
+
   it('shows the protected content once logged in', () => {
     pathname = '/input';
     mockAuth.authed = true;

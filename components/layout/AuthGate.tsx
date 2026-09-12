@@ -7,7 +7,7 @@ import styles from './AuthGate.module.css';
 // Dashboard stays public (the whole point of the login gate is to keep it
 // the always-visible view); Input writes shift data and History exposes past
 // shifts, so those two are what "lebih privasi" is actually asking to lock.
-const PROTECTED_PATHS = ['/input', '/history'];
+const PROTECTED_PATHS = ['/input', '/history', '/master-data'];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/input', label: 'Input' },
   { href: '/history', label: 'History' },
+  { href: '/master-data', label: 'Master Data' },
 ] as const;
 
 function RealTimeClock() {

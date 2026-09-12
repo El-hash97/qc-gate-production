@@ -32,6 +32,15 @@ const mockDashboardSettings = { hidden: new Set<string>() };
 vi.mock('@/hooks/useDashboardSettings', () => ({
   useDashboardSettings: () => mockDashboardSettings,
 }));
+vi.mock('@/hooks/useDefectLines', () => ({
+  useDefectLines: () => ({
+    mappings: [
+      { id: 1, line: 'Melting', defectName: 'Gas Hole' },
+      { id: 2, line: 'Moulding', defectName: 'Dross' },
+    ],
+    isLoading: false,
+  }),
+}));
 
 import DashboardPage from '@/app/dashboard/page';
 
@@ -162,6 +171,13 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
     // The 09:00 row from hourlyDataCam — its worked-window start field.
     expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
+  });
+
+  it('shows the Pareto Defect per Line panel aggregating NG by suspect line', () => {
+    render(<DashboardPage />);
+    // fixture defectData is { 'Gas Hole Cope': 1 } on the B/C default view —
+    // matches the Melting mapping above, so that bar should carry the 1 pcs.
+    expect(screen.getByText('Pareto Defect per Line')).toBeInTheDocument();
   });
 
   it('hides a panel whose id is in the shared hidden-panels set', () => {

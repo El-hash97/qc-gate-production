@@ -26,6 +26,9 @@ import {
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
+import { LineParetoChart } from '@/components/production/LineParetoChart';
+import { useDefectLines } from '@/hooks/useDefectLines';
+import { paretoByLine } from '@/utils/defectLines';
 import { useTheme } from '@/hooks/useTheme';
 import { useDashboardSettings } from '@/hooks/useDashboardSettings';
 import { findPic } from '@/utils/constants';
@@ -80,6 +83,7 @@ export default function DashboardPage() {
   const current = state ?? EMPTY_STATE;
   const [printedAt, setPrintedAt] = useState('');
   const { hidden } = useDashboardSettings();
+  const { mappings: defectLineMappings } = useDefectLines();
 
   const [view, setView] = useState<DashboardView>('bc');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
@@ -365,6 +369,15 @@ export default function DashboardPage() {
                 hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'repair', defectType) : undefined}
                 onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'repair', defectType }) : undefined}
               />
+            </div>
+          </section>
+        )}
+
+        {!hidden.has('lineDefect') && (
+          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+            <div className={styles.panelTitle}>Pareto Defect per Line</div>
+            <div className={styles.panelBody}>
+              <LineParetoChart bars={paretoByLine(defectData, defectLineMappings)} />
             </div>
           </section>
         )}

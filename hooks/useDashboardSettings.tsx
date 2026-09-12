@@ -13,6 +13,7 @@ export const PANELS = [
   { id: 'oeeChart', label: 'OEE per Jam' },
   { id: 'paretoNg', label: 'Pareto Defect (NG)' },
   { id: 'paretoRepair', label: 'Pareto Repair' },
+  { id: 'lineDefect', label: 'Pareto Defect per Line' },
   { id: 'defectDetails', label: 'Defect Details' },
   { id: 'repairDetails', label: 'Repair Details' },
   { id: 'heatmap', label: 'Flask/Cavity × Defect' },

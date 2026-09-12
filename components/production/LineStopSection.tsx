@@ -40,11 +40,11 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
       <div className={styles.form}>
         <label className={styles.group}>
           <span className={styles.label}>Jam Mulai</span>
-          <input type="time" className={styles.input} value={start} onChange={(e) => setStart(e.target.value)} />
+          <input type="time" lang="id-ID" className={styles.input} value={start} onChange={(e) => setStart(e.target.value)} />
         </label>
         <label className={styles.group}>
           <span className={styles.label}>Jam Selesai</span>
-          <input type="time" className={styles.input} value={end} onChange={(e) => setEnd(e.target.value)} />
+          <input type="time" lang="id-ID" className={styles.input} value={end} onChange={(e) => setEnd(e.target.value)} />
         </label>
         <label className={styles.group}>
           <span className={styles.label}>Keterangan</span>

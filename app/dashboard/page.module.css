@@ -62,7 +62,9 @@
   width: fit-content;
   max-width: 100%;
   overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
 }
+.viewToggle::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
 
 .exportBtn {
   border: 1px solid var(--border-color);
@@ -243,7 +245,9 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: none; /* Firefox */
 }
+.scrollBody::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
 
 /* Column spans (desktop, 12-col) */
 .spanDonut { grid-column: span 4; }

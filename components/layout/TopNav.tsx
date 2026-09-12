@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
+import { LoginModal } from './LoginModal';
 import styles from './TopNav.module.css';
 
 const LINKS = [
@@ -39,28 +41,65 @@ function RealTimeClock() {
   );
 }
 
+// Plain "person" glyph — inherits colour from the button via currentColor,
+// same as the theme toggle's ☀/☾ characters do.
+function PersonIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" fill="currentColor" />
+      <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function TopNav() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
+  const { authed, loginModalOpen, openLoginModal, closeLoginModal, login, logout } = useAuth();
 
   return (
     <header className={styles.header}>
-      <div className={styles.titleGroup}>
-        <div className={styles.title}>QC Gate Production</div>
-        <div className={styles.subtitle}>Block Cylinder Line Finishing — Monitoring System</div>
-      </div>
-      <nav className={styles.nav}>
-        {LINKS.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={pathname.startsWith(link.href) ? styles.linkActive : styles.link}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
+      {authed ? (
+        <>
+          <div className={styles.titleGroup}>
+            <div className={styles.title}>QC Gate Production</div>
+            <div className={styles.subtitle}>Block Cylinder Line Finishing — Monitoring System</div>
+          </div>
+          <nav className={styles.nav}>
+            {LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={pathname.startsWith(link.href) ? styles.linkActive : styles.link}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </>
+      ) : (
+        <>
+          <div className={styles.logoGroup}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- matches
+                the plain <img> convention already used for PicCard photos */}
+            <img className={styles.logo} src="/logo.png" alt="Toyota" />
+          </div>
+          <div className={`${styles.titleGroup} ${styles.titleGroupCenter}`}>
+            <div className={styles.title}>QC Gate Production</div>
+            <div className={styles.subtitle}>Block Cylinder Line Finishing — Monitoring System</div>
+          </div>
+        </>
+      )}
       <div className={styles.rightControls}>
+        <button
+          type="button"
+          className={authed ? `${styles.authButton} ${styles.authButtonActive}` : styles.authButton}
+          onClick={authed ? logout : openLoginModal}
+          aria-label={authed ? 'Logout' : 'Login'}
+          title={authed ? 'Logout' : 'Login'}
+        >
+          <PersonIcon />
+        </button>
         <button
           type="button"
           className={styles.themeToggle}
@@ -71,6 +110,7 @@ export function TopNav() {
         </button>
         <RealTimeClock />
       </div>
+      <LoginModal isOpen={loginModalOpen} onClose={closeLoginModal} onLogin={login} />
     </header>
   );
 }

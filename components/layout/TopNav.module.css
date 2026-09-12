@@ -21,6 +21,28 @@
   min-width: 0;
 }
 
+/* Logged-out header: title moves here, centred where the nav links usually
+   sit, since there's nothing to navigate between until logging in. */
+.titleGroupCenter {
+  justify-self: center;
+  text-align: center;
+}
+
+.logoGroup {
+  justify-self: start;
+  min-width: 0;
+}
+
+/* logo.png is solid red — invisible against this header's red gradient
+   without recolouring it. brightness(0) invert(1) turns any opaque colour
+   white, matching the white title/links/icons already used on this header. */
+.logo {
+  height: 30px;
+  width: auto;
+  display: block;
+  filter: brightness(0) invert(1);
+}
+
 .title {
   font-size: 18px;
   font-weight: 700;
@@ -91,6 +113,35 @@
 
 .themeToggle:hover { background: rgba(255,255,255,0.22); }
 
+/* Login/logout toggle, immediately left of the theme toggle — same square
+   button shape, so the two read as a pair of icon controls. */
+.authButton {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition);
+}
+
+.authButton:hover { background: rgba(255,255,255,0.22); }
+
+/* Logged in — filled solid so the icon's state is visible at a glance,
+   distinct from the logged-out outline look. */
+.authButtonActive {
+  background: #fff;
+  color: var(--accent-red);
+  border-color: #fff;
+}
+
+.authButtonActive:hover { background: rgba(255,255,255,0.85); }
+
 .clock {
   display: flex;
   flex-direction: column;
@@ -128,6 +179,8 @@
   .titleGroup { grid-area: title; }
   .nav { grid-area: nav; }
   .rightControls { grid-area: clock; }
+  .logoGroup { grid-area: title; }
+  .titleGroupCenter { grid-area: nav; }
 
   .subtitle {
     display: none;

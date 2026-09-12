@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test('operator enters counts on Input, sees them on Dashboard, resets, and finds the shift in History', async ({ page, context }) => {
+  // Input and History sit behind the login gate — Dashboard doesn't.
   await page.goto('/input');
+  await page.getByRole('button', { name: 'Login' }).click();
+  await page.getByLabel('Username').fill('finishing');
+  await page.getByLabel('Password').fill('toyota@1');
+  await page.getByRole('button', { name: 'Masuk' }).click();
 
   await page.getByPlaceholder('Nama Operator').fill('Budi Santoso');
   await page.getByRole('button', { name: 'Tambah OK' }).first().click();

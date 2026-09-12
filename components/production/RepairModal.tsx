@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { DieNumberModal } from './DieNumberModal';
+import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import { needsDieNumber } from '@/utils/constants';
 import styles from './EntryModal.module.css';
 
@@ -14,15 +15,13 @@ interface RepairModalProps {
   flaskLabel?: string;
 }
 
-const OTHER = 'Other';
-
 export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask' }: RepairModalProps) {
   const [repairType, setRepairType] = useState<string>(types[0]);
   const [customType, setCustomType] = useState('');
   // 'Other' is never in `types` but is a valid choice, so exempt it from the
   // "reset to first option when the product's list changes" guard.
   useEffect(() => {
-    if (repairType !== OTHER && !types.includes(repairType)) setRepairType(types[0]);
+    if (repairType !== OTHER_TYPE && !types.includes(repairType)) setRepairType(types[0]);
   }, [types]);
   const [qtyInput, setQtyInput] = useState('1');
   const [lot, setLot] = useState('');
@@ -47,7 +46,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
 
   function handleSave() {
     const qty = parseInt(qtyInput, 10);
-    const type = repairType === OTHER ? customType.trim() : repairType;
+    const type = repairType === OTHER_TYPE ? customType.trim() : repairType;
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
     // Safety net for paths that skip handleTypeChange entirely — e.g. the
     // default selection (types[0] is "Mejashi Bore 1") accepted without ever
@@ -70,19 +69,15 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Input Repair">
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Jenis Repair</span>
-        <select
-          className={styles.select}
-          size={6}
-          value={repairType}
-          onChange={(event) => handleTypeChange(event.target.value)}
-        >
-          {types.map((type) => <option key={type} value={type}>{type}</option>)}
-          <option value={OTHER}>{OTHER}</option>
-        </select>
-      </label>
-      {repairType === OTHER && (
+      <TypeSelect
+        label="Jenis Repair"
+        types={types}
+        value={repairType}
+        onChange={handleTypeChange}
+        isOpen={isOpen}
+        searchPlaceholder="Cari jenis repair…"
+      />
+      {repairType === OTHER_TYPE && (
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Repair Lainnya</span>
           <input

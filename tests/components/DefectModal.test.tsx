@@ -75,4 +75,11 @@ describe('DefectModal', () => {
     rerender(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={['Ireboshi', 'Hike']} />);
     expect(screen.getByRole('listbox')).toHaveValue('Ireboshi');
   });
+
+  it('narrows the defect list to matches when searching', async () => {
+    render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jenis Defect' }), 'kandama');
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual(['Kandama Front', 'Kandama Rear', 'Kandama Drag', 'Kandama Cope', 'Other']);
+  });
 });

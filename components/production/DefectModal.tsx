@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import styles from './EntryModal.module.css';
 
 interface DefectModalProps {
@@ -12,8 +13,6 @@ interface DefectModalProps {
   flaskLabel?: string;
 }
 
-const OTHER = 'Other';
-
 export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask' }: DefectModalProps) {
   const [defectType, setDefectType] = useState<string>(types[0]);
   const [customType, setCustomType] = useState('');
@@ -22,7 +21,7 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   // option instead of keeping a selection that no longer exists in it.
   // 'Other' is never in `types` but is a valid choice, so exempt it.
   useEffect(() => {
-    if (defectType !== OTHER && !types.includes(defectType)) setDefectType(types[0]);
+    if (defectType !== OTHER_TYPE && !types.includes(defectType)) setDefectType(types[0]);
   }, [types]);
   // Held as a string (not a coerced number) so the field can actually go
   // empty while the user is clearing/retyping it — a live `parseInt(...) ||
@@ -34,7 +33,7 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
 
   function handleSave() {
     const qty = parseInt(qtyInput, 10);
-    const type = defectType === OTHER ? customType.trim() : defectType;
+    const type = defectType === OTHER_TYPE ? customType.trim() : defectType;
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
     onSave(type, qty, lot.trim(), flask.trim());
     setQtyInput('1');
@@ -45,19 +44,15 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Input Defect (NG)">
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Jenis Defect</span>
-        <select
-          className={styles.select}
-          size={6}
-          value={defectType}
-          onChange={(event) => setDefectType(event.target.value)}
-        >
-          {types.map((type) => <option key={type} value={type}>{type}</option>)}
-          <option value={OTHER}>{OTHER}</option>
-        </select>
-      </label>
-      {defectType === OTHER && (
+      <TypeSelect
+        label="Jenis Defect"
+        types={types}
+        value={defectType}
+        onChange={setDefectType}
+        isOpen={isOpen}
+        searchPlaceholder="Cari jenis defect…"
+      />
+      {defectType === OTHER_TYPE && (
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Defect Lainnya</span>
           <input

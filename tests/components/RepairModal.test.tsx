@@ -116,4 +116,11 @@ describe('RepairModal', () => {
     rerender(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={['Ireboshi', 'Hike']} />);
     expect(screen.getByRole('listbox')).toHaveValue('Ireboshi');
   });
+
+  it('narrows the repair list to matches when searching', async () => {
+    render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jenis Repair' }), 'mejashi');
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual(['Mejashi Bore 1', 'Mejashi Bore 2', 'Mejashi Bore 3', 'Mejashi Bore 4', 'Other']);
+  });
 });

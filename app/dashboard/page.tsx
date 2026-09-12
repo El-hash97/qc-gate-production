@@ -22,7 +22,7 @@ import {
 } from '@/utils/rates';
 import {
   DEFAULT_CYCLE_TIME_SEC, productCycleTime, hourCapacity, windowMinutes, workedMinutesInHour,
-  hourlyOee, peMinutesByHour, shiftOee,
+  hourlyOee, avMinutesByHour, peMinutesByHour, shiftOee,
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
@@ -167,18 +167,20 @@ export default function DashboardPage() {
 
   const oeeByHour = useMemo(() => {
     if (!showOee) return undefined;
+    const avByHour = avMinutesByHour(current.lineStops);
     const peByHour = peMinutesByHour(current.lineStops);
     const now = new Date(minuteTick);
     const out: Record<string, OeeBreakdown> = {};
     for (const [hour, snapshot] of Object.entries(hourlyData)) {
-      out[hour] = hourlyOee(snapshot, peByHour[hour] ?? 0, cycleTime, workedMinutesInHour(hour, hourlyWindow, now));
+      const elapsed = workedMinutesInHour(hour, hourlyWindow, now);
+      out[hour] = hourlyOee(snapshot, avByHour[hour] ?? 0, peByHour[hour] ?? 0, elapsed);
     }
     return out;
-  }, [showOee, hourlyData, hourlyWindow, current.lineStops, cycleTime, minuteTick]);
+  }, [showOee, hourlyData, hourlyWindow, current.lineStops, minuteTick]);
 
   const oeeShift = useMemo(
-    () => (showOee ? shiftOee(hourlyData, current.lineStops, cycleTime, new Date(minuteTick), hourlyWindow) : null),
-    [showOee, hourlyData, hourlyWindow, current.lineStops, cycleTime, minuteTick],
+    () => (showOee ? shiftOee(hourlyData, current.lineStops, new Date(minuteTick), hourlyWindow) : null),
+    [showOee, hourlyData, hourlyWindow, current.lineStops, minuteTick],
   );
 
   // Plant-wide worked window, so it writes the same `hourlyWindow` map from any

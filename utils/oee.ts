@@ -54,14 +54,17 @@ export function hourCapacity(cycleTimeSec: number): number {
   return 3600 / cycleTimeSec;
 }
 
-// Minutes lost to PE line stops, split into the hours they actually fell in and
-// keyed like the hourly snapshots ("07:00"). A stop from 07:50 to 08:20 books
-// 10 minutes to 07:00 and 20 to 08:00; one that runs past midnight wraps around
-// to 00:00. AV and RQ stops are not performance losses, so they're skipped.
-export function peMinutesByHour(stops: LineStop[] = []): Record<string, number> {
+// Minutes lost to line stops of one category, split into the hours they
+// actually fell in and keyed like the hourly snapshots ("07:00"). A stop from
+// 07:50 to 08:20 books 10 minutes to 07:00 and 20 to 08:00; one that runs past
+// midnight wraps around to 00:00.
+function lineStopMinutesByHour(
+  stops: LineStop[],
+  category: LineStop['category'],
+): Record<string, number> {
   const out: Record<string, number> = {};
   for (const stop of stops) {
-    if (stop.category !== 'PE') continue;
+    if (stop.category !== category) continue;
     const start = toMinutes(stop.start);
     const rawEnd = toMinutes(stop.end);
     if (start === null || rawEnd === null) continue;
@@ -74,6 +77,17 @@ export function peMinutesByHour(stops: LineStop[] = []): Record<string, number> 
     }
   }
   return out;
+}
+
+// Minutes lost to AV line stops, per hour. AV is triggered purely by these
+// stops now — not by production falling short of Plan — mirroring PE exactly.
+export function avMinutesByHour(stops: LineStop[] = []): Record<string, number> {
+  return lineStopMinutesByHour(stops, 'AV');
+}
+
+// Minutes lost to PE line stops, per hour.
+export function peMinutesByHour(stops: LineStop[] = []): Record<string, number> {
+  return lineStopMinutesByHour(stops, 'PE');
 }
 
 function currentHourKey(now: Date): string {
@@ -119,25 +133,30 @@ export function workedMinutesInHour(
 /**
  * The three factors for a single hour.
  *
- * - AV: what the hour produced against what its cycle time allows (capped at
- *   100%, since beating the cycle time isn't extra availability).
- * - PE: the share of the hour not lost to PE line stops.
+ * - AV: the share of the hour not lost to AV line stops. Deliberately NOT a
+ *   function of production vs. Plan any more — an hour that simply fell
+ *   short of Plan (no machine down, just fewer pieces) no longer drags AV
+ *   down; only an actual AV-category line stop does. A shortfall against
+ *   Plan is instead surfaced in the Hourly table's Actual column (see
+ *   HourlyTable.tsx), not folded into this score.
+ * - PE: the share of the hour not lost to PE line stops. Same shape as AV,
+ *   just keyed to the PE category.
  * - RQ: OK pieces over everything produced — repair counts as a quality loss
  *   alongside NG, because a repaired piece needed a second pass.
  *
- * `elapsedMin` shortens the hour for the one currently running.
+ * `elapsedMin` shortens the hour for the one currently running, for both AV
+ * and PE (a stop can't lose more of the hour than has actually elapsed).
  */
 export function hourlyOee(
   snapshot: HourlySnapshot,
+  avMinutes: number,
   peMinutes: number,
-  cycleTimeSec: number,
   elapsedMin: number = 60,
 ): OeeBreakdown {
   const produced = snapshot.ok + snapshot.repair + snapshot.ng;
   const minutes = Math.max(0, elapsedMin);
-  const capacity = hourCapacity(cycleTimeSec) * (minutes / 60);
 
-  const av = capacity > 0 ? clamp01(produced / capacity) : 0;
+  const av = minutes > 0 ? clamp01((minutes - Math.max(0, avMinutes)) / minutes) : 0;
   const pe = minutes > 0 ? clamp01((minutes - Math.max(0, peMinutes)) / minutes) : 0;
   const rq = produced > 0 ? snapshot.ok / produced : 0;
 
@@ -149,31 +168,30 @@ export function hourlyOee(
  * averaging the hourly percentages — an hour with two pieces in it would
  * otherwise weigh as much as a full one.
  *
- * Only hours present in `hourlyData` count, so PE stops logged outside the
+ * Only hours present in `hourlyData` count, so AV/PE stops logged outside the
  * running shift's hours are ignored, and a stop longer than an hour can't
  * subtract more than that hour holds.
  *
  * `windows` shortens any hour the operator marked as partly break time, so a
  * shift with a 45-minute lunch inside the 12:00 hour is measured against 15
- * minutes of capacity there, not 60.
+ * minutes of AV/PE denominator there, not 60.
  */
 export function shiftOee(
   hourlyData: Record<string, HourlySnapshot>,
   stops: LineStop[] = [],
-  cycleTimeSec: number = DEFAULT_CYCLE_TIME_SEC,
   now: Date = new Date(),
   windows: Record<string, HourWindow> = {},
 ): OeeBreakdown {
   const hours = Object.keys(hourlyData);
   if (hours.length === 0) return ZERO;
 
+  const avByHour = avMinutesByHour(stops);
   const peByHour = peMinutesByHour(stops);
-  const perHourCapacity = hourCapacity(cycleTimeSec);
 
   let produced = 0;
   let ok = 0;
-  let capacity = 0;
   let minutes = 0;
+  let avLost = 0;
   let peLost = 0;
 
   for (const hour of hours) {
@@ -181,12 +199,12 @@ export function shiftOee(
     const elapsed = workedMinutesInHour(hour, windows, now);
     produced += snapshot.ok + snapshot.repair + snapshot.ng;
     ok += snapshot.ok;
-    capacity += perHourCapacity * (elapsed / 60);
     minutes += elapsed;
+    avLost += Math.min(avByHour[hour] ?? 0, elapsed);
     peLost += Math.min(peByHour[hour] ?? 0, elapsed);
   }
 
-  const av = capacity > 0 ? clamp01(produced / capacity) : 0;
+  const av = minutes > 0 ? clamp01((minutes - avLost) / minutes) : 0;
   const pe = minutes > 0 ? clamp01((minutes - peLost) / minutes) : 0;
   const rq = produced > 0 ? ok / produced : 0;
 

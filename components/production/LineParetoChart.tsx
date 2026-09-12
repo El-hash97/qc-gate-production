@@ -66,7 +66,9 @@ export function LineParetoChart({ bars }: LineParetoChartProps) {
           x: { grid: { display: false }, ticks: { color: ct.tick, font: { size: 10 } } },
           y: {
             beginAtZero: true,
-            max: 100,
+            // No fixed max — a lopsided shift (one line dominant) shouldn't
+            // squash the other bars against the axis; auto-scale like
+            // ParetoChart does, with headroom for the pcs label above the bar.
             grace: '15%',
             grid: { color: ct.grid },
             ticks: { color: ct.tick, callback: (v: number | string) => `${v}%` },

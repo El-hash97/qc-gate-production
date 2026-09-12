@@ -91,6 +91,40 @@ describe('HourlyTable', () => {
     expect(actual(2).className).toMatch(/rateGood/);
   });
 
+  it('adds a "/ N%" suffix to Actual only when the hour missed its Plan', () => {
+    render(
+      <HourlyTable
+        hourlyData={{
+          '07:00': { ok: 40, repair: 0, ng: 0 }, // 40/72 = 56% -> missed
+          '08:00': { ok: 72, repair: 0, ng: 0 }, // met exactly -> no suffix
+          '09:00': { ok: 80, repair: 0, ng: 0 }, // exceeded -> no suffix
+        }}
+        hourlyPlan={{ '07:00': 72, '08:00': 72, '09:00': 72 }}
+        oee={{ '07:00': factors, '08:00': factors, '09:00': factors }}
+      />,
+    );
+    const rows = screen.getAllByRole('row').slice(1);
+    const actual = (i: number) => within(rows[i]).getAllByRole('cell')[5];
+    expect(actual(0)).toHaveTextContent('40 / 56%');
+    expect(actual(1)).toHaveTextContent('72');
+    expect(actual(1).textContent).not.toContain('/');
+    expect(actual(2)).toHaveTextContent('80');
+    expect(actual(2).textContent).not.toContain('/');
+  });
+
+  it('shows the Actual total alone when there is no Plan to compare against', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 10, repair: 0, ng: 0 } }}
+        hourlyPlan={{}}
+        oee={{ '07:00': factors }}
+      />,
+    );
+    const cell = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell')[5];
+    expect(cell).toHaveTextContent('10');
+    expect(cell.textContent).not.toContain('/');
+  });
+
   it('renders AV/PE/RQ/OEE as percentages when factors are supplied', () => {
     render(
       <HourlyTable

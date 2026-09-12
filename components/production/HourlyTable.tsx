@@ -69,13 +69,22 @@ function rateClass(percent: number): string {
 }
 
 // Actual vs Plan for the hour: green on/above plan, amber within 10%, red below.
-// A red cell here lines up with a lower AV that row — fewer pieces against the
-// same capacity. Uncoloured when there's no plan for the hour.
+// Uncoloured when there's no plan for the hour. AV no longer follows this
+// comparison (it's driven by AV line stops now, see utils/oee.ts) — a missed
+// Plan shows up only here, as the colour plus the percentage in the cell text
+// below, not by pulling the AV column down too.
 function actualClass(actual: number, plan: number): string {
   if (plan <= 0) return '';
   if (actual >= plan) return styles.rateGood;
   if (actual >= plan * 0.9) return styles.rateWarn;
   return styles.rateBad;
+}
+
+// "45" when the hour met (or has no) Plan; "45 / 63%" when it fell short, so
+// the shortfall is visible right in this cell without a dedicated column.
+function actualCellText(actual: number, plan: number): string {
+  if (plan <= 0 || actual >= plan) return String(actual);
+  return `${actual} / ${Math.round((actual / plan) * 100)}%`;
 }
 
 function RateCell({ ratio }: { ratio: number }) {
@@ -118,7 +127,7 @@ export function HourlyTable({
               {oee && factors && (
                 <>
                   <td>{plan || '—'}</td>
-                  <td className={actualClass(actual, plan)}>{actual}</td>
+                  <td className={actualClass(actual, plan)}>{actualCellText(actual, plan)}</td>
                   <RateCell ratio={factors.av} />
                   <RateCell ratio={factors.pe} />
                   <RateCell ratio={factors.rq} />

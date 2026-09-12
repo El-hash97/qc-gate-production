@@ -159,4 +159,20 @@ describe('DashboardPage', () => {
     // The 09:00 row from hourlyDataCam — its worked-window start field.
     expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
   });
+
+  it('hides a panel via Pengaturan and remembers the choice on remount', async () => {
+    localStorage.removeItem('qc-dashboard-hidden-panels');
+    const { unmount } = render(<DashboardPage />);
+    expect(screen.getByText('Production Distribution')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Pengaturan' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Production Distribution/ }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByText('Production Distribution')).not.toBeInTheDocument();
+
+    unmount();
+    render(<DashboardPage />);
+    expect(screen.queryByText('Production Distribution')).not.toBeInTheDocument();
+    expect(screen.getByText('Hourly Production')).toBeInTheDocument();
+  });
 });

@@ -26,10 +26,55 @@ import {
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
+import { Modal } from '@/components/ui/Modal';
 import { useTheme } from '@/hooks/useTheme';
 import { findPic } from '@/utils/constants';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
+
+// Which bento panels a viewer can hide — persisted per-browser so a kiosk
+// display keeps its chosen layout across reloads.
+const PANELS = [
+  { id: 'distribution', label: 'Production Distribution' },
+  { id: 'hourlyChart', label: 'Hourly Production' },
+  { id: 'lineStop', label: 'Line Stop' },
+  { id: 'hourlyTable', label: 'Hourly (Tabel)' },
+  { id: 'oeeChart', label: 'OEE per Jam' },
+  { id: 'paretoNg', label: 'Pareto Defect (NG)' },
+  { id: 'paretoRepair', label: 'Pareto Repair' },
+  { id: 'defectDetails', label: 'Defect Details' },
+  { id: 'repairDetails', label: 'Repair Details' },
+  { id: 'heatmap', label: 'Flask/Cavity × Defect' },
+  { id: 'lotDefect', label: 'Lot × Defect' },
+  { id: 'entryLog', label: 'Lot/Flask Log' },
+] as const;
+type PanelId = (typeof PANELS)[number]['id'];
+
+const HIDDEN_PANELS_KEY = 'qc-dashboard-hidden-panels';
+
+function useHiddenPanels() {
+  const [hidden, setHidden] = useState<Set<PanelId>>(new Set());
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HIDDEN_PANELS_KEY);
+      if (raw) setHidden(new Set(JSON.parse(raw)));
+    } catch {
+      /* private mode / bad stored value — everything stays visible */
+    }
+  }, []);
+
+  function toggle(id: PanelId) {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(HIDDEN_PANELS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  return { hidden, toggle };
+}
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
@@ -78,6 +123,8 @@ export default function DashboardPage() {
   const { theme, setTheme } = useTheme();
   const current = state ?? EMPTY_STATE;
   const [printedAt, setPrintedAt] = useState('');
+  const { hidden, toggle: toggleHidden } = useHiddenPanels();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [view, setView] = useState<DashboardView>('bc');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
@@ -255,10 +302,28 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
+        <button type="button" className={styles.exportBtn} onClick={() => setSettingsOpen(true)}>
+          Pengaturan
+        </button>
         <button type="button" className={styles.exportBtn} onClick={handleExportPdf}>
           Export PDF
         </button>
       </div>
+
+      <Modal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} title="Panel Dashboard">
+        <div className={styles.settingsList}>
+          {PANELS.map((panel) => (
+            <label key={panel.id} className={styles.settingsItem}>
+              <input
+                type="checkbox"
+                checked={!hidden.has(panel.id)}
+                onChange={() => toggleHidden(panel.id)}
+              />
+              {panel.label}
+            </label>
+          ))}
+        </div>
+      </Modal>
 
       <div className={styles.kpiRow}>
         <div className={`${styles.kpiCard} ${styles.kpiTotal}`}>
@@ -292,101 +357,123 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.bento}>
-        <section className={`${styles.panel} ${styles.spanDonut} ${styles.hTrend}`}>
-          <div className={styles.panelTitle}>Production Distribution</div>
-          <div className={styles.panelBody}><ProductionChart ok={ok} repair={repair} ng={ng} /></div>
-        </section>
+        {!hidden.has('distribution') && (
+          <section className={`${styles.panel} ${styles.spanDonut} ${styles.hTrend}`}>
+            <div className={styles.panelTitle}>Production Distribution</div>
+            <div className={styles.panelBody}><ProductionChart ok={ok} repair={repair} ng={ng} /></div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${styles.spanHero} ${styles.hTrend}`}>
-          <div className={styles.panelTitle}>Hourly Production</div>
-          <div className={styles.panelBody}>
-            {/* The Plan line is the formula plan per hour — B/C only (elsewhere
-                there's no cycle time), so hourlyPlan is undefined and no line shows. */}
-            <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyPlan} />
-          </div>
-        </section>
+        {!hidden.has('hourlyChart') && (
+          <section className={`${styles.panel} ${styles.spanHero} ${styles.hTrend}`}>
+            <div className={styles.panelTitle}>Hourly Production</div>
+            <div className={styles.panelBody}>
+              {/* The Plan line is the formula plan per hour — B/C only (elsewhere
+                  there's no cycle time), so hourlyPlan is undefined and no line shows. */}
+              <HourlyChart hourlyData={hourlyData} hourlyTarget={hourlyPlan} />
+            </div>
+          </section>
+        )}
 
         {/* Fills the top row's remaining 3 columns; spans the full width in print. */}
-        <section className={`${styles.panel} ${styles.spanList} ${styles.hTrend} ${styles.lineStopPanel}`}>
-          <div className={styles.panelTitle}>Line Stop</div>
-          <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
-        </section>
+        {!hidden.has('lineStop') && (
+          <section className={`${styles.panel} ${styles.spanList} ${styles.hTrend} ${styles.lineStopPanel}`}>
+            <div className={styles.panelTitle}>Line Stop</div>
+            <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${oeeByHour ? styles.spanWide : styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
-          <div className={styles.panelTitle}>Hourly (Tabel)</div>
-          <div className={styles.scrollBody}>
-            <HourlyTable
-              hourlyData={hourlyData}
-              hourlyWindow={hourlyWindow}
-              hourlyPlan={hourlyPlan}
-              editable={view !== 'all'}
-              onWindowChange={handleHourlyWindow}
-              oee={oeeByHour}
-            />
-          </div>
-        </section>
+        {!hidden.has('hourlyTable') && (
+          <section className={`${styles.panel} ${oeeByHour ? styles.spanWide : styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
+            <div className={styles.panelTitle}>Hourly (Tabel)</div>
+            <div className={styles.scrollBody}>
+              <HourlyTable
+                hourlyData={hourlyData}
+                hourlyWindow={hourlyWindow}
+                hourlyPlan={hourlyPlan}
+                editable={view !== 'all'}
+                onWindowChange={handleHourlyWindow}
+                oee={oeeByHour}
+              />
+            </div>
+          </section>
+        )}
 
-        {oeeByHour && (
+        {oeeByHour && !hidden.has('oeeChart') && (
           <section className={`${styles.panel} ${styles.oeeChartPanel} ${styles.hPareto}`}>
             <div className={styles.panelTitle}>OEE per Jam</div>
             <div className={styles.panelBody}><HourlyOeeChart oee={oeeByHour} /></div>
           </section>
         )}
 
-        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
-          <div className={styles.panelTitle}>Pareto Defect (NG)</div>
-          <div className={styles.panelBody}>
-            <ParetoChart
-              data={defectData}
-              hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'ng', defectType) : undefined}
-              onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'ng', defectType }) : undefined}
-            />
-          </div>
-        </section>
+        {!hidden.has('paretoNg') && (
+          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+            <div className={styles.panelTitle}>Pareto Defect (NG)</div>
+            <div className={styles.panelBody}>
+              <ParetoChart
+                data={defectData}
+                hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'ng', defectType) : undefined}
+                onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'ng', defectType }) : undefined}
+              />
+            </div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
-          <div className={styles.panelTitle}>Pareto Repair</div>
-          <div className={styles.panelBody}>
-            <ParetoChart
-              data={repairData}
-              hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'repair', defectType) : undefined}
-              onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'repair', defectType }) : undefined}
-            />
-          </div>
-        </section>
+        {!hidden.has('paretoRepair') && (
+          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
+            <div className={styles.panelTitle}>Pareto Repair</div>
+            <div className={styles.panelBody}>
+              <ParetoChart
+                data={repairData}
+                hasPhoto={photoGroup ? (defectType) => hasPhoto(photoGroup, 'repair', defectType) : undefined}
+                onBarClick={photoGroup ? (defectType) => setPhotoModal({ chartType: 'repair', defectType }) : undefined}
+              />
+            </div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
-          <div className={styles.scrollBody}><DefectRepairSummary title="Defect Details" data={defectData} /></div>
-        </section>
+        {!hidden.has('defectDetails') && (
+          <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
+            <div className={styles.scrollBody}><DefectRepairSummary title="Defect Details" data={defectData} /></div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
-          <div className={styles.scrollBody}><DefectRepairSummary title="Repair Details" data={repairData} /></div>
-        </section>
+        {!hidden.has('repairDetails') && (
+          <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
+            <div className={styles.scrollBody}><DefectRepairSummary title="Repair Details" data={repairData} /></div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hDetail}`}>
-          <div className={styles.panelTitle}>
-            {view === 'all' ? 'Flask / Cavity × Defect' : isShaftLine ? 'Cavity × Defect' : 'Flask × Defect'}
-          </div>
-          <div className={styles.panelBody}>
-            <DefectHeatmap
-              logs={entryLogs}
-              variant={view === 'all' ? 'both' : isShaftLine ? 'cavity' : 'flask'}
-            />
-          </div>
-        </section>
+        {!hidden.has('heatmap') && (
+          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hDetail}`}>
+            <div className={styles.panelTitle}>
+              {view === 'all' ? 'Flask / Cavity × Defect' : isShaftLine ? 'Cavity × Defect' : 'Flask × Defect'}
+            </div>
+            <div className={styles.panelBody}>
+              <DefectHeatmap
+                logs={entryLogs}
+                variant={view === 'all' ? 'both' : isShaftLine ? 'cavity' : 'flask'}
+              />
+            </div>
+          </section>
+        )}
 
-        <section className={`${styles.panel} ${styles.spanHalf} ${styles.hLog}`}>
-          <div className={styles.panelTitle}>Lot × Defect</div>
-          <div className={styles.panelBody}><LotDefectChart logs={entryLogs} /></div>
-        </section>
+        {!hidden.has('lotDefect') && (
+          <section className={`${styles.panel} ${styles.spanHalf} ${styles.hLog}`}>
+            <div className={styles.panelTitle}>Lot × Defect</div>
+            <div className={styles.panelBody}><LotDefectChart logs={entryLogs} /></div>
+          </section>
+        )}
 
         {/* Without the "OEE per Jam" panel (every view but B/C) the log would sit
             alone on a half-empty row, so it takes the full width there instead. */}
-        <section className={`${styles.panel} ${oeeByHour ? styles.spanHalf : styles.spanFull} ${styles.hLog}`}>
-          <div className={styles.scrollBody}>
-            <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
-          </div>
-        </section>
+        {!hidden.has('entryLog') && (
+          <section className={`${styles.panel} ${oeeByHour ? styles.spanHalf : styles.spanFull} ${styles.hLog}`}>
+            <div className={styles.scrollBody}>
+              <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
+            </div>
+          </section>
+        )}
       </div>
 
       {photoGroup && photoModal && (

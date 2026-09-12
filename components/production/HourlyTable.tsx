@@ -48,12 +48,12 @@ function WindowCell({ win, onCommit }: { win: HourWindow; onCommit: (w: HourWind
   return (
     <span className={styles.windowCell}>
       <input
-        type="time" aria-label="Jam mulai" className={styles.timeInput}
+        type="time" lang="id-ID" aria-label="Jam mulai" className={styles.timeInput}
         value={start.value} onChange={start.onChange} onBlur={start.onBlur} onKeyDown={start.onKeyDown}
       />
       <span className={styles.windowDash}>–</span>
       <input
-        type="time" aria-label="Jam selesai" className={styles.timeInput}
+        type="time" lang="id-ID" aria-label="Jam selesai" className={styles.timeInput}
         value={end.value} onChange={end.onChange} onBlur={end.onBlur} onKeyDown={end.onKeyDown}
       />
     </span>

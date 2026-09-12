@@ -26,55 +26,11 @@ import {
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import { PicCard } from '@/components/production/PicCard';
-import { Modal } from '@/components/ui/Modal';
 import { useTheme } from '@/hooks/useTheme';
+import { useDashboardSettings } from '@/hooks/useDashboardSettings';
 import { findPic } from '@/utils/constants';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
-
-// Which bento panels a viewer can hide — persisted per-browser so a kiosk
-// display keeps its chosen layout across reloads.
-const PANELS = [
-  { id: 'distribution', label: 'Production Distribution' },
-  { id: 'hourlyChart', label: 'Hourly Production' },
-  { id: 'lineStop', label: 'Line Stop' },
-  { id: 'hourlyTable', label: 'Hourly (Tabel)' },
-  { id: 'oeeChart', label: 'OEE per Jam' },
-  { id: 'paretoNg', label: 'Pareto Defect (NG)' },
-  { id: 'paretoRepair', label: 'Pareto Repair' },
-  { id: 'defectDetails', label: 'Defect Details' },
-  { id: 'repairDetails', label: 'Repair Details' },
-  { id: 'heatmap', label: 'Flask/Cavity × Defect' },
-  { id: 'lotDefect', label: 'Lot × Defect' },
-  { id: 'entryLog', label: 'Lot/Flask Log' },
-] as const;
-type PanelId = (typeof PANELS)[number]['id'];
-
-const HIDDEN_PANELS_KEY = 'qc-dashboard-hidden-panels';
-
-function useHiddenPanels() {
-  const [hidden, setHidden] = useState<Set<PanelId>>(new Set());
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HIDDEN_PANELS_KEY);
-      if (raw) setHidden(new Set(JSON.parse(raw)));
-    } catch {
-      /* private mode / bad stored value — everything stays visible */
-    }
-  }, []);
-
-  function toggle(id: PanelId) {
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      try { localStorage.setItem(HIDDEN_PANELS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
-    });
-  }
-
-  return { hidden, toggle };
-}
 
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', target: 0,
@@ -123,8 +79,7 @@ export default function DashboardPage() {
   const { theme, setTheme } = useTheme();
   const current = state ?? EMPTY_STATE;
   const [printedAt, setPrintedAt] = useState('');
-  const { hidden, toggle: toggleHidden } = useHiddenPanels();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { hidden } = useDashboardSettings();
 
   const [view, setView] = useState<DashboardView>('bc');
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
@@ -302,28 +257,10 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
-        <button type="button" className={styles.exportBtn} onClick={() => setSettingsOpen(true)}>
-          Pengaturan
-        </button>
         <button type="button" className={styles.exportBtn} onClick={handleExportPdf}>
           Export PDF
         </button>
       </div>
-
-      <Modal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} title="Panel Dashboard">
-        <div className={styles.settingsList}>
-          {PANELS.map((panel) => (
-            <label key={panel.id} className={styles.settingsItem}>
-              <input
-                type="checkbox"
-                checked={!hidden.has(panel.id)}
-                onChange={() => toggleHidden(panel.id)}
-              />
-              {panel.label}
-            </label>
-          ))}
-        </div>
-      </Modal>
 
       <div className={styles.kpiRow}>
         <div className={`${styles.kpiCard} ${styles.kpiTotal}`}>

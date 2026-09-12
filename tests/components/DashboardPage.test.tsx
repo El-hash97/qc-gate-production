@@ -28,6 +28,10 @@ vi.mock('@/lib/chartSetup', () => ({}));
 vi.mock('@/hooks/useDefectPhotos', () => ({
   useDefectPhotoFlags: () => ({ hasPhoto: () => false }),
 }));
+const mockDashboardSettings = { hidden: new Set<string>() };
+vi.mock('@/hooks/useDashboardSettings', () => ({
+  useDashboardSettings: () => mockDashboardSettings,
+}));
 
 import DashboardPage from '@/app/dashboard/page';
 
@@ -160,19 +164,11 @@ describe('DashboardPage', () => {
     expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
   });
 
-  it('hides a panel via Pengaturan and remembers the choice on remount', async () => {
-    localStorage.removeItem('qc-dashboard-hidden-panels');
-    const { unmount } = render(<DashboardPage />);
-    expect(screen.getByText('Production Distribution')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Pengaturan' }));
-    await userEvent.click(screen.getByRole('checkbox', { name: /Production Distribution/ }));
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByText('Production Distribution')).not.toBeInTheDocument();
-
-    unmount();
+  it('hides a panel whose id is in the shared hidden-panels set', () => {
+    mockDashboardSettings.hidden = new Set(['distribution']);
     render(<DashboardPage />);
     expect(screen.queryByText('Production Distribution')).not.toBeInTheDocument();
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
+    mockDashboardSettings.hidden = new Set();
   });
 });

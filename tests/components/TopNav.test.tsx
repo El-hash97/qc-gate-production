@@ -18,12 +18,25 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockAuth,
 }));
 
+const mockSettings = {
+  hidden: new Set<string>(),
+  toggle: vi.fn(),
+  settingsOpen: false,
+  openSettings: vi.fn(),
+  closeSettings: vi.fn(),
+};
+vi.mock('@/hooks/useDashboardSettings', () => ({
+  useDashboardSettings: () => mockSettings,
+  PANELS: [{ id: 'distribution', label: 'Production Distribution' }],
+}));
+
 import { TopNav } from '@/components/layout/TopNav';
 
 describe('TopNav', () => {
   beforeEach(() => {
     mockAuth.authed = false;
     mockAuth.loginModalOpen = false;
+    mockSettings.settingsOpen = false;
     vi.clearAllMocks();
   });
 
@@ -62,6 +75,18 @@ describe('TopNav', () => {
     render(<TopNav />);
     await userEvent.click(screen.getByRole('button', { name: 'Logout' }));
     expect(mockAuth.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the settings gear icon when logged out', () => {
+    render(<TopNav />);
+    expect(screen.queryByRole('button', { name: 'Pengaturan dashboard' })).not.toBeInTheDocument();
+  });
+
+  it('opens the settings modal from the gear icon once logged in', async () => {
+    mockAuth.authed = true;
+    render(<TopNav />);
+    await userEvent.click(screen.getByRole('button', { name: 'Pengaturan dashboard' }));
+    expect(mockSettings.openSettings).toHaveBeenCalledTimes(1);
   });
 
   it('fills in the clock after mount', () => {

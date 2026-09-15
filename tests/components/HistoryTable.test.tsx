@@ -12,12 +12,12 @@ const record: HistoryRecord = {
 
 describe('HistoryTable', () => {
   it('shows an empty state when there are no records', () => {
-    render(<HistoryTable records={[]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} onEdit={() => {}} />);
+    render(<HistoryTable records={[]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onEdit={() => {}} />);
     expect(screen.getByText('Belum ada histori shift')).toBeInTheDocument();
   });
 
   it('renders one row per record with OK/Repair/NG totals summed across both products', () => {
-    render(<HistoryTable records={[record]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} onEdit={() => {}} />);
+    render(<HistoryTable records={[record]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onEdit={() => {}} />);
     const row = screen.getByText('Budi').closest('tr')!;
     expect(row).toHaveTextContent('90'); // ok1 + ok2
     expect(row).toHaveTextContent('3');  // repair1 + repair2
@@ -25,7 +25,7 @@ describe('HistoryTable', () => {
   });
 
   it('shows the PIC name in its own column', () => {
-    render(<HistoryTable records={[{ ...record, pic: 'suryo' }]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onExport={() => {}} onEdit={() => {}} />);
+    render(<HistoryTable records={[{ ...record, pic: 'suryo' }]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onEdit={() => {}} />);
     expect(screen.getByText('SURYO HADI WIHARJO')).toBeInTheDocument();
   });
 
@@ -36,26 +36,25 @@ describe('HistoryTable', () => {
         expandedId={1}
         onToggle={() => {}}
         renderDetail={() => <div data-testid="detail">detail content</div>}
-        onExport={() => {}}
         onEdit={() => {}}
       />,
     );
     expect(screen.getByTestId('detail')).toBeInTheDocument();
   });
 
-  it('calls onExport without triggering onToggle when Export is clicked', async () => {
-    const onToggle = vi.fn();
-    const onExport = vi.fn();
-    render(<HistoryTable records={[record]} expandedId={null} onToggle={onToggle} renderDetail={() => null} onExport={onExport} onEdit={() => {}} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(onExport).toHaveBeenCalledWith(record);
-    expect(onToggle).not.toHaveBeenCalled();
+  // PDF export now lives inside the expanded detail itself (see
+  // ProductionDashboardView's own "Export PDF" button) rather than as a
+  // separate row-level action, since printing needs the content rendered
+  // first — there's no longer an Export button on the collapsed row.
+  it('has no Export button on the collapsed row', () => {
+    render(<HistoryTable records={[record]} expandedId={null} onToggle={() => {}} renderDetail={() => null} onEdit={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
   });
 
   it('calls onEdit without triggering onToggle when Edit is clicked', async () => {
     const onToggle = vi.fn();
     const onEdit = vi.fn();
-    render(<HistoryTable records={[record]} expandedId={null} onToggle={onToggle} renderDetail={() => null} onExport={() => {}} onEdit={onEdit} />);
+    render(<HistoryTable records={[record]} expandedId={null} onToggle={onToggle} renderDetail={() => null} onEdit={onEdit} />);
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledWith(record);
     expect(onToggle).not.toHaveBeenCalled();

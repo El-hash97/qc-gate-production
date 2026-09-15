@@ -99,8 +99,12 @@ function currentHourKey(now: Date): string {
 // 20-minute-old hour against a full 72 pcs would show a healthy line at 33%
 // availability. Every other recorded hour counts as complete, which also keeps
 // a night shift's pre-midnight hours full. Never 0, so capacity stays divisible.
-export function elapsedMinutesInHour(hour: string, now: Date = new Date()): number {
-  if (hour !== currentHourKey(now)) return 60;
+//
+// `now: null` means the shift is finished (e.g. an archived history record,
+// not the live running shift) — every hour counts as a full 60 minutes, since
+// there's no "current" clock hour to prorate against.
+export function elapsedMinutesInHour(hour: string, now: Date | null = new Date()): number {
+  if (now === null || hour !== currentHourKey(now)) return 60;
   return Math.max(1, now.getMinutes());
 }
 
@@ -125,7 +129,7 @@ export function windowMinutes(hour: string, windows: Record<string, HourWindow> 
 export function workedMinutesInHour(
   hour: string,
   windows: Record<string, HourWindow> = {},
-  now: Date = new Date(),
+  now: Date | null = new Date(),
 ): number {
   return Math.max(1, Math.min(elapsedMinutesInHour(hour, now), windowMinutes(hour, windows)));
 }
@@ -179,7 +183,7 @@ export function hourlyOee(
 export function shiftOee(
   hourlyData: Record<string, HourlySnapshot>,
   stops: LineStop[] = [],
-  now: Date = new Date(),
+  now: Date | null = new Date(),
   windows: Record<string, HourWindow> = {},
 ): OeeBreakdown {
   const hours = Object.keys(hourlyData);

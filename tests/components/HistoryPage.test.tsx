@@ -5,9 +5,6 @@ import userEvent from '@testing-library/user-event';
 const useHistoryMock = vi.fn();
 vi.mock('@/hooks/useHistory', () => ({ useHistory: (...args: any[]) => useHistoryMock(...args) }));
 
-const exportMock = vi.fn();
-vi.mock('@/utils/excelExport', () => ({ exportShiftToExcel: (...args: any[]) => exportMock(...args) }));
-
 const restoreMock = vi.fn();
 vi.mock('@/hooks/useRestoreHistory', () => ({
   useRestoreHistory: () => ({ mutate: restoreMock, isPending: false, isError: false, error: null }),
@@ -19,13 +16,16 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: pushMock }) }));
 
 vi.mock('react-chartjs-2', () => ({ Bar: () => null, Doughnut: () => null, Chart: () => null }));
 vi.mock('@/lib/chartSetup', () => ({}));
+vi.mock('@/hooks/useDefectLines', () => ({
+  useDefectLines: () => ({ mappings: [], isLoading: false }),
+}));
 
 import HistoryPage from '@/app/history/page';
 
 const record = {
   id: 1, date: '2026-08-04', shift: 'Shift Red', operator: 'Budi', target: 100,
   ok1: 50, repair1: 2, ng1: 1, ok2: 40, repair2: 1, ng2: 0,
-  defectData: {}, repairData: {}, hourlyData: {}, savedAt: '',
+  defectData: {}, repairData: {}, hourlyData: {}, entryLogs: [], lineStops: [], savedAt: '',
 };
 
 describe('HistoryPage', () => {
@@ -42,11 +42,15 @@ describe('HistoryPage', () => {
     expect(screen.getByText('Belum ada histori shift')).toBeInTheDocument();
   });
 
-  it('exports a record to Excel when its Export button is clicked', async () => {
+  it('shows the record like the Dashboard, with its own Export PDF button, when the row is clicked', async () => {
     useHistoryMock.mockReturnValue({ data: [record], isLoading: false, isError: false });
     render(<HistoryPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(exportMock).toHaveBeenCalledWith(record);
+    await userEvent.click(screen.getByText('Budi'));
+    expect(screen.getByRole('group', { name: 'Filter produk' })).toBeInTheDocument();
+    expect(screen.getByText('Total Produksi')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export PDF' })).toBeInTheDocument();
+    // No separate Excel export action anymore.
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
   });
 
   it('restores a record after confirming the Edit dialog', async () => {

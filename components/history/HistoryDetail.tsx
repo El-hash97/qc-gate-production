@@ -1,35 +1,24 @@
+'use client';
+
+import { useState } from 'react';
 import type { HistoryRecord } from '@/lib/types';
-import { ParetoChart } from '@/components/production/ParetoChart';
-import { EntryLogList } from '@/components/production/EntryLogList';
-import { PicCard } from '@/components/production/PicCard';
-import { LineStopTable } from '@/components/production/LineStopTable';
-import { mergeCounts } from '@/utils/rates';
+import { ProductionDashboardView, type DashboardView } from '@/components/production/ProductionDashboardView';
 import styles from './HistoryDetail.module.css';
 
+// Shows a saved shift exactly like the live Dashboard (same toggle, same
+// panels), sourced from the archived record instead of the polled live
+// state. Always read-only: no hourly-window editing (an archived shift isn't
+// meant to be edited in place — see History's own "Edit" flow, which
+// restores it to the live shift instead) and no defect-photo affordance
+// (photos are live-only, not tied to a saved shift; see useDefectPhotos).
+// `now={null}` tells the OEE math the shift is finished, so every recorded
+// hour counts as fully worked rather than measuring against the live clock.
 export function HistoryDetail({ record }: { record: HistoryRecord }) {
-  // Combine Block Cylinder and Camshaft/Crankshaft so a saved shift shows its
-  // full defect/repair picture at a glance.
-  const defectData = mergeCounts(record.defectData, record.defectDataShaft);
-  const repairData = mergeCounts(record.repairData, record.repairDataShaft);
+  const [view, setView] = useState<DashboardView>('bc');
 
   return (
     <div className={styles.detail}>
-      {record.pic && <PicCard pic={record.pic} />}
-      <div className={styles.chartsGrid}>
-        <div>
-          <div className={styles.chartTitle}>Pareto Defect (NG)</div>
-          <div className={styles.chartWrapper}><ParetoChart data={defectData} /></div>
-        </div>
-        <div>
-          <div className={styles.chartTitle}>Pareto Repair</div>
-          <div className={styles.chartWrapper}><ParetoChart data={repairData} /></div>
-        </div>
-      </div>
-      <EntryLogList title="Lot / Flask Log" logs={record.entryLogs} />
-      <div>
-        <div className={styles.chartTitle}>Line Stop</div>
-        <LineStopTable stops={record.lineStops ?? []} />
-      </div>
+      <ProductionDashboardView state={record} view={view} onViewChange={setView} now={null} />
     </div>
   );
 }

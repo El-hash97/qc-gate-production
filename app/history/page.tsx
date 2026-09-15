@@ -9,7 +9,6 @@ import { HistoryFilterBar } from '@/components/history/HistoryFilterBar';
 import { HistoryTable } from '@/components/history/HistoryTable';
 import { HistoryDetail } from '@/components/history/HistoryDetail';
 import { Modal } from '@/components/ui/Modal';
-import { exportShiftToExcel } from '@/utils/excelExport';
 import { getGrandTotal } from '@/utils/rates';
 import { todayString } from '@/utils/date';
 import type { HistoryRecord } from '@/lib/types';
@@ -52,7 +51,6 @@ export default function HistoryPage() {
           expandedId={expandedId}
           onToggle={(id) => setExpandedId((current) => (current === id ? null : id))}
           renderDetail={(record) => <HistoryDetail record={record} />}
-          onExport={exportShiftToExcel}
           onEdit={setPendingEdit}
         />
       )}

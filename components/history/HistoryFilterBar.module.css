@@ -4,6 +4,12 @@
   margin-bottom: 16px;
 }
 
+/* On-screen chrome — leave it out of a printed shift report (see
+   ProductionDashboardView's own "Export PDF", used from an expanded row). */
+@media print {
+  .bar { display: none; }
+}
+
 .field {
   display: flex;
   flex-direction: column;

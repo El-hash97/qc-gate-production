@@ -54,3 +54,22 @@
   background: var(--bg-card-hover);
   color: var(--text-primary);
 }
+
+/* A printed shift report shows only the expanded record's own dashboard
+   content (see ProductionDashboardView's "Export PDF") — the clickable
+   summary rows (and their Edit button) and the header don't belong in it. At
+   most one detail row exists at a time (single expandedId), so hiding every
+   .row here is enough; there's nothing else per-record to target. */
+@media print {
+  .table thead,
+  .row {
+    display: none;
+  }
+  .table {
+    border-collapse: collapse;
+  }
+  .table td {
+    border: none;
+    padding: 0;
+  }
+}

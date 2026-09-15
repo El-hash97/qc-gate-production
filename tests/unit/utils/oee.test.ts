@@ -121,6 +121,11 @@ describe('elapsedMinutesInHour', () => {
   it('treats an hour from earlier in a night shift as complete', () => {
     expect(elapsedMinutesInHour('23:00', at(1, 30))).toBe(60);
   });
+
+  it('treats every hour as a full 60 minutes for a finished shift (now: null)', () => {
+    expect(elapsedMinutesInHour('09:00', null)).toBe(60);
+    expect(elapsedMinutesInHour('23:00', null)).toBe(60);
+  });
 });
 
 describe('windowMinutes', () => {
@@ -159,6 +164,11 @@ describe('workedMinutesInHour', () => {
   it('falls back to the elapsed minutes when there is no window', () => {
     expect(workedMinutesInHour('09:00', {}, at(9, 24))).toBe(24);
     expect(workedMinutesInHour('07:00', {}, at(9, 24))).toBe(60);
+  });
+
+  it('is the full window span for a finished shift (now: null), even for the hour "now" would be running', () => {
+    expect(workedMinutesInHour('09:00', { '09:00': { start: '09:00', end: '09:40' } }, null)).toBe(40);
+    expect(workedMinutesInHour('09:00', {}, null)).toBe(60);
   });
 });
 
@@ -301,6 +311,14 @@ describe('shiftOee', () => {
 
   it('is all zeros before the shift has recorded anything', () => {
     expect(shiftOee({}, [], now)).toEqual({ av: 0, pe: 0, rq: 0, oee: 0 });
+  });
+
+  it('treats every hour as fully worked for a finished shift (now: null), not prorated', () => {
+    const hourly = { '12:00': { ok: 10, repair: 0, ng: 0 } };
+    // Same 10-minute AV stop as the "prorates" test above, but the shift is
+    // finished: the hour counts its full 60 minutes, not just 20 elapsed —
+    // (60-10)/60 = 83%, not the 50% a still-running hour would show.
+    expect(toPercent(shiftOee(hourly, [stop('12:05', '12:15', 'AV')], null).av)).toBe(83);
   });
 
   it('caps an AV stop at the worked window, not the full hour', () => {

@@ -5,3 +5,11 @@
 .error {
   color: var(--accent-red);
 }
+
+@media print {
+  .page {
+    padding: 0;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

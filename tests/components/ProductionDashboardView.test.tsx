@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
-vi.mock('@/lib/chartSetup', () => ({}));
+const resizeAllChartsMock = vi.fn();
+vi.mock('@/lib/chartSetup', () => ({ resizeAllCharts: (...args: unknown[]) => resizeAllChartsMock(...args) }));
+const setPrintStylesActiveMock = vi.fn();
+vi.mock('@/utils/printCapture', () => ({ setPrintStylesActive: (...args: unknown[]) => setPrintStylesActiveMock(...args) }));
 vi.mock('@/hooks/useDefectLines', () => ({
   useDefectLines: () => ({ mappings: [], isLoading: false }),
 }));
@@ -67,10 +70,20 @@ describe('ProductionDashboardView export button', () => {
       await vi.advanceTimersByTimeAsync(300);
       expect(html2pdfFactory).toHaveBeenCalled();
       expect(html2pdfChain.set).toHaveBeenCalledWith(
-        expect.objectContaining({ filename: 'QC_Gate_Shift_Red_5_Agustus_2026.pdf' }),
+        expect.objectContaining({
+          filename: 'QC_Gate_Shift_Red_5_Agustus_2026.pdf',
+          // Keeps a panel from being sliced across a page boundary — see
+          // ProductionDashboardView.module.css's @media print .panel rule,
+          // reused here via setPrintStylesActive below.
+          pagebreak: expect.objectContaining({ mode: expect.arrayContaining(['css', 'avoid-all']) }),
+        }),
       );
       expect(html2pdfChain.save).toHaveBeenCalled();
       expect(printSpy).not.toHaveBeenCalled();
+      // The print stylesheet is made to apply on screen for the capture,
+      // charts resized to fit it, then both reverted once the file is saved.
+      expect(setPrintStylesActiveMock.mock.calls.map((c) => c[0])).toEqual([true, false]);
+      expect(resizeAllChartsMock).toHaveBeenCalled();
     } finally {
       window.print = original;
       vi.useRealTimers();

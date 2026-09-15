@@ -19,6 +19,8 @@ import { paretoByLine } from '@/utils/defectLines';
 import { useTheme } from '@/hooks/useTheme';
 import { useDashboardSettings } from '@/hooks/useDashboardSettings';
 import { findPic } from '@/utils/constants';
+import { setPrintStylesActive } from '@/utils/printCapture';
+import { resizeAllCharts } from '@/lib/chartSetup';
 import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
@@ -212,35 +214,50 @@ export function ProductionDashboardView({
 
   // Downloads a real .pdf file client-side — no print dialog, unlike
   // handlePrintPdf above. html2canvas (via html2pdf.js) can only snapshot
-  // what's actually on screen, not the @media print stylesheet, so the
-  // `.exporting` class (ProductionDashboardView.module.css) stands in for
-  // the bits of that stylesheet a screenshot still needs: showing the report
-  // header, hiding the toggle row, and un-scrolling each panel so nothing
-  // gets clipped. Dynamically imported: html2pdf.js touches `window` at
+  // what's actually on screen, not the @media print stylesheet — so this
+  // reuses that exact stylesheet by temporarily making it apply on screen
+  // too (setPrintStylesActive), rather than a second, hand-duplicated copy
+  // of the same rules. That also means the print columns need Chart.js
+  // canvases resized to match (resizeAllCharts — normally done by the real
+  // beforeprint/afterprint events, which a screenshot never fires), and
+  // pagebreak mode 'css'/'avoid-all' so a panel's own `break-inside: avoid`
+  // (already in the print stylesheet) keeps it from being sliced across a
+  // page boundary. Dynamically imported: html2pdf.js touches `window` at
   // module load and can't run during Next.js's server-side render.
   function handleDownloadPdf() {
     setPrintedAt(new Date().toLocaleString('id-ID'));
-    const previous = theme;
-    if (previous !== 'light') setTheme('light');
+    const previousTheme = theme;
+    if (previousTheme !== 'light') setTheme('light');
     const target = containerRef.current;
-    target?.classList.add(styles.exporting);
+    setPrintStylesActive(true);
     window.setTimeout(async () => {
       try {
         if (!target) return;
+        resizeAllCharts();
         const html2pdf = (await import('html2pdf.js')).default;
-        await html2pdf()
-          .set({
-            filename: pdfFileName || 'QC_Gate.pdf',
-            margin: 10,
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-            jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' },
-          })
+        const worker = html2pdf();
+        // `pagebreak` is a real, documented html2pdf.js option that its own
+        // shipped type.d.ts is simply missing — routed through this
+        // pre-typed variable (rather than an inline literal) so that gap
+        // doesn't trip TypeScript's excess-property check on the call below.
+        const options: Parameters<typeof worker.set>[0] & {
+          pagebreak: { mode: ('css' | 'avoid-all')[] };
+        } = {
+          filename: pdfFileName || 'QC_Gate.pdf',
+          margin: 10,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'avoid-all'] },
+        };
+        await worker
+          .set(options)
           .from(target)
           .save();
       } finally {
-        target?.classList.remove(styles.exporting);
-        if (previous !== 'light') setTheme(previous);
+        setPrintStylesActive(false);
+        resizeAllCharts();
+        if (previousTheme !== 'light') setTheme(previousTheme);
       }
     }, 300);
   }

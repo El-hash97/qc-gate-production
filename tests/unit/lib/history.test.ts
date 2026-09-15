@@ -12,7 +12,7 @@ vi.mock('@/lib/productionState', () => ({
   getProductionState: (...args: any[]) => mockGetProductionState(...args),
 }));
 
-import { getHistory, restoreHistoryToCurrent, HistoryRecordNotFoundError } from '@/lib/history';
+import { getHistory, getHistoryById, restoreHistoryToCurrent, HistoryRecordNotFoundError } from '@/lib/history';
 
 describe('getHistory', () => {
   beforeEach(() => mockSql.mockReset());
@@ -50,6 +50,28 @@ describe('getHistory', () => {
     mockSql.mockResolvedValueOnce([]);
     const result = await getHistory({ shift: 'Shift White' });
     expect(result).toEqual([]);
+  });
+});
+
+describe('getHistoryById', () => {
+  beforeEach(() => mockSql.mockReset());
+
+  it('maps the row to a camelCase HistoryRecord', async () => {
+    mockSql.mockResolvedValueOnce([{
+      id: 7, date: '2026-08-04', shift: 'Shift Red', operator: 'Budi', target: 100,
+      ok1: 50, repair1: 2, ng1: 1, ok2: 40, repair2: 1, ng2: 0,
+      defect_data: {}, repair_data: {}, hourly_data: {},
+      saved_at: '2026-08-04T19:00:00.000Z',
+    }]);
+
+    const result = await getHistoryById(7);
+
+    expect(result).toMatchObject({ id: 7, date: '2026-08-04', shift: 'Shift Red', operator: 'Budi' });
+  });
+
+  it('returns null when the id is not in history', async () => {
+    mockSql.mockResolvedValueOnce([]);
+    expect(await getHistoryById(999)).toBeNull();
   });
 });
 

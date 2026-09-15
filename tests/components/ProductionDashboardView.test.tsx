@@ -1,18 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
-const resizeAllChartsMock = vi.fn();
-vi.mock('@/lib/chartSetup', () => ({ resizeAllCharts: (...args: unknown[]) => resizeAllChartsMock(...args) }));
-const setPrintStylesActiveMock = vi.fn();
-vi.mock('@/utils/printCapture', () => ({ setPrintStylesActive: (...args: unknown[]) => setPrintStylesActiveMock(...args) }));
+vi.mock('@/lib/chartSetup', () => ({}));
 vi.mock('@/hooks/useDefectLines', () => ({
   useDefectLines: () => ({ mappings: [], isLoading: false }),
 }));
-
-const html2pdfChain = { set: vi.fn(), from: vi.fn(), save: vi.fn() };
-const html2pdfFactory = vi.fn(() => html2pdfChain);
-vi.mock('html2pdf.js', () => ({ default: () => html2pdfFactory() }));
 
 import { ProductionDashboardView } from '@/components/production/ProductionDashboardView';
 import type { ProductionState } from '@/lib/types';
@@ -28,11 +22,7 @@ const state: ProductionState = {
 
 describe('ProductionDashboardView export button', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    html2pdfChain.set.mockReturnValue(html2pdfChain);
-    html2pdfChain.from.mockReturnValue(html2pdfChain);
-    html2pdfChain.save.mockResolvedValue(undefined);
-    html2pdfFactory.mockReturnValue(html2pdfChain);
+    vi.restoreAllMocks();
   });
 
   it('defaults to "Export PDF" via window.print (unchanged live-Dashboard behaviour)', async () => {
@@ -41,52 +31,90 @@ describe('ProductionDashboardView export button', () => {
     const original = window.print;
     window.print = printSpy;
     try {
-      render(<ProductionDashboardView state={state} view="bc" onViewChange={() => {}} now={null} />);
+      render(
+        <ToastProvider>
+          <ProductionDashboardView state={state} view="bc" onViewChange={() => {}} now={null} />
+        </ToastProvider>,
+      );
       expect(screen.getByRole('button', { name: 'Export PDF' })).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
       await vi.advanceTimersByTimeAsync(300);
       expect(printSpy).toHaveBeenCalledTimes(1);
-      expect(html2pdfFactory).not.toHaveBeenCalled();
     } finally {
       window.print = original;
       vi.useRealTimers();
     }
   });
 
-  it('shows "Download PDF" and generates a real file with html2pdf when exportMode is "download"', async () => {
-    vi.useFakeTimers();
+  it('shows "Download PDF" and saves the server-rendered file when exportMode is "download"', async () => {
     const printSpy = vi.fn();
-    const original = window.print;
     window.print = printSpy;
-    try {
-      render(
+    const blob = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(blob) });
+    vi.stubGlobal('fetch', fetchMock);
+    const createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    render(
+      <ToastProvider>
         <ProductionDashboardView
           state={state} view="bc" onViewChange={() => {}} now={null}
-          exportMode="download" pdfFileName="QC_Gate_Shift_Red_5_Agustus_2026.pdf"
-        />,
-      );
-      expect(screen.queryByRole('button', { name: 'Export PDF' })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
-      await vi.advanceTimersByTimeAsync(300);
-      expect(html2pdfFactory).toHaveBeenCalled();
-      expect(html2pdfChain.set).toHaveBeenCalledWith(
-        expect.objectContaining({
-          filename: 'QC_Gate_Shift_Red_5_Agustus_2026.pdf',
-          // Keeps a panel from being sliced across a page boundary — see
-          // ProductionDashboardView.module.css's @media print .panel rule,
-          // reused here via setPrintStylesActive below.
-          pagebreak: expect.objectContaining({ mode: expect.arrayContaining(['css', 'avoid-all']) }),
-        }),
-      );
-      expect(html2pdfChain.save).toHaveBeenCalled();
-      expect(printSpy).not.toHaveBeenCalled();
-      // The print stylesheet is made to apply on screen for the capture,
-      // charts resized to fit it, then both reverted once the file is saved.
-      expect(setPrintStylesActiveMock.mock.calls.map((c) => c[0])).toEqual([true, false]);
-      expect(resizeAllChartsMock).toHaveBeenCalled();
-    } finally {
-      window.print = original;
-      vi.useRealTimers();
-    }
+          exportMode="download" downloadPdfUrl="/api/history/7/pdf?view=bc"
+        />
+      </ToastProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Export PDF' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith('/api/history/7/pdf?view=bc');
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    expect(printSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows a pending state while the PDF is being generated', async () => {
+    let resolveFetch!: (value: { ok: boolean; blob: () => Promise<Blob> }) => void;
+    const fetchMock = vi.fn().mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock-url'), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    render(
+      <ToastProvider>
+        <ProductionDashboardView
+          state={state} view="bc" onViewChange={() => {}} now={null}
+          exportMode="download" downloadPdfUrl="/api/history/7/pdf?view=bc"
+        />
+      </ToastProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    const button = await screen.findByRole('button', { name: 'Menyiapkan PDF…' });
+    expect(button).toBeDisabled();
+
+    resolveFetch({ ok: true, blob: () => Promise.resolve(new Blob(['%PDF'])) });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument());
+  });
+
+  it('shows an error toast and resets when the server fails to generate the PDF', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+
+    render(
+      <ToastProvider>
+        <ProductionDashboardView
+          state={state} view="bc" onViewChange={() => {}} now={null}
+          exportMode="download" downloadPdfUrl="/api/history/7/pdf?view=bc"
+        />
+      </ToastProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    expect(await screen.findByText('Gagal membuat PDF')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
   });
 });

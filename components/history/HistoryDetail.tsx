@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import type { HistoryRecord } from '@/lib/types';
 import { ProductionDashboardView, type DashboardView } from '@/components/production/ProductionDashboardView';
-import { pdfFileName } from '@/utils/pdfExport';
 import styles from './HistoryDetail.module.css';
 
 // Shows a saved shift exactly like the live Dashboard (same toggle, same
@@ -21,7 +20,7 @@ export function HistoryDetail({ record }: { record: HistoryRecord }) {
     <div className={styles.detail}>
       <ProductionDashboardView
         state={record} view={view} onViewChange={setView} now={null}
-        exportMode="download" pdfFileName={pdfFileName(record)}
+        exportMode="download" downloadPdfUrl={`/api/history/${record.id}/pdf?view=${view}`}
       />
     </div>
   );

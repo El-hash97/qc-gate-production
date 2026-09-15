@@ -91,6 +91,14 @@ export async function getHistory(filters: HistoryFilters = {}): Promise<HistoryR
   return rows.map(rowToHistory);
 }
 
+// One archived shift by id, or null if it's not there. Used by the PDF
+// export route (app/api/history/[id]/pdf) to render a specific record.
+export async function getHistoryById(id: number): Promise<HistoryRecord | null> {
+  const rows = (await sql`SELECT * FROM history WHERE id = ${id}`) as HistoryRow[];
+  const row = rows[0];
+  return row ? rowToHistory(row) : null;
+}
+
 export class HistoryRecordNotFoundError extends Error {
   constructor(id: number) {
     super(`History record ${id} not found`);

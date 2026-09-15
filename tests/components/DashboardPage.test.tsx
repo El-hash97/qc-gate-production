@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 vi.mock('@/hooks/useProductionState', () => ({
   useProductionState: () => ({
@@ -54,26 +55,26 @@ describe('DashboardPage', () => {
   });
 
   it('shows the current operator and shift', () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     expect(screen.getByText('Budi')).toBeInTheDocument();
     expect(screen.getByText('Shift Red')).toBeInTheDocument();
   });
 
   it('defaults to the B/C view and shows its achievement percentage', () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     expect(screen.getByRole('button', { name: 'B/C' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Achievement: 74%')).toBeInTheDocument();
   });
 
   it('shows the combined achievement percentage on the "Semua" view', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Semua' }));
     // BC total 74 + Camshaft/Crankshaft total 10 = 84 against a target of 100.
     expect(screen.getByText('Achievement: 84%')).toBeInTheDocument();
   });
 
   it('shows the OEE card by default (B/C) and hides it on the mixed "Semua" view', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     let card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
     expect(card.getByRole('img', { name: /^OEE \d+ persen$/ })).toBeInTheDocument();
     for (const factor of ['AV', 'PE', 'RQ']) {
@@ -87,7 +88,7 @@ describe('DashboardPage', () => {
   });
 
   it('derives Camshaft and Crankshaft OEE capacity from the B/C cycle time', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
 
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     let card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
@@ -103,7 +104,7 @@ describe('DashboardPage', () => {
   });
 
   it("puts the OEE card in its own fixed grid column, not centered by flex margins", async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'B/C' }));
 
     // .statusBar is a 3-column grid (1fr auto 1fr): the OEE card's column sits
@@ -123,7 +124,7 @@ describe('DashboardPage', () => {
   });
 
   it('shows connection status from the hook', () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     expect(screen.getByText('Real-time Connected')).toBeInTheDocument();
   });
 
@@ -133,7 +134,7 @@ describe('DashboardPage', () => {
     const original = window.print;
     window.print = printSpy;
     try {
-      render(<DashboardPage />);
+      render(<ToastProvider><DashboardPage /></ToastProvider>);
       fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
       vi.advanceTimersByTime(300);
       expect(printSpy).toHaveBeenCalledTimes(1);
@@ -144,13 +145,13 @@ describe('DashboardPage', () => {
   });
 
   it('renders the printed-report header with the scoped product label', () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     expect(screen.getByText('Laporan Harian Produksi')).toBeInTheDocument();
     expect(screen.getByText('Produk: BC 1TR + BC 2TR')).toBeInTheDocument();
   });
 
   it('scopes the numbers to Block Cylinder when B/C is selected', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'B/C' }));
     expect(screen.getByText('Achievement: 74%')).toBeInTheDocument();
     expect(screen.getByText('Gas Hole Cope')).toBeInTheDocument();
@@ -158,7 +159,7 @@ describe('DashboardPage', () => {
   });
 
   it('scopes the numbers to Camshaft (line 3) on its own tab', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.getByText('Achievement: 10%')).toBeInTheDocument();
     expect(screen.getByText('Dross')).toBeInTheDocument();
@@ -166,7 +167,7 @@ describe('DashboardPage', () => {
   });
 
   it('keeps Camshaft and Crankshaft separate', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Crankshaft' }));
     // the line-3 Dross entry must not show under Crankshaft (line 4)
     expect(screen.queryByText('Dross')).not.toBeInTheDocument();
@@ -174,7 +175,7 @@ describe('DashboardPage', () => {
   });
 
   it('shows per-line hourly on the Camshaft tab, read-only while logged out', async () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
     // The 09:00 row from hourlyDataCam — read-only text, not an editable field,
@@ -185,14 +186,14 @@ describe('DashboardPage', () => {
 
   it('makes the hourly window editable on the Camshaft tab once logged in', async () => {
     mockAuth.authed = true;
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     // Same 09:00 row, now a clock-picker trigger instead of plain text.
     expect(screen.getByRole('button', { name: 'Jam mulai' })).toHaveTextContent('09:00');
   });
 
   it('shows the Pareto Defect per Line panel aggregating NG by suspect line', () => {
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     // fixture defectData is { 'Gas Hole Cope': 1 } on the B/C default view —
     // matches the Melting mapping above, so that bar should carry the 1 pcs.
     expect(screen.getByText('Pareto Defect per Line')).toBeInTheDocument();
@@ -200,7 +201,7 @@ describe('DashboardPage', () => {
 
   it('hides a panel whose id is in the shared hidden-panels set', () => {
     mockDashboardSettings.hidden = new Set(['distribution']);
-    render(<DashboardPage />);
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
     expect(screen.queryByText('Production Distribution')).not.toBeInTheDocument();
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
     mockDashboardSettings.hidden = new Set();

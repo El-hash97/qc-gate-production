@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
 vi.mock('@/lib/chartSetup', () => ({}));
@@ -28,7 +29,7 @@ const record: HistoryRecord = {
 
 describe('HistoryDetail', () => {
   it('shows the same KPI/toggle/panel layout as the live Dashboard, sourced from the record', () => {
-    render(<HistoryDetail record={record} />);
+    render(<ToastProvider><HistoryDetail record={record} /></ToastProvider>);
     expect(screen.getByRole('group', { name: 'Filter produk' })).toBeInTheDocument();
     expect(screen.getByText('Total Produksi')).toBeInTheDocument();
     expect(screen.getByText('Production Distribution')).toBeInTheDocument();
@@ -36,7 +37,7 @@ describe('HistoryDetail', () => {
   });
 
   it('defaults to the B/C view, scoped to the record\'s own BC totals', () => {
-    render(<HistoryDetail record={record} />);
+    render(<ToastProvider><HistoryDetail record={record} /></ToastProvider>);
     expect(screen.getByRole('button', { name: 'B/C' })).toHaveAttribute('aria-pressed', 'true');
     // ok1 (40) + ok2 (30) = 70 ok, 3 repair, 1 ng -> 74 total
     const totalCard = screen.getByText('Total Produksi').parentElement;
@@ -44,20 +45,20 @@ describe('HistoryDetail', () => {
   });
 
   it('does not offer hourly-window editing (always read-only for a saved shift)', () => {
-    render(<HistoryDetail record={record} />);
+    render(<ToastProvider><HistoryDetail record={record} /></ToastProvider>);
     // The 20:00 row shows as plain text, not a clock-picker trigger button.
     expect(screen.getByText('20:00–21:00')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Jam mulai' })).not.toBeInTheDocument();
   });
 
   it('does not offer the defect-photo affordance (live-only feature)', async () => {
-    render(<HistoryDetail record={record} />);
+    render(<ToastProvider><HistoryDetail record={record} /></ToastProvider>);
     // Clicking a Pareto NG bar does nothing photo-related when there's no click handler wired.
     expect(screen.getByText('Pareto Defect (NG)')).toBeInTheDocument();
   });
 
   it('switches product view via the same toggle the Dashboard has', async () => {
-    render(<HistoryDetail record={record} />);
+    render(<ToastProvider><HistoryDetail record={record} /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.getByRole('button', { name: 'Camshaft' })).toHaveAttribute('aria-pressed', 'true');
   });

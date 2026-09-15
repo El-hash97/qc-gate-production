@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
 import { HourlyChart } from '@/components/production/HourlyChart';
@@ -18,9 +18,8 @@ import { useDefectLines } from '@/hooks/useDefectLines';
 import { paretoByLine } from '@/utils/defectLines';
 import { useTheme } from '@/hooks/useTheme';
 import { useDashboardSettings } from '@/hooks/useDashboardSettings';
+import { useToast } from '@/components/ui/ToastProvider';
 import { findPic } from '@/utils/constants';
-import { setPrintStylesActive } from '@/utils/printCapture';
-import { resizeAllCharts } from '@/lib/chartSetup';
 import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
@@ -89,21 +88,23 @@ export interface ProductionDashboardViewProps {
   connectionStatus?: 'online' | 'syncing' | 'offline';
   // 'print' (default): the existing window.print()-based "Export PDF",
   // matching the live Dashboard exactly. 'download' shows "Download PDF"
-  // instead, which builds and saves a real .pdf file client-side (see
-  // utils/pdfExport.ts and html2pdf.js) with no print dialog — used by
-  // History, where `pdfFileName` names the downloaded file.
+  // instead, which fetches an already-rendered .pdf file from `downloadPdfUrl`
+  // (see app/api/history/[id]/pdf — a headless-browser print of this same
+  // view, so the layout is guaranteed identical to the print export, unlike
+  // an in-browser screenshot) and saves it with no print dialog.
   exportMode?: 'print' | 'download';
-  pdfFileName?: string;
+  downloadPdfUrl?: string;
 }
 
 export function ProductionDashboardView({
   state, view, onViewChange, now,
   onHourlyWindowChange, hasPhoto, onPhotoBarClick, connectionStatus,
-  exportMode = 'print', pdfFileName,
+  exportMode = 'print', downloadPdfUrl,
 }: ProductionDashboardViewProps) {
   const { theme, setTheme } = useTheme();
+  const { showToast } = useToast();
   const [printedAt, setPrintedAt] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
   const { hidden } = useDashboardSettings();
   const { mappings: defectLineMappings } = useDefectLines();
 
@@ -212,54 +213,34 @@ export function ProductionDashboardView({
     }, 300);
   }
 
-  // Downloads a real .pdf file client-side — no print dialog, unlike
-  // handlePrintPdf above. html2canvas (via html2pdf.js) can only snapshot
-  // what's actually on screen, not the @media print stylesheet — so this
-  // reuses that exact stylesheet by temporarily making it apply on screen
-  // too (setPrintStylesActive), rather than a second, hand-duplicated copy
-  // of the same rules. That also means the print columns need Chart.js
-  // canvases resized to match (resizeAllCharts — normally done by the real
-  // beforeprint/afterprint events, which a screenshot never fires), and
-  // pagebreak mode 'css'/'avoid-all' so a panel's own `break-inside: avoid`
-  // (already in the print stylesheet) keeps it from being sliced across a
-  // page boundary. Dynamically imported: html2pdf.js touches `window` at
-  // module load and can't run during Next.js's server-side render.
-  function handleDownloadPdf() {
-    setPrintedAt(new Date().toLocaleString('id-ID'));
-    const previousTheme = theme;
-    if (previousTheme !== 'light') setTheme('light');
-    const target = containerRef.current;
-    setPrintStylesActive(true);
-    window.setTimeout(async () => {
-      try {
-        if (!target) return;
-        resizeAllCharts();
-        const html2pdf = (await import('html2pdf.js')).default;
-        const worker = html2pdf();
-        // `pagebreak` is a real, documented html2pdf.js option that its own
-        // shipped type.d.ts is simply missing — routed through this
-        // pre-typed variable (rather than an inline literal) so that gap
-        // doesn't trip TypeScript's excess-property check on the call below.
-        const options: Parameters<typeof worker.set>[0] & {
-          pagebreak: { mode: ('css' | 'avoid-all')[] };
-        } = {
-          filename: pdfFileName || 'QC_Gate.pdf',
-          margin: 10,
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-          jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'avoid-all'] },
-        };
-        await worker
-          .set(options)
-          .from(target)
-          .save();
-      } finally {
-        setPrintStylesActive(false);
-        resizeAllCharts();
-        if (previousTheme !== 'light') setTheme(previousTheme);
-      }
-    }, 300);
+  // Downloads a real .pdf file — no print dialog, unlike handlePrintPdf
+  // above. `downloadPdfUrl` (app/api/history/[id]/pdf) is a headless-browser
+  // print of this exact view/record, done server-side, so the PDF is
+  // guaranteed to look like the print export — a client-side DOM screenshot
+  // can't reliably reproduce this app's CSS Grid layout the way a real
+  // browser's print engine does. Fetched as a blob (rather than a plain
+  // navigation) so a failure surfaces as a toast instead of a broken tab,
+  // and so the button can show a pending state while the server renders it.
+  async function handleDownloadPdf() {
+    if (!downloadPdfUrl || downloading) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(downloadPdfUrl);
+      if (!res.ok) throw new Error('Gagal membuat PDF');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Gagal membuat PDF', 'error');
+    } finally {
+      setDownloading(false);
+    }
   }
 
   const handleExport = exportMode === 'download' ? handleDownloadPdf : handlePrintPdf;
@@ -268,7 +249,7 @@ export function ProductionDashboardView({
   const editableHourly = view !== 'all' && onHourlyWindowChange !== undefined;
 
   return (
-    <div className={styles.container} ref={containerRef}>
+    <div className={styles.container}>
       <div className={styles.printHeader} aria-hidden="true">
         <h1>Laporan Harian Produksi</h1>
         <div className={styles.printMeta}>
@@ -318,8 +299,8 @@ export function ProductionDashboardView({
             </button>
           ))}
         </div>
-        <button type="button" className={styles.exportBtn} onClick={handleExport}>
-          {exportMode === 'download' ? 'Download PDF' : 'Export PDF'}
+        <button type="button" className={styles.exportBtn} onClick={handleExport} disabled={downloading}>
+          {exportMode === 'download' ? (downloading ? 'Menyiapkan PDF…' : 'Download PDF') : 'Export PDF'}
         </button>
       </div>
 

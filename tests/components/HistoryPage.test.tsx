@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 const useHistoryMock = vi.fn();
 vi.mock('@/hooks/useHistory', () => ({ useHistory: (...args: any[]) => useHistoryMock(...args) }));
@@ -31,20 +32,20 @@ const record = {
 describe('HistoryPage', () => {
   it('renders a row per history record', () => {
     useHistoryMock.mockReturnValue({ data: [record], isLoading: false, isError: false });
-    render(<HistoryPage />);
+    render(<ToastProvider><HistoryPage /></ToastProvider>);
     expect(screen.getByText('Budi')).toBeInTheDocument();
     expect(screen.getByText('2026-08-04')).toBeInTheDocument();
   });
 
   it('shows an empty state when there is no history yet', () => {
     useHistoryMock.mockReturnValue({ data: [], isLoading: false, isError: false });
-    render(<HistoryPage />);
+    render(<ToastProvider><HistoryPage /></ToastProvider>);
     expect(screen.getByText('Belum ada histori shift')).toBeInTheDocument();
   });
 
   it('shows the record like the Dashboard, with its own Download PDF button, when the row is clicked', async () => {
     useHistoryMock.mockReturnValue({ data: [record], isLoading: false, isError: false });
-    render(<HistoryPage />);
+    render(<ToastProvider><HistoryPage /></ToastProvider>);
     await userEvent.click(screen.getByText('Budi'));
     expect(screen.getByRole('group', { name: 'Filter produk' })).toBeInTheDocument();
     expect(screen.getByText('Total Produksi')).toBeInTheDocument();
@@ -56,7 +57,7 @@ describe('HistoryPage', () => {
 
   it('restores a record after confirming the Edit dialog', async () => {
     useHistoryMock.mockReturnValue({ data: [record], isLoading: false, isError: false });
-    render(<HistoryPage />);
+    render(<ToastProvider><HistoryPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.getByText('Edit shift dari history')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ya, edit' }));

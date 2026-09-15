@@ -37,16 +37,10 @@ ChartJS.defaults.font.family = "'Inter', sans-serif";
 // every live chart to its container once the print layout is applied, and
 // again afterwards to restore the screen size. (Chart.js v3+ dropped the
 // built-in handling — this is the documented replacement.)
-//
-// Exported so the "Download PDF" flow (ProductionDashboardView, via
-// utils/printCapture) can call it directly too — it forces the print
-// stylesheet to apply on screen for an html2canvas capture, which never
-// fires the browser's own beforeprint/afterprint events.
-export function resizeAllCharts(): void {
-  for (const id in ChartJS.instances) ChartJS.instances[id].resize();
-}
-
 if (typeof window !== 'undefined') {
+  const resizeAllCharts = () => {
+    for (const id in ChartJS.instances) ChartJS.instances[id].resize();
+  };
   window.addEventListener('beforeprint', resizeAllCharts);
   window.addEventListener('afterprint', resizeAllCharts);
 }

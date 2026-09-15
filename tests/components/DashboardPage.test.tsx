@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -41,10 +41,18 @@ vi.mock('@/hooks/useDefectLines', () => ({
     isLoading: false,
   }),
 }));
+const mockAuth = { authed: false, openLoginModal: vi.fn() };
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => mockAuth,
+}));
 
 import DashboardPage from '@/app/dashboard/page';
 
 describe('DashboardPage', () => {
+  beforeEach(() => {
+    mockAuth.authed = false;
+  });
+
   it('shows the current operator and shift', () => {
     render(<DashboardPage />);
     expect(screen.getByText('Budi')).toBeInTheDocument();
@@ -165,11 +173,21 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Achievement: 0%')).toBeInTheDocument();
   });
 
-  it('shows per-line hourly on the Camshaft tab', async () => {
+  it('shows per-line hourly on the Camshaft tab, read-only while logged out', async () => {
     render(<DashboardPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
-    // The 09:00 row from hourlyDataCam — its worked-window start field.
+    // The 09:00 row from hourlyDataCam — read-only text, not an editable field,
+    // for a logged-out viewer (window editing is a member-only action).
+    expect(screen.getByText('09:00–10:00')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('09:00')).not.toBeInTheDocument();
+  });
+
+  it('makes the hourly window editable on the Camshaft tab once logged in', async () => {
+    mockAuth.authed = true;
+    render(<DashboardPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
+    // Same 09:00 row, now an editable time field.
     expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
   });
 

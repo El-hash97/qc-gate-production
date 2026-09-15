@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/ToastProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { useDefectPhoto, useUploadDefectPhoto, useDeleteDefectPhoto } from '@/hooks/useDefectPhotos';
 import { compressImageFile, isAcceptedImageType, MAX_SOURCE_FILE_BYTES } from '@/utils/imageCompress';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
@@ -21,6 +22,7 @@ interface DefectPhotoModalProps {
 export function DefectPhotoModal({ isOpen, onClose, group, chartType, defectType, title }: DefectPhotoModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+  const { authed, openLoginModal } = useAuth();
   const photoQuery = useDefectPhoto(group, chartType, defectType, isOpen);
   const upload = useUploadDefectPhoto();
   const remove = useDeleteDefectPhoto();
@@ -66,17 +68,21 @@ export function DefectPhotoModal({ isOpen, onClose, group, chartType, defectType
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className={photoStyles.hiddenInput}
-        onChange={handleFileChange}
-      />
+      {/* Upload/delete/replace are member-only actions (see useAuth) — a logged-out
+          viewer only ever sees the read-only branches below, never this input. */}
+      {authed && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className={photoStyles.hiddenInput}
+          onChange={handleFileChange}
+        />
+      )}
 
       {photoQuery.isLoading && <p className={styles.description}>Memuat foto…</p>}
 
-      {!photoQuery.isLoading && !photo && (
+      {!photoQuery.isLoading && !photo && authed && (
         <>
           <p className={styles.description}>
             Belum ada foto untuk defect ini. Upload foto untuk mendokumentasikan defect yang sedang terjadi.
@@ -85,6 +91,10 @@ export function DefectPhotoModal({ isOpen, onClose, group, chartType, defectType
             {upload.isPending ? 'Mengupload…' : '+ Upload Foto'}
           </div>
         </>
+      )}
+
+      {!photoQuery.isLoading && !photo && !authed && (
+        <p className={styles.description}>Belum ada foto untuk defect ini.</p>
       )}
 
       {photo && (
@@ -99,12 +109,17 @@ export function DefectPhotoModal({ isOpen, onClose, group, chartType, defectType
 
       <div className={styles.actions}>
         <button type="button" className={styles.cancelButton} onClick={onClose}>Tutup</button>
-        {photo && (
+        {!authed && (
+          <button type="button" className={styles.cancelButton} onClick={openLoginModal}>
+            Login untuk kelola foto
+          </button>
+        )}
+        {authed && photo && (
           <button type="button" className={styles.cancelButton} onClick={handleDelete} disabled={isBusy}>
             Hapus
           </button>
         )}
-        {photo && (
+        {authed && photo && (
           <button
             type="button"
             className={styles.saveButtonNg}

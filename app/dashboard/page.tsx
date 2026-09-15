@@ -30,6 +30,7 @@ import { LineParetoChart } from '@/components/production/LineParetoChart';
 import { useDefectLines } from '@/hooks/useDefectLines';
 import { paretoByLine } from '@/utils/defectLines';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSettings } from '@/hooks/useDashboardSettings';
 import { findPic } from '@/utils/constants';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
@@ -80,6 +81,7 @@ function bucketByLine(logs: EntryLog[], line: 3 | 4, kind: 'defect' | 'repair'):
 export default function DashboardPage() {
   const { state, isFetching, isError, updateState } = useProductionState();
   const { theme, setTheme } = useTheme();
+  const { authed } = useAuth();
   const current = state ?? EMPTY_STATE;
   const [printedAt, setPrintedAt] = useState('');
   const { hidden } = useDashboardSettings();
@@ -332,7 +334,7 @@ export default function DashboardPage() {
                 hourlyData={hourlyData}
                 hourlyWindow={hourlyWindow}
                 hourlyPlan={hourlyPlan}
-                editable={view !== 'all'}
+                editable={view !== 'all' && authed}
                 onWindowChange={handleHourlyWindow}
                 oee={oeeByHour}
               />

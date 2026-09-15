@@ -27,6 +27,17 @@ describe('hourlySeries', () => {
     expect(ng).toEqual([2, 0]);
     expect(cumulative).toEqual([10, 16]);
   });
+
+  it('keeps a night shift in production order across midnight instead of wrapping 00:00 to the front', () => {
+    const { hours } = hourlySeries({
+      '23:00': { ok: 1, repair: 0, ng: 0 },
+      '20:00': { ok: 1, repair: 0, ng: 0 },
+      '00:00': { ok: 1, repair: 0, ng: 0 },
+      '21:00': { ok: 1, repair: 0, ng: 0 },
+      '22:00': { ok: 1, repair: 0, ng: 0 },
+    });
+    expect(hours).toEqual(['20:00', '21:00', '22:00', '23:00', '00:00']);
+  });
 });
 
 describe('pareto', () => {
@@ -104,6 +115,12 @@ describe('hourlyOeeSeries', () => {
 
   it('is empty for no recorded hours', () => {
     expect(hourlyOeeSeries({})).toEqual({ hours: [], av: [], pe: [], rq: [], oee: [] });
+  });
+
+  it('keeps a night shift in production order across midnight', () => {
+    const factors = { av: 1, pe: 1, rq: 1, oee: 1 };
+    const series = hourlyOeeSeries({ '23:00': factors, '20:00': factors, '00:00': factors });
+    expect(series.hours).toEqual(['20:00', '23:00', '00:00']);
   });
 });
 

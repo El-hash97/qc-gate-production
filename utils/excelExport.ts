@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { ProductionState } from '@/lib/types';
 import { mergeCounts, mergeHourly } from '@/utils/rates';
+import { sortHourKeys } from '@/utils/hourOrder';
 
 export function buildShiftWorkbook(state: ProductionState) {
   const prodData = [
@@ -28,7 +29,7 @@ export function buildShiftWorkbook(state: ProductionState) {
   const repairDetail = Object.entries(repairData).sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ 'Jenis Repair': name, Jumlah: count }));
 
-  const hourlyDetail = Object.keys(hourlyData).sort()
+  const hourlyDetail = sortHourKeys(Object.keys(hourlyData))
     .map((key) => ({ Jam: key, OK: hourlyData[key].ok, Repair: hourlyData[key].repair, NG: hourlyData[key].ng }));
 
   const workbook = XLSX.utils.book_new();

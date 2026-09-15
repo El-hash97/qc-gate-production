@@ -1,6 +1,7 @@
 import type { EntryLog, HourlySnapshot, ProductLine } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
+import { sortHourKeys } from '@/utils/hourOrder';
 
 // Minimum category slots a bar chart / heatmap axis is laid out over. With only
 // 1-2 real categories the chart would otherwise draw a couple of oversized bars;
@@ -26,7 +27,7 @@ export interface HourlySeries {
 }
 
 export function hourlySeries(hourly: Record<string, HourlySnapshot>): HourlySeries {
-  const hours = Object.keys(hourly).sort();
+  const hours = sortHourKeys(Object.keys(hourly));
   const series: HourlySeries = { hours, ok: [], repair: [], ng: [], cumulative: [] };
   let running = 0;
   for (const hour of hours) {
@@ -51,7 +52,7 @@ export interface HourlyOeeSeries {
 }
 
 export function hourlyOeeSeries(oee: Record<string, OeeBreakdown>): HourlyOeeSeries {
-  const hours = Object.keys(oee).sort();
+  const hours = sortHourKeys(Object.keys(oee));
   const series: HourlyOeeSeries = { hours, av: [], pe: [], rq: [], oee: [] };
   for (const hour of hours) {
     const f = oee[hour];

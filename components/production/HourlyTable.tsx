@@ -4,6 +4,7 @@ import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { HourWindow, ProductionState } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
+import { sortHourKeys } from '@/utils/hourOrder';
 import styles from './HourlyTable.module.css';
 
 interface HourlyTableProps {
@@ -91,7 +92,7 @@ function RateCell({ ratio }: { ratio: number }) {
 export function HourlyTable({
   hourlyData, hourlyWindow = {}, hourlyPlan = {}, editable = false, onWindowChange, oee,
 }: HourlyTableProps) {
-  const sortedHours = Object.keys(hourlyData).sort();
+  const sortedHours = sortHourKeys(Object.keys(hourlyData));
 
   return (
     <table className={styles.table}>

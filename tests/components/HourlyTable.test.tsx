@@ -13,6 +13,21 @@ describe('HourlyTable', () => {
     expect(rows[1]).toHaveTextContent('15:00');
   });
 
+  it('keeps a night shift in production order (20:00 onward, not wrapped to the top)', () => {
+    render(
+      <HourlyTable
+        hourlyData={{
+          '23:00': { ok: 1, repair: 0, ng: 0 },
+          '00:00': { ok: 2, repair: 0, ng: 0 },
+          '20:00': { ok: 3, repair: 0, ng: 0 },
+          '21:00': { ok: 4, repair: 0, ng: 0 },
+        }}
+      />,
+    );
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows.map((r) => r.textContent?.slice(0, 5))).toEqual(['20:00', '21:00', '23:00', '00:00']);
+  });
+
   it('renders an empty body when there is no hourly data', () => {
     render(<HourlyTable hourlyData={{}} />);
     expect(screen.getAllByRole('row')).toHaveLength(1); // header row only
@@ -20,9 +35,11 @@ describe('HourlyTable', () => {
 
   it('auto-generates a one-hour range in the Jam column when read-only', () => {
     render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 }, '23:00': { ok: 1, repair: 0, ng: 0 } }} />);
-    const rows = screen.getAllByRole('row').slice(1);
-    expect(rows[0]).toHaveTextContent('07:00–08:00');
-    expect(rows[1]).toHaveTextContent('23:00–00:00');
+    // Row order isn't the point here (see the dedicated night-shift-order
+    // test below) — just that each hour's default window renders correctly,
+    // including the 23:00 -> 00:00 midnight wrap.
+    expect(screen.getByRole('row', { name: /07:00/ })).toHaveTextContent('07:00–08:00');
+    expect(screen.getByRole('row', { name: /23:00/ })).toHaveTextContent('23:00–00:00');
   });
 
   it('shows the stored window instead of the default when one is set', () => {

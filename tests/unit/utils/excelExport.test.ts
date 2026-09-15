@@ -28,6 +28,19 @@ describe('buildShiftWorkbook', () => {
     expect(buildShiftWorkbook(state).SheetNames).toContain('Hourly');
     expect(buildShiftWorkbook({ ...state, hourlyData: {} }).SheetNames).not.toContain('Hourly');
   });
+
+  it('lists the Hourly sheet in production order for a night shift, not wrapped at midnight', () => {
+    const workbook = buildShiftWorkbook({
+      ...state,
+      hourlyData: {
+        '23:00': { ok: 1, repair: 0, ng: 0 },
+        '20:00': { ok: 1, repair: 0, ng: 0 },
+        '00:00': { ok: 1, repair: 0, ng: 0 },
+      },
+    });
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Hourly']) as any[];
+    expect(rows.map((r) => r.Jam)).toEqual(['20:00', '23:00', '00:00']);
+  });
 });
 
 describe('buildShiftFileName', () => {

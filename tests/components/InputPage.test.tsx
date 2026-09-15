@@ -66,10 +66,11 @@ describe('InputPage', () => {
     expect(updateStateMock).toHaveBeenCalledWith(expect.objectContaining({ targetBc: 250, target: 250 }));
   });
 
-  it('defaults the cycle time to 50 s and shows the hourly capacity it implies', () => {
+  it('defaults the cycle time field to 50 s, without the pcs/jam capacity breakdown', () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
-    expect(screen.getByText('CT B/C — 72 pcs/jam · Cam 432 · Crank 216')).toBeInTheDocument();
-    expect(screen.getByLabelText(/CT B\/C/)).toHaveValue(50);
+    expect(screen.getByText('CT B/C')).toBeInTheDocument();
+    expect(screen.queryByText(/pcs\/jam/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('CT B/C')).toHaveValue(50);
   });
 
   it('commits an edited cycle time on blur', async () => {

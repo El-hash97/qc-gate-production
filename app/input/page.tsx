@@ -14,7 +14,7 @@ import { PicCard } from '@/components/production/PicCard';
 import {
   getRates, getAchievementPercent, getProgressPercent,
 } from '@/utils/rates';
-import { DEFAULT_CYCLE_TIME_SEC, productCycleTime, hourCapacity } from '@/utils/oee';
+import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
 import {
@@ -284,12 +284,9 @@ export default function InputPage() {
         </label>
         <label className={styles.toolbarGroup}>
           {/* One cycle time drives all three products: Camshaft and Crankshaft
-              capacities derive from it by mould ratio, so show what it implies. */}
-          <span className={styles.toolbarLabel}>
-            CT B/C — {Math.round(hourCapacity(cycleTime))} pcs/jam
-            {' · Cam '}{Math.round(hourCapacity(productCycleTime('camshaft', cycleTime)))}
-            {' · Crank '}{Math.round(hourCapacity(productCycleTime('crankshaft', cycleTime)))}
-          </span>
+              capacities derive from it by mould ratio (see the dashboard for
+              what that implies per hour). */}
+          <span className={styles.toolbarLabel}>CT B/C</span>
           <input
             type="number"
             min={1}

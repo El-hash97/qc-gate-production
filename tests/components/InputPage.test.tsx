@@ -88,6 +88,27 @@ describe('InputPage', () => {
     expect(screen.getByText('Konfirmasi Reset')).toBeInTheDocument();
   });
 
+  it('places each product\'s Target/Progress/Achievement bar directly above its own OK/Repair/NG cards', () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    const [bcBadge, camBadge, crankBadge] = screen.getAllByText(/^Achievement:/);
+    // [BC 1TR, BC 2TR, Camshaft, Crankshaft]
+    const okButtons = screen.getAllByRole('button', { name: 'Tambah OK' });
+    const ngButtons = screen.getAllByRole('button', { name: 'Tambah NG' });
+    const isBefore = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    // BC's combined bar sits above both the BC 1TR and BC 2TR card rows.
+    expect(isBefore(bcBadge, okButtons[0])).toBe(true);
+    expect(isBefore(bcBadge, okButtons[1])).toBe(true);
+    // Camshaft's bar sits after BC's cards (not clustered with the other bars
+    // at the top of the page) and directly above Camshaft's own cards.
+    expect(isBefore(ngButtons[1], camBadge)).toBe(true);
+    expect(isBefore(camBadge, okButtons[2])).toBe(true);
+    // Same for Crankshaft, after Camshaft's cards.
+    expect(isBefore(ngButtons[2], crankBadge)).toBe(true);
+    expect(isBefore(crankBadge, okButtons[3])).toBe(true);
+  });
+
   it('renders Camshaft and Crankshaft sections using the Shaft defect list', async () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
     expect(screen.getByRole('heading', { name: 'Camshaft' })).toBeInTheDocument();

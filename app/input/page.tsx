@@ -24,6 +24,45 @@ import type { ProductLine, ProductionState } from '@/lib/types';
 import { lineGroup } from '@/lib/types';
 import styles from './page.module.css';
 
+// Target input + Progress bar + Achievement badge for one product group, sat
+// directly above that group's OK/Repair/NG cards (rather than clustered as
+// one block above every product, which made it unclear which bar tracked
+// which product further down the page).
+function TargetBar({
+  label, field, progress, achievement,
+}: {
+  label: string;
+  field: ReturnType<typeof useDraftValue<number>>;
+  progress: number;
+  achievement: number;
+}) {
+  return (
+    <div className={styles.progressStrip}>
+      <div className={styles.targetFieldRow}>
+        <label className={styles.targetField}>
+          <span className={styles.toolbarLabel}>Target</span>
+          <input
+            type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
+            value={field.value}
+            onChange={field.onChange} onBlur={field.onBlur} onKeyDown={field.onKeyDown}
+          />
+        </label>
+        <span className={styles.targetProduct}>{label}</span>
+      </div>
+      <div className={styles.progressWrapper}>
+        <div className={styles.progressLabel}>
+          <span>Progress</span>
+          <span>{progress}%</span>
+        </div>
+        <div className={styles.progressTrack}>
+          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <div className={styles.achievementBadge}>Achievement: {achievement}%</div>
+    </div>
+  );
+}
+
 const EMPTY_STATE: ProductionState = {
   date: '', shift: 'Shift Red', operator: '', pic: '', target: 0,
   targetBc: 0, targetCam: 0, targetCrank: 0,
@@ -177,11 +216,12 @@ export default function InputPage() {
   const targetCamField = useDraftValue(current.targetCam ?? 0, (v) => commitTarget({ targetCam: v }), parseTarget);
   const targetCrankField = useDraftValue(current.targetCrank ?? 0, (v) => commitTarget({ targetCrank: v }), parseTarget);
 
-  const TARGET_GROUPS: { label: string; scope: 'bc' | 3 | 4; target: number; field: typeof targetBcField }[] = [
-    { label: 'BC (1TR + 2TR)', scope: 'bc', target: current.targetBc ?? 0, field: targetBcField },
-    { label: 'Camshaft', scope: 3, target: current.targetCam ?? 0, field: targetCamField },
-    { label: 'Crankshaft', scope: 4, target: current.targetCrank ?? 0, field: targetCrankField },
-  ];
+  const bcProgress = getProgressPercent(current, current.targetBc ?? 0, 'bc');
+  const bcAchievement = getAchievementPercent(current, current.targetBc ?? 0, 'bc');
+  const camProgress = getProgressPercent(current, current.targetCam ?? 0, 3);
+  const camAchievement = getAchievementPercent(current, current.targetCam ?? 0, 3);
+  const crankProgress = getProgressPercent(current, current.targetCrank ?? 0, 4);
+  const crankAchievement = getAchievementPercent(current, current.targetCrank ?? 0, 4);
 
   // Block the whole form until the running shift has loaded — otherwise the
   // first click/keystroke would write EMPTY_STATE over live data.
@@ -263,58 +303,31 @@ export default function InputPage() {
       </div>
       </div>
 
-      <div className={styles.progressGroups}>
-        {TARGET_GROUPS.map((g) => {
-          const progress = getProgressPercent(current, g.target, g.scope);
-          const achievement = getAchievementPercent(current, g.target, g.scope);
-          return (
-            <div className={styles.progressStrip} key={g.label}>
-              <div className={styles.targetFieldRow}>
-                <label className={styles.targetField}>
-                  <span className={styles.toolbarLabel}>Target</span>
-                  <input
-                    type="number" className={`${styles.toolbarInput} ${styles.targetInput}`} min={0}
-                    value={g.field.value}
-                    onChange={g.field.onChange} onBlur={g.field.onBlur} onKeyDown={g.field.onKeyDown}
-                  />
-                </label>
-                <span className={styles.targetProduct}>{g.label}</span>
-              </div>
-              <div className={styles.progressWrapper}>
-                <div className={styles.progressLabel}>
-                  <span>Progress</span>
-                  <span>{progress}%</span>
-                </div>
-                <div className={styles.progressTrack}>
-                  <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-                </div>
-              </div>
-              <div className={styles.achievementBadge}>Achievement: {achievement}%</div>
-            </div>
-          );
-        })}
-      </div>
-
       <section className={styles.productSection}>
-        <h2 className={styles.productHeaderBc1}>BC 1TR</h2>
-        <div className={styles.counterGrid}>
-          <CounterCard label="OK" variant="ok" value={current.ok1} onIncrement={() => increment('ok1')} onDecrement={() => decrement('ok1')} />
-          <CounterCard label="Repair" variant="repair" value={current.repair1} onIncrement={() => setRepairTarget('repair1')} onDecrement={() => decrement('repair1')} />
-          <CounterCard label="NG" variant="ng" value={current.ng1} onIncrement={() => setDefectTarget('ng1')} onDecrement={() => decrement('ng1')} />
+        {/* BC 1TR and BC 2TR share one target (see per-group-targets), so their
+            combined bar sits once above both card rows rather than repeating. */}
+        <TargetBar label="BC (1TR + 2TR)" field={targetBcField} progress={bcProgress} achievement={bcAchievement} />
+        <div className={styles.productSubGroup}>
+          <h2 className={styles.productHeaderBc1}>BC 1TR</h2>
+          <div className={styles.counterGrid}>
+            <CounterCard label="OK" variant="ok" value={current.ok1} onIncrement={() => increment('ok1')} onDecrement={() => decrement('ok1')} />
+            <CounterCard label="Repair" variant="repair" value={current.repair1} onIncrement={() => setRepairTarget('repair1')} onDecrement={() => decrement('repair1')} />
+            <CounterCard label="NG" variant="ng" value={current.ng1} onIncrement={() => setDefectTarget('ng1')} onDecrement={() => decrement('ng1')} />
+          </div>
         </div>
-      </section>
-
-      <section className={styles.productSection}>
-        <h2 className={styles.productHeaderBc2}>BC 2TR</h2>
-        <div className={styles.counterGrid}>
-          <CounterCard label="OK" variant="ok" value={current.ok2} onIncrement={() => increment('ok2')} onDecrement={() => decrement('ok2')} />
-          <CounterCard label="Repair" variant="repair" value={current.repair2} onIncrement={() => setRepairTarget('repair2')} onDecrement={() => decrement('repair2')} />
-          <CounterCard label="NG" variant="ng" value={current.ng2} onIncrement={() => setDefectTarget('ng2')} onDecrement={() => decrement('ng2')} />
+        <div className={styles.productSubGroup}>
+          <h2 className={styles.productHeaderBc2}>BC 2TR</h2>
+          <div className={styles.counterGrid}>
+            <CounterCard label="OK" variant="ok" value={current.ok2} onIncrement={() => increment('ok2')} onDecrement={() => decrement('ok2')} />
+            <CounterCard label="Repair" variant="repair" value={current.repair2} onIncrement={() => setRepairTarget('repair2')} onDecrement={() => decrement('repair2')} />
+            <CounterCard label="NG" variant="ng" value={current.ng2} onIncrement={() => setDefectTarget('ng2')} onDecrement={() => decrement('ng2')} />
+          </div>
         </div>
       </section>
 
       <section className={styles.productSection}>
         <h2 className={styles.productHeaderCamshaft}>Camshaft</h2>
+        <TargetBar label="Camshaft" field={targetCamField} progress={camProgress} achievement={camAchievement} />
         <div className={styles.counterGrid}>
           <CounterCard label="OK" variant="ok" value={current.ok3 ?? 0} onIncrement={() => increment('ok3')} onDecrement={() => decrement('ok3')} />
           <CounterCard label="Repair" variant="repair" value={current.repair3 ?? 0} onIncrement={() => setRepairTarget('repair3')} onDecrement={() => decrement('repair3')} />
@@ -324,6 +337,7 @@ export default function InputPage() {
 
       <section className={styles.productSection}>
         <h2 className={styles.productHeaderCrankshaft}>Crankshaft</h2>
+        <TargetBar label="Crankshaft" field={targetCrankField} progress={crankProgress} achievement={crankAchievement} />
         <div className={styles.counterGrid}>
           <CounterCard label="OK" variant="ok" value={current.ok4 ?? 0} onIncrement={() => increment('ok4')} onDecrement={() => decrement('ok4')} />
           <CounterCard label="Repair" variant="repair" value={current.repair4 ?? 0} onIncrement={() => setRepairTarget('repair4')} onDecrement={() => decrement('repair4')} />

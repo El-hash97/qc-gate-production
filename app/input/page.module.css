@@ -77,12 +77,6 @@
   padding-bottom: 7px;
 }
 
-.progressGroups {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .progressStrip {
   display: flex;
   align-items: center;
@@ -135,6 +129,14 @@
 }
 
 .productSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Wraps one physical line's header + cards inside the combined BC section,
+   so BC 1TR and BC 2TR stay visually distinct under their shared target bar. */
+.productSubGroup {
   display: flex;
   flex-direction: column;
   gap: 12px;

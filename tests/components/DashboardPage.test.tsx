@@ -187,8 +187,8 @@ describe('DashboardPage', () => {
     mockAuth.authed = true;
     render(<DashboardPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
-    // Same 09:00 row, now an editable time field.
-    expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
+    // Same 09:00 row, now a clock-picker trigger instead of plain text.
+    expect(screen.getByRole('button', { name: 'Jam mulai' })).toHaveTextContent('09:00');
   });
 
   it('shows the Pareto Defect per Line panel aggregating NG by suspect line', () => {

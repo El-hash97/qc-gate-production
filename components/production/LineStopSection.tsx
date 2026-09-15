@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { LineStop } from '@/lib/types';
 import { lineStopMinutes, formatDuration } from '@/utils/lineStop';
 import styles from './LineStop.module.css';
@@ -40,11 +41,11 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
       <div className={styles.form}>
         <label className={styles.group}>
           <span className={styles.label}>Jam Mulai</span>
-          <input type="time" lang="id-ID" className={styles.input} value={start} onChange={(e) => setStart(e.target.value)} />
+          <ClockTimeInput value={start} ariaLabel="Jam Mulai" onChange={setStart} />
         </label>
         <label className={styles.group}>
           <span className={styles.label}>Jam Selesai</span>
-          <input type="time" lang="id-ID" className={styles.input} value={end} onChange={(e) => setEnd(e.target.value)} />
+          <ClockTimeInput value={end} ariaLabel="Jam Selesai" onChange={setEnd} />
         </label>
         <label className={styles.group}>
           <span className={styles.label}>Keterangan</span>

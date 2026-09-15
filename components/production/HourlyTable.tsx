@@ -1,6 +1,6 @@
 'use client';
 
-import { useDraftValue } from '@/hooks/useDraftValue';
+import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { HourWindow, ProductionState } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
@@ -25,11 +25,6 @@ interface HourlyTableProps {
   oee?: Record<string, OeeBreakdown>;
 }
 
-const identityTime = {
-  parse: (raw: string) => raw,
-  format: (value: string) => value,
-};
-
 // "07:00" -> "08:00"; "23:00" -> "00:00". The default window of an hour is the
 // clock hour itself, shown until the operator narrows it for a break.
 function nextHour(hour: string): string {
@@ -42,19 +37,20 @@ function defaultWindow(hour: string): HourWindow {
 }
 
 // Two time fields; either one committing sends the whole {start,end} back up.
+// Each is a circular clock picker (24h, no AM/PM) rather than a native time
+// input — it only calls onChange once, when OK is pressed, so there's no
+// half-edited value for the background poll to yank back mid-pick.
 function WindowCell({ win, onCommit }: { win: HourWindow; onCommit: (w: HourWindow) => void }) {
-  const start = useDraftValue(win.start, (v) => onCommit({ start: v, end: win.end }), identityTime);
-  const end = useDraftValue(win.end, (v) => onCommit({ start: win.start, end: v }), identityTime);
   return (
     <span className={styles.windowCell}>
-      <input
-        type="time" lang="id-ID" aria-label="Jam mulai" className={styles.timeInput}
-        value={start.value} onChange={start.onChange} onBlur={start.onBlur} onKeyDown={start.onKeyDown}
+      <ClockTimeInput
+        value={win.start} ariaLabel="Jam mulai"
+        onChange={(v) => onCommit({ start: v, end: win.end })}
       />
       <span className={styles.windowDash}>–</span>
-      <input
-        type="time" lang="id-ID" aria-label="Jam selesai" className={styles.timeInput}
-        value={end.value} onChange={end.onChange} onBlur={end.onBlur} onKeyDown={end.onKeyDown}
+      <ClockTimeInput
+        value={win.end} ariaLabel="Jam selesai"
+        onChange={(v) => onCommit({ start: win.start, end: v })}
       />
     </span>
   );

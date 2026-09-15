@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { HourlyTable } from '@/components/production/HourlyTable';
 
 const factors = { av: 1, pe: 1, rq: 1, oee: 1 };
@@ -34,7 +35,7 @@ describe('HourlyTable', () => {
     expect(screen.getByRole('row', { name: /12:00/ })).toHaveTextContent('12:00–12:45');
   });
 
-  it('commits an edited window on blur', () => {
+  it('commits an edited window once OK is pressed in the clock picker', async () => {
     const onWindowChange = vi.fn();
     render(
       <HourlyTable
@@ -43,10 +44,12 @@ describe('HourlyTable', () => {
         onWindowChange={onWindowChange}
       />,
     );
-    const end = screen.getByLabelText('Jam selesai');
-    fireEvent.change(end, { target: { value: '07:45' } });
+    // default window is 07:00-08:00; open the "Jam selesai" clock and set it to 07:45.
+    await userEvent.click(screen.getByRole('button', { name: 'Jam selesai' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Jam 7' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Menit 45' }));
     expect(onWindowChange).not.toHaveBeenCalled();
-    fireEvent.blur(end);
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }));
     expect(onWindowChange).toHaveBeenCalledWith('07:00', { start: '07:00', end: '07:45' });
   });
 

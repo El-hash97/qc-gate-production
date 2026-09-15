@@ -32,7 +32,7 @@ describe('HistoryDetail', () => {
     expect(screen.getByRole('group', { name: 'Filter produk' })).toBeInTheDocument();
     expect(screen.getByText('Total Produksi')).toBeInTheDocument();
     expect(screen.getByText('Production Distribution')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Export PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
   });
 
   it('defaults to the B/C view, scoped to the record\'s own BC totals', () => {

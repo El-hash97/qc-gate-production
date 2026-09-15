@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ProductionChart } from '@/components/production/ProductionChart';
 import { ParetoChart } from '@/components/production/ParetoChart';
 import { HourlyChart } from '@/components/production/HourlyChart';
@@ -85,14 +85,23 @@ export interface ProductionDashboardViewProps {
   // falls back to a centered 2-column layout — the same one the print
   // stylesheet already uses to drop this column from the report.
   connectionStatus?: 'online' | 'syncing' | 'offline';
+  // 'print' (default): the existing window.print()-based "Export PDF",
+  // matching the live Dashboard exactly. 'download' shows "Download PDF"
+  // instead, which builds and saves a real .pdf file client-side (see
+  // utils/pdfExport.ts and html2pdf.js) with no print dialog — used by
+  // History, where `pdfFileName` names the downloaded file.
+  exportMode?: 'print' | 'download';
+  pdfFileName?: string;
 }
 
 export function ProductionDashboardView({
   state, view, onViewChange, now,
   onHourlyWindowChange, hasPhoto, onPhotoBarClick, connectionStatus,
+  exportMode = 'print', pdfFileName,
 }: ProductionDashboardViewProps) {
   const { theme, setTheme } = useTheme();
   const [printedAt, setPrintedAt] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
   const { hidden } = useDashboardSettings();
   const { mappings: defectLineMappings } = useDefectLines();
 
@@ -191,7 +200,7 @@ export function ProductionDashboardView({
   // Export the current view as a PDF via the browser's print-to-PDF. Chart
   // canvases can't be recoloured by the print stylesheet, so force the light
   // palette first, let the charts redraw, print, then restore the theme.
-  function handleExportPdf() {
+  function handlePrintPdf() {
     setPrintedAt(new Date().toLocaleString('id-ID'));
     const previous = theme;
     if (previous !== 'light') setTheme('light');
@@ -201,11 +210,48 @@ export function ProductionDashboardView({
     }, 300);
   }
 
+  // Downloads a real .pdf file client-side — no print dialog, unlike
+  // handlePrintPdf above. html2canvas (via html2pdf.js) can only snapshot
+  // what's actually on screen, not the @media print stylesheet, so the
+  // `.exporting` class (ProductionDashboardView.module.css) stands in for
+  // the bits of that stylesheet a screenshot still needs: showing the report
+  // header, hiding the toggle row, and un-scrolling each panel so nothing
+  // gets clipped. Dynamically imported: html2pdf.js touches `window` at
+  // module load and can't run during Next.js's server-side render.
+  function handleDownloadPdf() {
+    setPrintedAt(new Date().toLocaleString('id-ID'));
+    const previous = theme;
+    if (previous !== 'light') setTheme('light');
+    const target = containerRef.current;
+    target?.classList.add(styles.exporting);
+    window.setTimeout(async () => {
+      try {
+        if (!target) return;
+        const html2pdf = (await import('html2pdf.js')).default;
+        await html2pdf()
+          .set({
+            filename: pdfFileName || 'QC_Gate.pdf',
+            margin: 10,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+            jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' },
+          })
+          .from(target)
+          .save();
+      } finally {
+        target?.classList.remove(styles.exporting);
+        if (previous !== 'light') setTheme(previous);
+      }
+    }, 300);
+  }
+
+  const handleExport = exportMode === 'download' ? handleDownloadPdf : handlePrintPdf;
+
   const reportPic = findPic(state.pic);
   const editableHourly = view !== 'all' && onHourlyWindowChange !== undefined;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} ref={containerRef}>
       <div className={styles.printHeader} aria-hidden="true">
         <h1>Laporan Harian Produksi</h1>
         <div className={styles.printMeta}>
@@ -255,8 +301,8 @@ export function ProductionDashboardView({
             </button>
           ))}
         </div>
-        <button type="button" className={styles.exportBtn} onClick={handleExportPdf}>
-          Export PDF
+        <button type="button" className={styles.exportBtn} onClick={handleExport}>
+          {exportMode === 'download' ? 'Download PDF' : 'Export PDF'}
         </button>
       </div>
 

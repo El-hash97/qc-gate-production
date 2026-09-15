@@ -300,6 +300,36 @@
   .achievementBadge { text-align: center; }
 }
 
+/* --- "Download PDF" (History): html2canvas screenshots whatever's on
+   screen — it has no notion of @media print — so this class stands in for
+   the handful of print rules below a screenshot still needs: hide the
+   toggle row (don't bake the export button into its own PDF), show the
+   report header (normally print-only), and un-scroll/un-fix every panel's
+   height so nothing gets clipped. Toggled on/off around the capture by
+   handleDownloadPdf. Deliberately not the full print stylesheet — the bento
+   grid keeps its on-screen columns rather than reflowing to print's 2-up
+   layout. --- */
+.exporting .toggleRow { display: none; }
+.exporting .printHeader {
+  display: block;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+.exporting .panel { height: auto !important; }
+.exporting .panelBody {
+  position: relative;
+  flex: none;
+  min-height: 0;
+  height: 260px;
+}
+.exporting .scrollBody {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+  flex: none !important;
+}
+
 /* --- Print / "Export PDF": clean daily report of the active view. The export
    handler forces the light theme first so the chart canvases stay legible;
    lib/chartSetup.ts resizes the Chart.js canvases to fit these columns on

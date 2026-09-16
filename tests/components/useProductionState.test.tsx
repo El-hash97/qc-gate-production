@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useProductionState } from '@/hooks/useProductionState';
+import { useProductionState, shouldPausePoll } from '@/hooks/useProductionState';
 import type { ProductionState } from '@/lib/types';
 
 const baseState: ProductionState = {
@@ -42,5 +42,16 @@ describe('useProductionState', () => {
     });
 
     await waitFor(() => expect(result.current.state?.ok1).toBe(2));
+  });
+
+  it('keeps the background poll paused through the post-save grace window', () => {
+    // Regression for the "field bounces back" bug: pendingWrites alone used
+    // to gate the poll, so it resumed the instant the POST resolved — before
+    // Neon's read path had caught up. The poll must also stay paused for the
+    // grace window that follows a successful save.
+    expect(shouldPausePoll(0, false)).toBe(false); // idle: poll runs
+    expect(shouldPausePoll(1, false)).toBe(true); // save in flight: paused
+    expect(shouldPausePoll(0, true)).toBe(true); // just after save: still paused
+    expect(shouldPausePoll(0, false)).toBe(false); // grace window over: poll resumes
   });
 });

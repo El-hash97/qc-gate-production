@@ -39,14 +39,21 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
       <h2 className={styles.header}>Line Stop</h2>
 
       <div className={styles.form}>
-        <label className={styles.group}>
+        {/* Plain <div>, not <label>: ClockTimeInput renders several of its own
+            buttons (trigger + every dial button), and a <label> wrapping more
+            than one labelable descendant makes the browser synthesize an
+            extra click on the first one (the trigger) whenever another is
+            clicked — openPicker() firing again wiped the in-progress
+            selection, the "jam/menit selalu mental" bug. ariaLabel on
+            ClockTimeInput's own trigger already covers accessibility. */}
+        <div className={styles.group}>
           <span className={styles.label}>Jam Mulai</span>
           <ClockTimeInput value={start} ariaLabel="Jam Mulai" onChange={setStart} />
-        </label>
-        <label className={styles.group}>
+        </div>
+        <div className={styles.group}>
           <span className={styles.label}>Jam Selesai</span>
           <ClockTimeInput value={end} ariaLabel="Jam Selesai" onChange={setEnd} />
-        </label>
+        </div>
         <label className={styles.group}>
           <span className={styles.label}>Keterangan</span>
           <input

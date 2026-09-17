@@ -37,4 +37,17 @@ describe('LineStopSection', () => {
     await userEvent.type(screen.getByPlaceholderText('Problem line stop'), 'Mesin macet');
     expect(screen.getByRole('button', { name: 'Tambah' })).toBeDisabled();
   });
+
+  it('does not wrap a clock picker in a native <label> (jam/menit "mental" regression)', () => {
+    // ClockTimeInput renders several of its own buttons (trigger + every dial
+    // button). A <label> ancestor with more than one labelable descendant
+    // makes real browsers synthesize an extra click on the first one — the
+    // closed trigger — whenever another is clicked, calling openPicker()
+    // again and wiping the in-progress hour/minute back to the start. jsdom
+    // doesn't simulate that browser default action, so this only asserts the
+    // structural cause directly rather than the symptom.
+    render(<LineStopSection stops={[]} onChange={vi.fn()} />);
+    const trigger = screen.getByRole('button', { name: 'Jam Mulai' });
+    expect(trigger.closest('label')).toBeNull();
+  });
 });

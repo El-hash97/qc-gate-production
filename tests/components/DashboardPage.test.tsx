@@ -188,8 +188,8 @@ describe('DashboardPage', () => {
     mockAuth.authed = true;
     render(<ToastProvider><DashboardPage /></ToastProvider>);
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
-    // Same 09:00 row, now a clock-picker trigger instead of plain text.
-    expect(screen.getByRole('button', { name: 'Jam mulai' })).toHaveTextContent('09:00');
+    // Same 09:00 row, now a clock-picker manual input instead of plain text.
+    expect(screen.getByRole('textbox', { name: 'Jam mulai' })).toHaveValue('09:00');
   });
 
   it('shows the Pareto Defect per Line panel aggregating NG by suspect line', () => {

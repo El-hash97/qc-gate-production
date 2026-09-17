@@ -62,7 +62,7 @@ describe('HourlyTable', () => {
       />,
     );
     // default window is 07:00-08:00; open the "Jam selesai" clock and set it to 07:45.
-    await userEvent.click(screen.getByRole('button', { name: 'Jam selesai' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Jam selesai (jam melingkar)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Jam 7' }));
     await userEvent.click(screen.getByRole('button', { name: 'Menit 45' }));
     expect(onWindowChange).not.toHaveBeenCalled();

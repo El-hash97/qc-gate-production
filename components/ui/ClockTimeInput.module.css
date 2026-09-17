@@ -1,5 +1,11 @@
-.trigger {
-  width: 74px;
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.manualInput {
+  width: 56px;
   padding: 3px 4px;
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -7,12 +13,32 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  cursor: pointer;
   text-align: center;
 }
 
-.trigger:hover {
+.manualInput:focus {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 1px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
   background: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 /* --- "HH : MM" readout in the dialog title, 24h, no AM/PM --- */

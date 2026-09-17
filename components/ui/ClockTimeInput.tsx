@@ -2,6 +2,7 @@
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Modal } from './Modal';
+import { useDraftValue } from '@/hooks/useDraftValue';
 import { angleFromPoint, minuteFromAngle, angleForMinute, angleForHour } from '@/utils/clockAngle';
 import styles from './ClockTimeInput.module.css';
 
@@ -36,6 +37,38 @@ function formatTime(hour: number, minute: number): string {
   return `${pad2(hour)}:${pad2(minute)}`;
 }
 
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+// Turns whatever was typed into a valid 24h "HH:MM" — the manual-entry safety
+// net for when the circular picker misbehaves. Non-digits are dropped; the
+// trailing up to 2 digits become minutes, anything before that becomes hours,
+// then both are clamped into range: "730" -> "07:30", "1430" -> "14:30",
+// "7" -> "07:00", "2599" -> "23:59". Falls back to the last committed value
+// when nothing recognizable was typed (e.g. cleared, or letters only).
+function correctTimeInput(raw: string, fallback: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return fallback;
+  const hourDigits = digits.length <= 2 ? digits : digits.slice(0, -2);
+  const minuteDigits = digits.length <= 2 ? '0' : digits.slice(-2);
+  const hour = clamp(parseInt(hourDigits, 10), 0, 23);
+  const minute = clamp(parseInt(minuteDigits, 10), 0, 59);
+  return formatTime(hour, minute);
+}
+
+// Small clock glyph for the icon button that opens the circular dial —
+// inherits colour from the button via currentColor, same as other icon
+// buttons in this app (e.g. TopNav's gear/person icons).
+function ClockIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Position of a dial-face child, as a percentage offset from the center, for
 // a given clock-degree angle and ring radius (fraction of the face's size).
 function ringPosition(angleDeg: number, radiusFraction: number): { left: string; top: string } {
@@ -51,6 +84,14 @@ export function ClockTimeInput({ value, onChange, ariaLabel }: ClockTimeInputPro
   const [draft, setDraft] = useState(() => parseTime(value));
   const dialRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+
+  // The manual field: free typing, corrected into a valid "HH:MM" on
+  // blur/Enter — same draft-then-commit pattern as every other text field in
+  // this app, so it's immune to whatever the circular dial does.
+  const manual = useDraftValue(value, onChange, {
+    parse: (raw: string) => correctTimeInput(raw, value),
+    format: (v: string) => v,
+  });
 
   function openPicker() {
     setDraft(parseTime(value));
@@ -103,9 +144,25 @@ export function ClockTimeInput({ value, onChange, ariaLabel }: ClockTimeInputPro
   }
 
   return (
-    <>
-      <button type="button" className={styles.trigger} aria-label={ariaLabel} onClick={openPicker}>
-        {value ? value : '--:--'}
+    <span className={styles.wrapper}>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="--:--"
+        aria-label={ariaLabel}
+        className={styles.manualInput}
+        value={manual.value}
+        onChange={manual.onChange}
+        onBlur={manual.onBlur}
+        onKeyDown={manual.onKeyDown}
+      />
+      <button
+        type="button"
+        className={styles.iconButton}
+        aria-label={`${ariaLabel} (jam melingkar)`}
+        onClick={openPicker}
+      >
+        <ClockIcon />
       </button>
 
       <Modal
@@ -183,6 +240,6 @@ export function ClockTimeInput({ value, onChange, ariaLabel }: ClockTimeInputPro
           <button type="button" className={styles.okButton} onClick={confirm}>OK</button>
         </div>
       </Modal>
-    </>
+    </span>
   );
 }

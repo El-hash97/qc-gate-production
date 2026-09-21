@@ -89,14 +89,14 @@ export function OverDimensiFields({ value, onChange }: Props) {
         </label>
       </div>
 
-      <div className={styles.fieldRow}>
+      <div className={styles.fieldRow3}>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Crank case No.</span>
           <input
             className={styles.input}
             value={value.crankCaseNo}
             onChange={(e) => update({ crankCaseNo: e.target.value })}
-            placeholder="Isi manual"
+            placeholder="1"
           />
         </label>
 
@@ -106,23 +106,23 @@ export function OverDimensiFields({ value, onChange }: Props) {
             className={styles.input}
             value={value.slubWjNo}
             onChange={(e) => update({ slubWjNo: e.target.value })}
-            placeholder="Isi manual"
+            placeholder="1"
           />
         </label>
-      </div>
 
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Front / Rear</span>
-        <select
-          className={styles.select}
-          value={value.position}
-          onChange={(e) => update({ position: e.target.value })}
-        >
-          <option value="">Pilih Front/Rear</option>
-          <option value="Front">Front</option>
-          <option value="Rear">Rear</option>
-        </select>
-      </label>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Front / Rear</span>
+          <select
+            className={styles.select}
+            value={value.position}
+            onChange={(e) => update({ position: e.target.value })}
+          >
+            <option value="">Pilih</option>
+            <option value="Front">Front</option>
+            <option value="Rear">Rear</option>
+          </select>
+        </label>
+      </div>
     </div>
   );
 }

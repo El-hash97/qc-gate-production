@@ -78,7 +78,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Input Repair">
+    <Modal isOpen={isOpen} onClose={onClose} title="Input Repair" wide>
       <TypeSelect
         label="Jenis Repair"
         types={types}

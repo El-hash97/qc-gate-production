@@ -54,7 +54,7 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Input Defect (NG)">
+    <Modal isOpen={isOpen} onClose={onClose} title="Input Defect (NG)" wide>
       <TypeSelect
         label="Jenis Defect"
         types={types}

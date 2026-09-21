@@ -1,12 +1,18 @@
 .field {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .fieldRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
+}
+
+.fieldRow3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
 }
 
 .fieldLabel {
@@ -107,18 +113,18 @@
 }
 
 .overDimensiBox {
-  margin: 16px 0;
-  padding: 14px;
+  margin: 10px 0;
+  padding: 10px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
 }
 
 .overDimensiTitle {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

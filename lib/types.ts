@@ -26,6 +26,14 @@ export function lineGroup(line: ProductLine): ProductGroup {
   return line <= 2 ? 'bc' : 'shaft';
 }
 
+export interface OverDimensiDetail {
+  dieMould: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  coreCombo: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  crankCaseNo: string;
+  slubWjNo: string;
+  position: 'Front' | 'Rear';
+}
+
 export interface EntryLog {
   kind: 'defect' | 'repair';
   // Optional so logs written before the split still parse — they are always
@@ -42,6 +50,8 @@ export interface EntryLog {
   // Bore repairs (see DIE_NUMBER_REPAIR_TYPES in utils/constants.ts); every
   // other entry, and every log written before this field existed, omits it.
   die?: 1 | 2 | 3 | 4;
+  // Over Dimensi detail — only set when type === 'Over Dimensi' (BC 1TR/2TR).
+  overDimensi?: OverDimensiDetail;
 }
 
 // A plant-wide line stop logged during the shift. start/end are "HH:MM"

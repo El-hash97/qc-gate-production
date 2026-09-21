@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { DieNumberModal } from './DieNumberModal';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
-import { needsDieNumber } from '@/utils/constants';
+import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
+import { needsDieNumber, needsOverDimensiDetail } from '@/utils/constants';
+import type { OverDimensiDetail } from '@/lib/types';
 import styles from './EntryModal.module.css';
 
 interface RepairModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4) => void;
+  onSave: (repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail) => void;
   types: readonly string[];
   flaskLabel?: string;
 }
@@ -32,6 +34,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   // from the same die doesn't force re-picking it each time.
   const [dieNumber, setDieNumber] = useState<1 | 2 | 3 | 4 | null>(null);
   const [dieModalOpen, setDieModalOpen] = useState(false);
+  const [overDimensi, setOverDimensi] = useState(initialOverDimensiState);
 
   // Fires only on an actual user selection (not the initial default, and not
   // the types-prop-changed reset above) — picking any Mejashi Bore type pops
@@ -48,6 +51,8 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     const qty = parseInt(qtyInput, 10);
     const type = repairType === OTHER_TYPE ? customType.trim() : repairType;
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
+    if (needsOverDimensiDetail(type) && !isOverDimensiValid(overDimensi)) return;
+    const overDetail = needsOverDimensiDetail(type) ? toOverDimensiDetail(overDimensi) : undefined;
     // Safety net for paths that skip handleTypeChange entirely — e.g. the
     // default selection (types[0] is "Mejashi Bore 1") accepted without ever
     // touching the list. A die number is mandatory for these repairs, so
@@ -56,8 +61,12 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
       setDieModalOpen(true);
       return;
     }
-    if (dieNumber !== null) {
+    if (dieNumber !== null && overDetail) {
+      onSave(type, qty, lot.trim(), flask.trim(), dieNumber, overDetail);
+    } else if (dieNumber !== null) {
       onSave(type, qty, lot.trim(), flask.trim(), dieNumber);
+    } else if (overDetail) {
+      onSave(type, qty, lot.trim(), flask.trim(), undefined, overDetail);
     } else {
       onSave(type, qty, lot.trim(), flask.trim());
     }
@@ -65,6 +74,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     setLot('');
     setFlask('');
     setCustomType('');
+    setOverDimensi(initialOverDimensiState);
   }
 
   return (
@@ -87,6 +97,9 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
             placeholder="Ketik jenis repair"
           />
         </label>
+      )}
+      {needsOverDimensiDetail(repairType === OTHER_TYPE ? customType.trim() : repairType) && (
+        <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />
       )}
       <div className={styles.fieldRow}>
         <label className={styles.field}>

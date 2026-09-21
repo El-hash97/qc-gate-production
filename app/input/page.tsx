@@ -20,7 +20,7 @@ import { todayString } from '@/utils/date';
 import {
   SHIFTS, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
-import type { ProductLine, ProductionState } from '@/lib/types';
+import type { OverDimensiDetail, ProductLine, ProductionState } from '@/lib/types';
 import { lineGroup } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -140,7 +140,7 @@ export default function InputPage() {
     }
   }
 
-  function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string) {
+  function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
     if (!defectTarget) return;
     const line = lineForTarget(defectTarget);
     const group = lineGroup(line);
@@ -149,14 +149,14 @@ export default function InputPage() {
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [defectType]: (currentData[defectType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'defect', group, line, type: defectType, qty, lot, flask }],
+      entryLogs: [...current.entryLogs, { kind: 'defect', group, line, type: defectType, qty, lot, flask, ...(overDimensi ? { overDimensi } : {}) }],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${defectType} ditambahkan`, 'error');
     setDefectTarget(null);
   }
 
   function handleSaveRepair(
-    repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4,
+    repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail,
   ) {
     if (!repairTarget) return;
     const line = lineForTarget(repairTarget);
@@ -168,7 +168,7 @@ export default function InputPage() {
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
       entryLogs: [
         ...current.entryLogs,
-        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(die ? { die } : {}) },
+        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) },
       ],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');

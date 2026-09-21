@@ -105,3 +105,20 @@
   color: #fff;
   background: var(--accent-orange);
 }
+
+.overDimensiBox {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.overDimensiTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

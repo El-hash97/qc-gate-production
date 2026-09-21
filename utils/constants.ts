@@ -1,3 +1,5 @@
+export const OVER_DIMENSI = 'Over Dimensi' as const;
+
 export const DEFECT_TYPES = [
   'Gas Hole Cope',
   'Gas Hole Drag',
@@ -22,6 +24,7 @@ export const DEFECT_TYPES = [
   'Mikui',
   'Inspeksi',
   'Yuzakai',
+  OVER_DIMENSI,
 ] as const;
 
 export const REPAIR_TYPES = [
@@ -53,6 +56,7 @@ export const REPAIR_TYPES = [
   'Mikui',
   'Inspeksi',
   'Yuzakai',
+  OVER_DIMENSI,
 ] as const;
 
 // Shared defect/repair/NG list for the Camshaft and Crankshaft products.
@@ -86,6 +90,10 @@ export const DIE_NUMBER_REPAIR_TYPES = [
 
 export function needsDieNumber(repairType: string): boolean {
   return (DIE_NUMBER_REPAIR_TYPES as readonly string[]).includes(repairType);
+}
+
+export function needsOverDimensiDetail(type: string): boolean {
+  return type === OVER_DIMENSI;
 }
 
 export const SHIFTS = ['Shift Red', 'Shift White'] as const;

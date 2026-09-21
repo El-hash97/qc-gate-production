@@ -12,6 +12,7 @@ export function EntryLogList({ title, logs = [] }: { title: string; logs?: Entry
         logs.map((log, i) => {
           const product = log.line ? PRODUCT_LINE_LABELS[log.line] : null;
           const slotLabel = log.group === 'shaft' ? 'Cavity' : 'Flask';
+          const od = log.overDimensi;
           return (
             <div key={i} className={styles.item}>
               <span>
@@ -19,6 +20,7 @@ export function EntryLogList({ title, logs = [] }: { title: string; logs?: Entry
                 {product && ' — '}
                 {log.type} · Lot {log.lot} / {slotLabel} {log.flask}
                 {log.die ? ` · Die ${log.die}` : ''}
+                {od ? ` · Die Mould ${od.dieMould} · Core ${od.coreCombo} · ${od.position} · CC ${od.crankCaseNo} · Slub/Wj ${od.slubWjNo}` : ''}
               </span>
               <span className={styles.count}>{log.qty}</span>
             </div>

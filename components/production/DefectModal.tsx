@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
+import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
+import { needsOverDimensiDetail } from '@/utils/constants';
+import type { OverDimensiDetail } from '@/lib/types';
 import styles from './EntryModal.module.css';
 
 interface DefectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (defectType: string, qty: number, lot: string, flask: string) => void;
+  onSave: (defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) => void;
   types: readonly string[];
   flaskLabel?: string;
 }
@@ -30,16 +33,24 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   const [qtyInput, setQtyInput] = useState('1');
   const [lot, setLot] = useState('');
   const [flask, setFlask] = useState('');
+  const [overDimensi, setOverDimensi] = useState(initialOverDimensiState);
 
   function handleSave() {
     const qty = parseInt(qtyInput, 10);
     const type = defectType === OTHER_TYPE ? customType.trim() : defectType;
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
-    onSave(type, qty, lot.trim(), flask.trim());
+    if (needsOverDimensiDetail(type) && !isOverDimensiValid(overDimensi)) return;
+    const detail = needsOverDimensiDetail(type) ? toOverDimensiDetail(overDimensi) : undefined;
+    if (detail) {
+      onSave(type, qty, lot.trim(), flask.trim(), detail);
+    } else {
+      onSave(type, qty, lot.trim(), flask.trim());
+    }
     setQtyInput('1');
     setLot('');
     setFlask('');
     setCustomType('');
+    setOverDimensi(initialOverDimensiState);
   }
 
   return (
@@ -62,6 +73,9 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
             placeholder="Ketik jenis defect"
           />
         </label>
+      )}
+      {needsOverDimensiDetail(defectType === OTHER_TYPE ? customType.trim() : defectType) && (
+        <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />
       )}
       <div className={styles.fieldRow}>
         <label className={styles.field}>

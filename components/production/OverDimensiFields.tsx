@@ -96,7 +96,7 @@ export function OverDimensiFields({ value, onChange }: Props) {
             className={styles.input}
             value={value.crankCaseNo}
             onChange={(e) => update({ crankCaseNo: e.target.value })}
-            placeholder="1"
+            placeholder="0"
           />
         </label>
 
@@ -106,7 +106,7 @@ export function OverDimensiFields({ value, onChange }: Props) {
             className={styles.input}
             value={value.slubWjNo}
             onChange={(e) => update({ slubWjNo: e.target.value })}
-            placeholder="1"
+            placeholder="0"
           />
         </label>
 

@@ -25,7 +25,7 @@ export function isOverDimensiValid(s: OverDimensiFormState): boolean {
     s.coreCombo !== '' &&
     s.crankCaseNo.trim() !== '' &&
     s.slubWjNo.trim() !== '' &&
-    (s.position === 'Front' || s.position === 'Rear')
+    s.position.trim() !== ''
   );
 }
 
@@ -35,7 +35,7 @@ export function toOverDimensiDetail(s: OverDimensiFormState): OverDimensiDetail 
     coreCombo: parseInt(s.coreCombo, 10) as OverDimensiDetail['coreCombo'],
     crankCaseNo: s.crankCaseNo.trim(),
     slubWjNo: s.slubWjNo.trim(),
-    position: s.position as 'Front' | 'Rear',
+    position: s.position.trim(),
   };
 }
 
@@ -111,16 +111,13 @@ export function OverDimensiFields({ value, onChange }: Props) {
         </label>
 
         <label className={styles.field}>
-          <span className={styles.fieldLabel}>Front / Rear</span>
-          <select
-            className={styles.select}
+          <span className={styles.fieldLabel}>Front / Rear No.</span>
+          <input
+            className={styles.input}
             value={value.position}
             onChange={(e) => update({ position: e.target.value })}
-          >
-            <option value="">Pilih</option>
-            <option value="Front">Front</option>
-            <option value="Rear">Rear</option>
-          </select>
+            placeholder="0"
+          />
         </label>
       </div>
     </div>

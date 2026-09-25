@@ -26,7 +26,7 @@ import {
 } from '@/utils/rates';
 import {
   DEFAULT_CYCLE_TIME_SEC, productCycleTime, hourCapacity, windowMinutes, workedMinutesInHour,
-  hourlyOee, avMinutesByHour, peMinutesByHour, shiftOee,
+  hourlyOee, avMinutesByHour, peMinutesByHour, lineStopsByHour, shiftOee,
 } from '@/utils/oee';
 import type { OeeBreakdown } from '@/utils/oee';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
@@ -77,6 +77,9 @@ export interface ProductionDashboardViewProps {
   // read-only, correct for a finished/archived shift. The live Dashboard
   // passes this only once the viewer is logged in.
   onHourlyWindowChange?: (hour: string, win: HourWindow) => void;
+  // Manual hour-pin toggle — omitted (the default) hides the toggle, same
+  // gate as onHourlyWindowChange (the live Dashboard passes it once logged in).
+  onPinHour?: (hour: string) => void;
   // Defect-photo click-through — live-only (see useDefectPhotos), omitted
   // for a historical record since a photo isn't tied to a saved shift.
   hasPhoto?: (group: PhotoGroup, chartType: PhotoChartType, defectType: string) => boolean;
@@ -98,7 +101,7 @@ export interface ProductionDashboardViewProps {
 
 export function ProductionDashboardView({
   state, view, onViewChange, now,
-  onHourlyWindowChange, hasPhoto, onPhotoBarClick, connectionStatus,
+  onHourlyWindowChange, onPinHour, hasPhoto, onPhotoBarClick, connectionStatus,
   exportMode = 'print', downloadPdfUrl,
 }: ProductionDashboardViewProps) {
   const { theme, setTheme } = useTheme();
@@ -159,6 +162,9 @@ export function ProductionDashboardView({
   const hourlyWindow = useMemo(() => state.hourlyWindow ?? {}, [state.hourlyWindow]);
 
   const lineStops = state.lineStops ?? [];
+  // Keyed on state.lineStops itself (not the `?? []` fallback, a fresh array
+  // every render) so an unchanged poll doesn't recompute it.
+  const stopsByHour = useMemo(() => lineStopsByHour(state.lineStops), [state.lineStops]);
 
   // OEE needs a cycle time to measure availability against. The B/C cycle time
   // drives every product (Camshaft and Crankshaft derive theirs from it by
@@ -363,15 +369,18 @@ export function ProductionDashboardView({
         )}
 
         {!hidden.has('hourlyTable') && (
-          <section className={`${styles.panel} ${oeeByHour ? styles.spanWide : styles.spanHalf} ${styles.hPareto} ${styles.hourlyTablePanel}`}>
+          <section className={`${styles.panel} ${styles.spanFull} ${styles.hPareto}`}>
             <div className={styles.panelTitle}>Hourly (Tabel)</div>
             <div className={styles.scrollBody}>
               <HourlyTable
                 hourlyData={hourlyData}
                 hourlyWindow={hourlyWindow}
                 hourlyPlan={hourlyPlan}
+                lineStopsByHour={stopsByHour}
                 editable={editableHourly}
                 onWindowChange={onHourlyWindowChange}
+                pinnedHour={state.pinnedHour}
+                onPinHour={editableHourly ? onPinHour : undefined}
                 oee={oeeByHour}
               />
             </div>
@@ -379,7 +388,7 @@ export function ProductionDashboardView({
         )}
 
         {oeeByHour && !hidden.has('oeeChart') && (
-          <section className={`${styles.panel} ${styles.oeeChartPanel} ${styles.hPareto}`}>
+          <section className={`${styles.panel} ${styles.spanFull} ${styles.hPareto}`}>
             <div className={styles.panelTitle}>OEE per Jam</div>
             <div className={styles.panelBody}><HourlyOeeChart oee={oeeByHour} /></div>
           </section>
@@ -457,10 +466,9 @@ export function ProductionDashboardView({
           </section>
         )}
 
-        {/* Without the "OEE per Jam" panel (every view but B/C) the log would sit
-            alone on a half-empty row, so it takes the full width there instead. */}
+        {/* Last panel, alone on its row in every view — full width. */}
         {!hidden.has('entryLog') && (
-          <section className={`${styles.panel} ${oeeByHour ? styles.spanHalf : styles.spanFull} ${styles.hLog}`}>
+          <section className={`${styles.panel} ${styles.spanFull} ${styles.hLog}`}>
             <div className={styles.scrollBody}>
               <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
             </div>

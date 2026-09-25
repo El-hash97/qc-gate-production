@@ -118,3 +118,58 @@ describe('ProductionDashboardView export button', () => {
     expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
   });
 });
+
+describe('ProductionDashboardView hourly table', () => {
+  it('gives the Hourly (Tabel) panel the full-width class', () => {
+    render(
+      <ToastProvider>
+        <ProductionDashboardView state={state} view="bc" onViewChange={() => {}} now={null} />
+      </ToastProvider>,
+    );
+    const panel = screen.getByText('Hourly (Tabel)').closest('section')!;
+    expect(panel.className).toMatch(/spanFull/);
+  });
+
+  it('gives the OEE per Jam panel the full-width class too', () => {
+    render(
+      <ToastProvider>
+        <ProductionDashboardView state={state} view="bc" onViewChange={() => {}} now={null} />
+      </ToastProvider>,
+    );
+    const panel = screen.getByText('OEE per Jam').closest('section')!;
+    expect(panel.className).toMatch(/spanFull/);
+  });
+
+  it('forwards a pin-toggle click to onPinHour', () => {
+    const withHour: ProductionState = {
+      ...state,
+      hourlyData: { '07:00': { ok: 5, repair: 0, ng: 0 } },
+    };
+    const onPinHour = vi.fn();
+    render(
+      <ToastProvider>
+        <ProductionDashboardView
+          state={withHour} view="bc" onViewChange={() => {}} now={null}
+          onHourlyWindowChange={() => {}} onPinHour={onPinHour}
+        />
+      </ToastProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Arahkan input manual ke jam 07:00' }));
+    expect(onPinHour).toHaveBeenCalledWith('07:00');
+  });
+
+  it("shows a line stop's Item Problem under its hour, via lineStopsByHour", () => {
+    const withStop: ProductionState = {
+      ...state,
+      hourlyData: { '07:00': { ok: 5, repair: 0, ng: 0 } },
+      lineStops: [{ start: '07:10', end: '07:20', problem: 'Ganti tooling', category: 'AV' }],
+    };
+    render(
+      <ToastProvider>
+        <ProductionDashboardView state={withStop} view="bc" onViewChange={() => {}} now={null} />
+      </ToastProvider>,
+    );
+    const row = screen.getByRole('row', { name: /07:00.*Ganti tooling/ });
+    expect(row).toBeInTheDocument();
+  });
+});

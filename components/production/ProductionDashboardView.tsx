@@ -147,16 +147,28 @@ export function ProductionDashboardView({
       : mergeCounts(state.repairData, state.repairDataShaft)
   ), [view, isShaftLine, state.repairData, state.repairDataShaft, state.entryLogs]);
   const hourlyData = useMemo(() => {
-    const base = view === 'bc' ? state.hourlyData
-      : view === 'camshaft' ? (state.hourlyDataCam ?? {})
-      : view === 'crankshaft' ? (state.hourlyDataCrank ?? {})
-      : mergeHourly(state.hourlyData, state.hourlyDataShaft);
-    const periodHours = hoursForShiftTime(state.shiftTime);
-    if (periodHours.length === 0) return base;
-    const filled: Record<string, typeof base[string]> = { ...base };
-    for (const h of periodHours) if (!filled[h]) filled[h] = { ok: 0, repair: 0, ng: 0 };
-    return filled;
-  }, [view, state.hourlyData, state.hourlyDataShaft, state.hourlyDataCam, state.hourlyDataCrank, state.shiftTime]);
+    // B/C, Camshaft, Crankshaft: show full shift timeline (Day/Night prefilled).
+    if (view !== 'all') {
+      const base = view === 'bc' ? state.hourlyData
+        : view === 'camshaft' ? (state.hourlyDataCam ?? {})
+        : (state.hourlyDataCrank ?? {});
+      const periodHours = hoursForShiftTime(state.shiftTime);
+      if (periodHours.length === 0) return base;
+      const filled: Record<string, typeof base[string]> = { ...base };
+      for (const h of periodHours) if (!filled[h]) filled[h] = { ok: 0, repair: 0, ng: 0 };
+      return filled;
+    }
+    // Semua: only hours with actual production or a line stop — avoids 13 empty
+    // zero rows when camshaft/crankshaft only run 1-2 specific hours.
+    const merged = mergeHourly(state.hourlyData, state.hourlyDataShaft);
+    const byHour = lineStopsByHour(state.lineStops);
+    const filtered: typeof merged = {};
+    for (const [hour, snap] of Object.entries(merged)) {
+      const total = snap.ok + snap.repair + snap.ng;
+      if (total > 0 || (byHour[hour]?.length ?? 0) > 0) filtered[hour] = snap;
+    }
+    return filtered;
+  }, [view, state.hourlyData, state.hourlyDataShaft, state.hourlyDataCam, state.hourlyDataCrank, state.shiftTime, state.lineStops]);
   const entryLogs = useMemo(() => {
     if (view === 'all') return state.entryLogs;
     if (view === 'bc') return state.entryLogs.filter((log) => (log.group ?? 'bc') === 'bc');

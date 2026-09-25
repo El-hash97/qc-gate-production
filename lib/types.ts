@@ -28,7 +28,8 @@ export function lineGroup(line: ProductLine): ProductGroup {
 
 export interface OverDimensiDetail {
   dieMould: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-  coreCombo: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  // coreCombo removed from UI; kept optional for back-compat with old rows that still store it.
+  coreCombo?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   crankCaseNo: string;
   slubWjNo: string;
   position: string;

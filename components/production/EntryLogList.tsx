@@ -20,7 +20,7 @@ export function EntryLogList({ title, logs = [] }: { title: string; logs?: Entry
                 {product && ' — '}
                 {log.type} · Lot {log.lot} / {slotLabel} {log.flask}
                 {log.die ? ` · Die ${log.die}` : ''}
-                {od ? ` · Die Mould ${od.dieMould} · Core ${od.coreCombo} · ${od.position} · CC ${od.crankCaseNo} · Slub/Wj ${od.slubWjNo}` : ''}
+                {od ? ` · Die Mould ${od.dieMould}${od.coreCombo ? ` · Core ${od.coreCombo}` : ''} · ${od.position} · CC ${od.crankCaseNo} · Slub/Wj ${od.slubWjNo}` : ''}
               </span>
               <span className={styles.count}>{log.qty}</span>
             </div>

@@ -5,7 +5,6 @@ import styles from './EntryModal.module.css';
 
 export interface OverDimensiFormState {
   dieMould: string;
-  coreCombo: string;
   crankCaseNo: string;
   slubWjNo: string;
   position: string;
@@ -13,7 +12,6 @@ export interface OverDimensiFormState {
 
 export const initialOverDimensiState: OverDimensiFormState = {
   dieMould: '',
-  coreCombo: '',
   crankCaseNo: '',
   slubWjNo: '',
   position: '',
@@ -22,7 +20,6 @@ export const initialOverDimensiState: OverDimensiFormState = {
 export function isOverDimensiValid(s: OverDimensiFormState): boolean {
   return (
     s.dieMould !== '' &&
-    s.coreCombo !== '' &&
     s.crankCaseNo.trim() !== '' &&
     s.slubWjNo.trim() !== '' &&
     s.position.trim() !== ''
@@ -32,14 +29,13 @@ export function isOverDimensiValid(s: OverDimensiFormState): boolean {
 export function toOverDimensiDetail(s: OverDimensiFormState): OverDimensiDetail {
   return {
     dieMould: parseInt(s.dieMould, 10) as OverDimensiDetail['dieMould'],
-    coreCombo: parseInt(s.coreCombo, 10) as OverDimensiDetail['coreCombo'],
     crankCaseNo: s.crankCaseNo.trim(),
     slubWjNo: s.slubWjNo.trim(),
     position: s.position.trim(),
   };
 }
 
-const OPTIONS_1_10 = Array.from({ length: 10 }, (_, i) => String(i + 1));
+const DIE_OPTIONS = Array.from({ length: 10 }, (_, i) => String(i + 1));
 
 interface Props {
   value: OverDimensiFormState;
@@ -55,38 +51,21 @@ export function OverDimensiFields({ value, onChange }: Props) {
     <div className={styles.overDimensiBox}>
       <div className={styles.overDimensiTitle}>Detail Over Dimensi</div>
 
-      <div className={styles.fieldRow}>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>No. Die Mould</span>
-          <select
-            className={styles.select}
-            value={value.dieMould}
-            onChange={(e) => update({ dieMould: e.target.value })}
-          >
-            <option value="">Pilih 1-10</option>
-            {OPTIONS_1_10.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>Combinasi Core</span>
-          <select
-            className={styles.select}
-            value={value.coreCombo}
-            onChange={(e) => update({ coreCombo: e.target.value })}
-          >
-            <option value="">Pilih 1-10</option>
-            {OPTIONS_1_10.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className={styles.field}>
+        <span className={styles.fieldLabel}>No. Die Mould</span>
+        <div className={styles.dieMouldGrid} role="group" aria-label="Pilih No. Die Mould">
+          {DIE_OPTIONS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={value.dieMould === n ? styles.dieCardActive : styles.dieCard}
+              aria-pressed={value.dieMould === n}
+              onClick={() => update({ dieMould: n })}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className={styles.fieldRow3}>

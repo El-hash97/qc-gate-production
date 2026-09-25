@@ -61,6 +61,8 @@ export interface LineStop {
   start: string;
   end: string;
   problem: string;
+  // Optional for back-compat — stops logged before this field existed have none.
+  countermeasure?: string;
   category: 'AV' | 'PE' | 'RQ';
 }
 

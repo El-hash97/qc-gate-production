@@ -54,10 +54,28 @@ export function hourCapacity(cycleTimeSec: number): number {
   return 3600 / cycleTimeSec;
 }
 
+// Hours (and minutes) a single stop's [start,end) overlaps, split at hour
+// boundaries and wrapped past midnight (a stop from 23:50 to 00:20 books 10
+// minutes to 23:00 and 20 to 00:00). Shared by lineStopMinutesByHour (sums
+// minutes, filtered by category) and lineStopsByHour (collects the stop
+// itself, every category) so both split a stop the same way. Empty array for
+// an unparseable start/end.
+function hourOverlaps(stop: LineStop): { hour: string; minutes: number }[] {
+  const start = toMinutes(stop.start);
+  const rawEnd = toMinutes(stop.end);
+  if (start === null || rawEnd === null) return [];
+  const end = rawEnd >= start ? rawEnd : rawEnd + 1440;
+  const out: { hour: string; minutes: number }[] = [];
+  for (let hour = Math.floor(start / 60); hour * 60 < end; hour++) {
+    const overlap = Math.min(end, (hour + 1) * 60) - Math.max(start, hour * 60);
+    if (overlap <= 0) continue;
+    out.push({ hour: `${String(hour % 24).padStart(2, '0')}:00`, minutes: overlap });
+  }
+  return out;
+}
+
 // Minutes lost to line stops of one category, split into the hours they
-// actually fell in and keyed like the hourly snapshots ("07:00"). A stop from
-// 07:50 to 08:20 books 10 minutes to 07:00 and 20 to 08:00; one that runs past
-// midnight wraps around to 00:00.
+// actually fell in and keyed like the hourly snapshots ("07:00").
 function lineStopMinutesByHour(
   stops: LineStop[],
   category: LineStop['category'],
@@ -65,15 +83,21 @@ function lineStopMinutesByHour(
   const out: Record<string, number> = {};
   for (const stop of stops) {
     if (stop.category !== category) continue;
-    const start = toMinutes(stop.start);
-    const rawEnd = toMinutes(stop.end);
-    if (start === null || rawEnd === null) continue;
-    const end = rawEnd >= start ? rawEnd : rawEnd + 1440;
-    for (let hour = Math.floor(start / 60); hour * 60 < end; hour++) {
-      const overlap = Math.min(end, (hour + 1) * 60) - Math.max(start, hour * 60);
-      if (overlap <= 0) continue;
-      const key = `${String(hour % 24).padStart(2, '0')}:00`;
-      out[key] = (out[key] ?? 0) + overlap;
+    for (const { hour, minutes } of hourOverlaps(stop)) {
+      out[hour] = (out[hour] ?? 0) + minutes;
+    }
+  }
+  return out;
+}
+
+// Which line stops (any category) overlap each hour, keyed like the hourly
+// snapshots ("07:00"). A stop from 07:50 to 08:20 appears under both 07:00
+// and 08:00 — for the Hourly table's Item Problem / Countermeasure columns.
+export function lineStopsByHour(stops: LineStop[] = []): Record<string, LineStop[]> {
+  const out: Record<string, LineStop[]> = {};
+  for (const stop of stops) {
+    for (const { hour } of hourOverlaps(stop)) {
+      (out[hour] ??= []).push(stop);
     }
   }
   return out;

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { LineStop } from '@/lib/types';
 import {
   DEFAULT_CYCLE_TIME_SEC, PIECES_PER_BC, productCycleTime, hourCapacity,
-  avMinutesByHour, peMinutesByHour,
+  avMinutesByHour, peMinutesByHour, lineStopsByHour,
   elapsedMinutesInHour, windowMinutes, workedMinutesInHour,
   hourlyOee, shiftOee, toPercent,
 } from '@/utils/oee';
@@ -338,5 +338,36 @@ describe('toPercent', () => {
     expect(toPercent(0.8333)).toBe(83);
     expect(toPercent(1)).toBe(100);
     expect(toPercent(0)).toBe(0);
+  });
+});
+
+describe('lineStopsByHour', () => {
+  it('places a single-hour stop under its hour', () => {
+    const stops: LineStop[] = [{ start: '08:10', end: '08:40', problem: 'Ganti tooling', category: 'AV' }];
+    expect(lineStopsByHour(stops)).toEqual({ '08:00': stops });
+  });
+
+  it('places a stop crossing an hour boundary under both hours', () => {
+    const stops: LineStop[] = [{ start: '07:50', end: '08:20', problem: 'Setting ulang', category: 'PE' }];
+    const result = lineStopsByHour(stops);
+    expect(result['07:00']).toEqual(stops);
+    expect(result['08:00']).toEqual(stops);
+  });
+
+  it('collects multiple stops that overlap the same hour, in order', () => {
+    const stops: LineStop[] = [
+      { start: '09:00', end: '09:10', problem: 'A', category: 'AV' },
+      { start: '09:20', end: '09:30', problem: 'B', category: 'PE' },
+    ];
+    expect(lineStopsByHour(stops)).toEqual({ '09:00': stops });
+  });
+
+  it('ignores a stop with an unparseable time', () => {
+    const stops: LineStop[] = [{ start: 'bad', end: '08:20', problem: 'A', category: 'AV' }];
+    expect(lineStopsByHour(stops)).toEqual({});
+  });
+
+  it('returns an empty object for no stops', () => {
+    expect(lineStopsByHour()).toEqual({});
   });
 });

@@ -11,7 +11,7 @@ import type { HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
-  date: '', shift: 'Shift Red', operator: '', target: 0,
+  date: '', shift: 'Shift Red', shiftTime: '', operator: '', target: 0,
   targetBc: 0, targetCam: 0, targetCrank: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,

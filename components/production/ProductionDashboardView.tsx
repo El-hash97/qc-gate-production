@@ -28,6 +28,7 @@ import {
   DEFAULT_CYCLE_TIME_SEC, productCycleTime, hourCapacity, windowMinutes, workedMinutesInHour,
   hourlyOee, avMinutesByHour, peMinutesByHour, lineStopsByHour, shiftOee,
 } from '@/utils/oee';
+import { hoursForShiftTime } from '@/utils/shiftHours';
 import type { OeeBreakdown } from '@/utils/oee';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
@@ -146,11 +147,16 @@ export function ProductionDashboardView({
       : mergeCounts(state.repairData, state.repairDataShaft)
   ), [view, isShaftLine, state.repairData, state.repairDataShaft, state.entryLogs]);
   const hourlyData = useMemo(() => {
-    if (view === 'bc') return state.hourlyData;
-    if (view === 'camshaft') return state.hourlyDataCam ?? {};
-    if (view === 'crankshaft') return state.hourlyDataCrank ?? {};
-    return mergeHourly(state.hourlyData, state.hourlyDataShaft);
-  }, [view, state.hourlyData, state.hourlyDataShaft, state.hourlyDataCam, state.hourlyDataCrank]);
+    const base = view === 'bc' ? state.hourlyData
+      : view === 'camshaft' ? (state.hourlyDataCam ?? {})
+      : view === 'crankshaft' ? (state.hourlyDataCrank ?? {})
+      : mergeHourly(state.hourlyData, state.hourlyDataShaft);
+    const periodHours = hoursForShiftTime(state.shiftTime);
+    if (periodHours.length === 0) return base;
+    const filled: Record<string, typeof base[string]> = { ...base };
+    for (const h of periodHours) if (!filled[h]) filled[h] = { ok: 0, repair: 0, ng: 0 };
+    return filled;
+  }, [view, state.hourlyData, state.hourlyDataShaft, state.hourlyDataCam, state.hourlyDataCrank, state.shiftTime]);
   const entryLogs = useMemo(() => {
     if (view === 'all') return state.entryLogs;
     if (view === 'bc') return state.entryLogs.filter((log) => (log.group ?? 'bc') === 'bc');

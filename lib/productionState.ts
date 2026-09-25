@@ -5,6 +5,7 @@ import type { EntryLog, HourlySnapshot, HourWindow, LineStop, ProductionState } 
 interface ProductionStateRow {
   date: string;
   shift: string;
+  shift_time?: string;
   operator: string;
   pic?: string;
   target: number;
@@ -46,6 +47,7 @@ function rowToState(row: ProductionStateRow): ProductionState {
   return {
     date: row.date,
     shift: row.shift,
+    shiftTime: (row.shift_time as ProductionState['shiftTime']) ?? '',
     operator: row.operator,
     pic: row.pic ?? '',
     target: row.target,
@@ -107,6 +109,7 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
     UPDATE production_state SET
       date = ${state.date ?? ''},
       shift = ${state.shift ?? 'Shift Red'},
+      shift_time = ${state.shiftTime ?? ''},
       operator = ${state.operator ?? ''},
       pic = ${state.pic ?? ''},
       target = ${state.target ?? 0},

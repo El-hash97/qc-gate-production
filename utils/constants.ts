@@ -98,6 +98,13 @@ export function needsOverDimensiDetail(type: string): boolean {
 
 export const SHIFTS = ['Shift Red', 'Shift White'] as const;
 
+export const SHIFT_TIMES = [
+  { value: 'day', label: 'Day (07:00–19:00)' },
+  { value: 'night', label: 'Night (20:00–08:00)' },
+] as const;
+
+export type ShiftTimeOption = (typeof SHIFT_TIMES)[number]['value'];
+
 // PIC / Group Leader per shift. `key` is what gets stored; `photo` is a
 // path under /public. Selecting a PIC also sets the shift.
 export const PICS = [

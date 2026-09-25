@@ -142,6 +142,10 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFA
 -- no "current hour" to redirect).
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS pinned_hour TEXT NOT NULL DEFAULT '';
 
+-- Day = 07:00–19:00, Night = 20:00–08:00. Drives which hourly rows are pre-generated.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS shift_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS shift_time TEXT NOT NULL DEFAULT '';
+
 -- Suspect defect line master data: which foundry process stage(s) a given
 -- defect name is suspected to come from. Many-to-many — one row per
 -- (line, defect_name) pair, since e.g. "Gas Hole" is suspect for three

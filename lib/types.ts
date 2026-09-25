@@ -79,9 +79,13 @@ export interface HourWindow {
   end: string;
 }
 
+export type ShiftTime = 'day' | 'night' | '';
+
 export interface ProductionState {
   date: string;
   shift: string;
+  // Day = 07:00–19:00, Night = 20:00–08:00 (1h per row). '' = belum dipilih (back-compat).
+  shiftTime?: ShiftTime;
   operator: string;
   // PIC / Group Leader key: 'suryo' | 'koewatno' | ''. Optional for
   // back-compat; every read site defaults a missing value to ''.

@@ -50,7 +50,7 @@ export async function resetProductionState(): Promise<ProductionState> {
     await sql.transaction([
       sql`
         INSERT INTO history
-          (date, shift, operator, pic, target, target_bc, target_cam, target_crank,
+          (date, shift, shift_time, operator, pic, target, target_bc, target_cam, target_crank,
            ok1, repair1, ng1, ok2, repair2, ng2,
            ok3, repair3, ng3, ok4, repair4, ng4,
            defect_data, repair_data, hourly_data,
@@ -60,7 +60,7 @@ export async function resetProductionState(): Promise<ProductionState> {
            hourly_window,
            cycle_time_bc, entry_logs, line_stops, saved_at)
         VALUES (
-          ${current.date}, ${current.shift}, ${current.operator}, ${current.pic ?? ''}, ${current.target},
+          ${current.date}, ${current.shift}, ${current.shiftTime ?? ''}, ${current.operator}, ${current.pic ?? ''}, ${current.target},
           ${current.targetBc ?? 0}, ${current.targetCam ?? 0}, ${current.targetCrank ?? 0},
           ${current.ok1}, ${current.repair1}, ${current.ng1},
           ${current.ok2}, ${current.repair2}, ${current.ng2},
@@ -86,7 +86,7 @@ export async function resetProductionState(): Promise<ProductionState> {
       `,
       sql`
         UPDATE production_state SET
-          date = '', shift = 'Shift Red', operator = '', pic = '', target = 0,
+          date = '', shift = 'Shift Red', shift_time = '', operator = '', pic = '', target = 0,
           target_bc = 0, target_cam = 0, target_crank = 0,
           ok1 = 0, repair1 = 0, ng1 = 0, ok2 = 0, repair2 = 0, ng2 = 0,
           ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,
@@ -104,7 +104,7 @@ export async function resetProductionState(): Promise<ProductionState> {
   } else {
     await sql`
       UPDATE production_state SET
-        date = '', shift = 'Shift Red', operator = '', pic = '', target = 0,
+        date = '', shift = 'Shift Red', shift_time = '', operator = '', pic = '', target = 0,
         target_bc = 0, target_cam = 0, target_crank = 0,
         ok1 = 0, repair1 = 0, ng1 = 0, ok2 = 0, repair2 = 0, ng2 = 0,
         ok3 = 0, repair3 = 0, ng3 = 0, ok4 = 0, repair4 = 0, ng4 = 0,

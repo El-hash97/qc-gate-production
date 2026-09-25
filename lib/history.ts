@@ -7,6 +7,7 @@ interface HistoryRow {
   id: number;
   date: string;
   shift: string;
+  shift_time?: string;
   operator: string;
   pic?: string;
   target: number;
@@ -40,6 +41,7 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     id: row.id,
     date: row.date,
     shift: row.shift,
+    shiftTime: (row.shift_time as HistoryRecord['shiftTime']) ?? '',
     operator: row.operator,
     pic: row.pic ?? '',
     target: row.target,
@@ -119,7 +121,7 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
   await sql.transaction([
     sql`
       UPDATE production_state SET
-        date = ${row.date}, shift = ${row.shift}, operator = ${row.operator}, pic = ${row.pic ?? ''}, target = ${row.target},
+        date = ${row.date}, shift = ${row.shift}, shift_time = ${row.shift_time ?? ''}, operator = ${row.operator}, pic = ${row.pic ?? ''}, target = ${row.target},
         target_bc = ${row.target_bc ?? 0}, target_cam = ${row.target_cam ?? 0}, target_crank = ${row.target_crank ?? 0},
         ok1 = ${row.ok1}, repair1 = ${row.repair1}, ng1 = ${row.ng1},
         ok2 = ${row.ok2}, repair2 = ${row.repair2}, ng2 = ${row.ng2},

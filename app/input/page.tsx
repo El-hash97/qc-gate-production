@@ -18,10 +18,12 @@ import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
 import {
-  SHIFTS, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
+  SHIFTS, SHIFT_TIMES, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
 import type { OverDimensiDetail, ProductLine, ProductionState } from '@/lib/types';
 import { lineGroup } from '@/lib/types';
+import { withShiftHours } from '@/utils/shiftHours';
+import type { ShiftTime } from '@/utils/shiftHours';
 import styles from './page.module.css';
 
 // Target input + Progress bar + Achievement badge for one product group, sat
@@ -64,7 +66,7 @@ function TargetBar({
 }
 
 const EMPTY_STATE: ProductionState = {
-  date: '', shift: 'Shift Red', operator: '', pic: '', target: 0,
+  date: '', shift: 'Shift Red', shiftTime: '', operator: '', pic: '', target: 0,
   targetBc: 0, targetCam: 0, targetCrank: 0,
   ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
@@ -285,6 +287,25 @@ export default function InputPage() {
             onChange={(event) => commit({ shift: event.target.value })}
           >
             {SHIFTS.map((shift) => <option key={shift} value={shift}>{shift}</option>)}
+          </select>
+        </label>
+        <label className={styles.toolbarGroup}>
+          <span className={styles.toolbarLabel}>Time</span>
+          <select
+            className={styles.toolbarSelect}
+            value={current.shiftTime ?? ''}
+            onChange={(event) => {
+              if (isLoading) return;
+              const v = event.target.value as ShiftTime | '';
+              if (v === 'day' || v === 'night') {
+                updateState(withShiftHours(current, v));
+              } else {
+                commit({ shiftTime: '' });
+              }
+            }}
+          >
+            <option value="">Pilih Time</option>
+            {SHIFT_TIMES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </label>
         <label className={styles.toolbarGroup}>

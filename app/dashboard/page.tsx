@@ -19,7 +19,7 @@ const EMPTY_STATE: ProductionState = {
   defectData: {}, repairData: {}, hourlyData: {},
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
   hourlyWindow: {},
-  entryLogs: [], lineStops: [], savedAt: '',
+  entryLogs: [], lineStops: [], pinnedHour: '', savedAt: '',
 };
 
 export default function DashboardPage() {
@@ -50,6 +50,14 @@ export default function DashboardPage() {
     updateState({ ...state, hourlyWindow: { ...(state.hourlyWindow ?? {}), [hour]: win } });
   }
 
+  // Toggles which hour manual OK/Repair/NG input attributes to (see
+  // useHourlySnapshot). Exclusive: pinning a new hour replaces any existing
+  // pin; pinning the already-pinned hour clears it back to real-time.
+  function handlePinHour(hour: string) {
+    if (!state) return;
+    updateState({ ...state, pinnedHour: state.pinnedHour === hour ? '' : hour });
+  }
+
   return (
     <main className={styles.page}>
       <ProductionDashboardView
@@ -58,6 +66,7 @@ export default function DashboardPage() {
         onViewChange={setView}
         now={new Date(minuteTick)}
         onHourlyWindowChange={authed ? handleHourlyWindow : undefined}
+        onPinHour={authed ? handlePinHour : undefined}
         hasPhoto={hasPhoto}
         onPhotoBarClick={(chartType, defectType) => setPhotoModal({ chartType, defectType })}
         connectionStatus={isError ? 'offline' : isFetching ? 'syncing' : 'online'}

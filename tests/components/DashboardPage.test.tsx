@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '@/components/ui/ToastProvider';
 
+const updateStateMock = vi.fn();
 vi.mock('@/hooks/useProductionState', () => ({
   useProductionState: () => ({
     state: {
@@ -21,7 +22,7 @@ vi.mock('@/hooks/useProductionState', () => ({
     },
     isFetching: false,
     isError: false,
-    updateState: vi.fn(),
+    updateState: updateStateMock,
   }),
 }));
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
@@ -52,6 +53,7 @@ import DashboardPage from '@/app/dashboard/page';
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockAuth.authed = false;
+    updateStateMock.mockClear();
   });
 
   it('shows the current operator and shift', () => {
@@ -205,5 +207,19 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Production Distribution')).not.toBeInTheDocument();
     expect(screen.getByText('Hourly Production')).toBeInTheDocument();
     mockDashboardSettings.hidden = new Set();
+  });
+
+  it("toggles pinnedHour when a row's pin button is clicked while logged in", async () => {
+    mockAuth.authed = true;
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
+    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Arahkan input manual ke jam 09:00' }));
+    expect(updateStateMock).toHaveBeenCalledWith(expect.objectContaining({ pinnedHour: '09:00' }));
+  });
+
+  it('shows no pin toggle while logged out', async () => {
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
+    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
+    expect(screen.queryByRole('button', { name: /input manual ke jam/i })).not.toBeInTheDocument();
   });
 });

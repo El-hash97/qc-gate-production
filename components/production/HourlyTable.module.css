@@ -25,7 +25,37 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- "Jam" column: start/end time fields for the actual worked window --- */
+/* --- "Jam" column: start/end time fields, plus the manual-input pin toggle --- */
+.jamCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.pinButton, .pinButtonActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pinButton:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+.pinButtonActive {
+  background: var(--accent-orange-soft, rgba(245, 158, 11, 0.15));
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+}
+
 .windowCell {
   display: inline-flex;
   align-items: center;

@@ -160,4 +160,84 @@ describe('HourlyTable', () => {
     expect(row).toHaveTextContent('83%');
     expect(row).toHaveTextContent('69%');
   });
+
+  it('shows a dash in Item Problem/Countermeasure for an hour with no line stops', () => {
+    render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }} />);
+    const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
+    expect(cells[cells.length - 2]).toHaveTextContent('—');
+    expect(cells[cells.length - 1]).toHaveTextContent('—');
+  });
+
+  it("shows a line stop's problem and countermeasure under its hour", () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
+        lineStopsByHour={{
+          '07:00': [{ start: '07:10', end: '07:20', problem: 'Ganti tooling', countermeasure: 'Cek berkala', category: 'AV' }],
+        }}
+      />,
+    );
+    const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
+    expect(cells[cells.length - 2]).toHaveTextContent('Ganti tooling');
+    expect(cells[cells.length - 1]).toHaveTextContent('Cek berkala');
+  });
+
+  it('joins multiple line stops in the same hour with "; "', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
+        lineStopsByHour={{
+          '07:00': [
+            { start: '07:00', end: '07:10', problem: 'A', countermeasure: 'CM A', category: 'AV' },
+            { start: '07:20', end: '07:30', problem: 'B', category: 'PE' },
+          ],
+        }}
+      />,
+    );
+    const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
+    expect(cells[cells.length - 2]).toHaveTextContent('A; B');
+    expect(cells[cells.length - 1]).toHaveTextContent('CM A; —');
+  });
+
+  it('does not show a pin toggle when read-only', () => {
+    render(<HourlyTable hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }} />);
+    expect(screen.queryByRole('button', { name: /jam 07:00/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a pin toggle per row when editable and onPinHour is supplied', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
+        editable
+        onPinHour={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Arahkan input manual ke jam 07:00' })).toBeInTheDocument();
+  });
+
+  it("calls onPinHour with the row's hour when its toggle is clicked", async () => {
+    const onPinHour = vi.fn();
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
+        editable
+        onPinHour={onPinHour}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Arahkan input manual ke jam 07:00' }));
+    expect(onPinHour).toHaveBeenCalledWith('07:00');
+  });
+
+  it('shows the pinned row\'s toggle as active, with an "off" label', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 5, repair: 0, ng: 0 } }}
+        editable
+        onPinHour={vi.fn()}
+        pinnedHour="07:00"
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Matikan input manual ke jam 07:00' });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
 });

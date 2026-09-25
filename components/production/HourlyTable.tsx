@@ -1,7 +1,7 @@
 'use client';
 
 import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
-import type { HourWindow, ProductionState } from '@/lib/types';
+import type { HourWindow, LineStop, ProductionState } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
 import { sortHourKeys } from '@/utils/hourOrder';
@@ -16,10 +16,19 @@ interface HourlyTableProps {
   // the cycle time, computed by the caller. Supplied only alongside `oee` (B/C);
   // the Plan and Actual columns show only when it's present.
   hourlyPlan?: Record<string, number>;
+  // Line stops overlapping each hour (see utils/oee.ts's lineStopsByHour),
+  // keyed "HH:00" — feeds the Item Problem / Countermeasure columns, shown
+  // on every view regardless of `oee`.
+  lineStopsByHour?: Record<string, LineStop[]>;
   // When true each row's time window is an editable field; otherwise it's shown
   // read-only (the "Semua" view).
   editable?: boolean;
   onWindowChange?: (hour: string, win: HourWindow) => void;
+  // Which hour (if any) manual OK/Repair/NG input is currently redirected to.
+  pinnedHour?: string;
+  // Toggles a row's hour as the pin target — only rendered when `editable` is
+  // true (same gate as the Jam-window clock picker).
+  onPinHour?: (hour: string) => void;
   // Per-hour OEE factors, keyed "HH:00". Supplied only for a view that has a
   // cycle time to measure against (B/C today); without it the Plan/Actual and
   // AV/PE/RQ/OEE columns aren't rendered at all.
@@ -57,6 +66,28 @@ function WindowCell({ win, onCommit }: { win: HourWindow; onCommit: (w: HourWind
   );
 }
 
+// Small map-pin glyph for the manual-input toggle — inherits colour from the
+// button via currentColor, same convention as TopNav's gear/person icons.
+function PinIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 2a7 7 0 00-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 00-7-7z"
+        stroke="currentColor" strokeWidth="2" strokeLinejoin="round"
+      />
+      <circle cx="12" cy="9" r="2.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+// "A; B" from every stop's problem (or countermeasure) in the hour, "—" for
+// an hour with none. Index-aligned across the two columns, so the Nth problem
+// and Nth countermeasure describe the same stop.
+function stopsText(stops: LineStop[], field: 'problem' | 'countermeasure'): string {
+  if (stops.length === 0) return '—';
+  return stops.map((s) => (field === 'problem' ? s.problem : s.countermeasure || '—')).join('; ');
+}
+
 // Green from 85%, amber from 60%, red below — a glance down the column shows
 // which hour cost the shift its OEE.
 function rateClass(percent: number): string {
@@ -90,7 +121,8 @@ function RateCell({ ratio }: { ratio: number }) {
 }
 
 export function HourlyTable({
-  hourlyData, hourlyWindow = {}, hourlyPlan = {}, editable = false, onWindowChange, oee,
+  hourlyData, hourlyWindow = {}, hourlyPlan = {}, lineStopsByHour = {},
+  editable = false, onWindowChange, pinnedHour, onPinHour, oee,
 }: HourlyTableProps) {
   const sortedHours = sortHourKeys(Object.keys(hourlyData));
 
@@ -100,6 +132,7 @@ export function HourlyTable({
         <tr>
           <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th>
           {oee && <><th>Plan</th><th>Actual</th><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
+          <th>Item Problem</th><th>Countermeasure</th>
         </tr>
       </thead>
       <tbody>
@@ -109,14 +142,29 @@ export function HourlyTable({
           const snap = hourlyData[hour];
           const actual = snap.ok + snap.repair + snap.ng;
           const plan = hourlyPlan[hour] ?? 0;
+          const stops = lineStopsByHour[hour] ?? [];
+          const pinned = hour === pinnedHour;
           return (
             <tr key={hour}>
               <td>
-                {editable && onWindowChange ? (
-                  <WindowCell win={win} onCommit={(w) => onWindowChange(hour, w)} />
-                ) : (
-                  `${win.start}–${win.end}`
-                )}
+                <span className={styles.jamCell}>
+                  {editable && onWindowChange ? (
+                    <WindowCell win={win} onCommit={(w) => onWindowChange(hour, w)} />
+                  ) : (
+                    `${win.start}–${win.end}`
+                  )}
+                  {editable && onPinHour && (
+                    <button
+                      type="button"
+                      className={pinned ? styles.pinButtonActive : styles.pinButton}
+                      aria-label={pinned ? `Matikan input manual ke jam ${hour}` : `Arahkan input manual ke jam ${hour}`}
+                      aria-pressed={pinned}
+                      onClick={() => onPinHour(hour)}
+                    >
+                      <PinIcon />
+                    </button>
+                  )}
+                </span>
               </td>
               <td>{snap.ok}</td>
               <td>{snap.repair}</td>
@@ -131,6 +179,8 @@ export function HourlyTable({
                   <RateCell ratio={factors.oee} />
                 </>
               )}
+              <td>{stopsText(stops, 'problem')}</td>
+              <td>{stopsText(stops, 'countermeasure')}</td>
             </tr>
           );
         })}

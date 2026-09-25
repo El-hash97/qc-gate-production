@@ -65,9 +65,10 @@ export function OeeCard({ oee, cycleTime, captionOverride }: OeeCardProps) {
         ))}
       </div>
 
-      <div className={styles.caption}>
-        {captionOverride ?? `CT ${formatCycleTime(cycleTime)} dtk \u00B7 ${Math.round(hourCapacity(cycleTime))} pcs/jam`}
-      </div>
+      {(() => {
+        const text = captionOverride ?? `CT ${formatCycleTime(cycleTime)} dtk \u00B7 ${Math.round(hourCapacity(cycleTime))} pcs/jam`;
+        return text ? <div className={styles.caption}>{text}</div> : null;
+      })()}
     </div>
   );
 }

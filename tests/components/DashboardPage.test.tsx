@@ -75,7 +75,7 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Achievement: 84%')).toBeInTheDocument();
   });
 
-  it('shows the OEE card by default (B/C) and as combined Gabungan on the mixed "Semua" view', async () => {
+  it('shows the OEE card by default (B/C) and as combined on the mixed "Semua" view without CT caption', async () => {
     render(<ToastProvider><DashboardPage /></ToastProvider>);
     let card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
     expect(card.getByRole('img', { name: /^OEE \d+ persen$/ })).toBeInTheDocument();
@@ -88,8 +88,8 @@ describe('DashboardPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Semua' }));
     card = within(screen.getByRole('group', { name: 'Ringkasan OEE' }));
     expect(card.getByRole('img', { name: /OEE/ })).toBeInTheDocument();
-    expect(card.getByText(/Gabungan/)).toBeInTheDocument();
-    expect(card.getByText(/720 pcs\/jam/)).toBeInTheDocument();
+    expect(card.queryByText(/Gabungan/)).not.toBeInTheDocument();
+    expect(card.queryByText(/pcs\/jam/)).not.toBeInTheDocument();
   });
 
   it('derives Camshaft and Crankshaft OEE capacity from the B/C cycle time', async () => {

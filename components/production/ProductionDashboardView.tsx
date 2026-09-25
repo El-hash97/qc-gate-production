@@ -193,8 +193,6 @@ export function ProductionDashboardView({
     view === 'all' ? 'bc' : view,
     state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC,
   );
-  const cycleTimeCam = productCycleTime('camshaft', state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC);
-  const cycleTimeCrank = productCycleTime('crankshaft', state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC);
 
   // Plan per hour = pieces the worked window allows at the cycle time:
   // round(3600/ct * windowMinutes/60), so a full hour at 50 s is 72 pcs and a
@@ -302,11 +300,7 @@ export function ProductionDashboardView({
             <OeeCard
               oee={oeeShift}
               cycleTime={cycleTime}
-              captionOverride={
-                view === 'all'
-                  ? `Gabungan \u00B7 ${Math.round(hourCapacity(cycleTime) + hourCapacity(cycleTimeCam) + hourCapacity(cycleTimeCrank))} pcs/jam`
-                  : undefined
-              }
+              captionOverride={view === 'all' ? '' : undefined}
             />
           )}
         </div>

@@ -130,17 +130,20 @@ function RateCell({ ratio }: { ratio: number }) {
 }
 
 export function HourlyTable({
-  hourlyData, hourlyWindow = {}, hourlyPlan = {}, lineStopsByHour = {},
+  hourlyData, hourlyWindow = {}, hourlyPlan, lineStopsByHour = {},
   editable = false, onWindowChange, pinnedHour, onPinHour, oee,
 }: HourlyTableProps) {
   const sortedHours = sortHourKeys(Object.keys(hourlyData));
+  const showPlan = oee !== undefined && hourlyPlan !== undefined;
+  const showOee = oee !== undefined;
 
   return (
     <table className={styles.table}>
       <thead>
         <tr>
           <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th>
-          {oee && <><th>Plan</th><th>Actual</th><th>Balance</th><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
+          {showPlan && <><th>Plan</th><th>Actual</th><th>Balance</th></>}
+          {showOee && <><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
           <th>Item Problem</th><th>Countermeasure</th>
         </tr>
       </thead>
@@ -150,7 +153,7 @@ export function HourlyTable({
           const win = hourlyWindow[hour] ?? defaultWindow(hour);
           const snap = hourlyData[hour];
           const actual = snap.ok + snap.repair + snap.ng;
-          const plan = hourlyPlan[hour] ?? 0;
+          const plan = (hourlyPlan ?? {})[hour] ?? 0;
           const stops = lineStopsByHour[hour] ?? [];
           const pinned = hour === pinnedHour;
           return (
@@ -178,11 +181,15 @@ export function HourlyTable({
               <td>{snap.ok}</td>
               <td>{snap.repair}</td>
               <td>{snap.ng}</td>
-              {oee && factors && (
+              {showPlan && factors && (
                 <>
                   <td>{plan || '—'}</td>
                   <td className={actualClass(actual, plan)}>{actualCellText(actual, plan)}</td>
                   <BalanceCell actual={actual} plan={plan} />
+                </>
+              )}
+              {showOee && factors && (
+                <>
                   <RateCell ratio={factors.av} />
                   <RateCell ratio={factors.pe} />
                   <RateCell ratio={factors.rq} />

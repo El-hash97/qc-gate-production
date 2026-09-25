@@ -186,22 +186,18 @@ export function ProductionDashboardView({
 
   // Plan per hour = pieces the worked window allows at the cycle time:
   // round(3600/ct * windowMinutes/60), so a full hour at 50 s is 72 pcs and a
-  // 45-minute window is 54. "Semua" sums BC + Camshaft + Crankshaft capacities.
+  // 45-minute window is 54. "Semua" has no Plan — camshaft/crankshaft only run
+  // 1-2 specific hours, so a combined 720 pcs plan would be misleading; show
+  // only AV/PE/RQ/OEE there.
   const hourlyPlan = useMemo(() => {
-    const out: Record<string, number> = {};
-    if (view === 'all') {
-      const totalCap = hourCapacity(cycleTime) + hourCapacity(cycleTimeCam) + hourCapacity(cycleTimeCrank);
-      for (const hour of Object.keys(hourlyData)) {
-        out[hour] = Math.round(totalCap * windowMinutes(hour, hourlyWindow) / 60);
-      }
-      return out;
-    }
+    if (view === 'all') return undefined;
     const capacity = hourCapacity(cycleTime);
+    const out: Record<string, number> = {};
     for (const hour of Object.keys(hourlyData)) {
       out[hour] = Math.round(capacity * windowMinutes(hour, hourlyWindow) / 60);
     }
     return out;
-  }, [view, hourlyData, hourlyWindow, cycleTime, cycleTimeCam, cycleTimeCrank]);
+  }, [view, hourlyData, hourlyWindow, cycleTime]);
 
   const oeeByHour = useMemo(() => {
     const avByHour = avMinutesByHour(state.lineStops);

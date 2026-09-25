@@ -60,8 +60,18 @@ export function HourlyOeeChart({ oee }: HourlyOeeChartProps) {
             suggestedMin: 0,
             suggestedMax: 100,
             grace: '8%',
-            grid: { color: ct.grid },
-            ticks: { color: ct.tick, stepSize: 20, callback: (v: number | string) => `${v}%` },
+            grid: {
+              color: (ctx: { tick: { value: number } }) =>
+                ctx.tick.value >= 0 && ctx.tick.value <= 100 ? ct.grid : 'transparent',
+            },
+            ticks: {
+              color: ct.tick,
+              stepSize: 20,
+              callback: (v: number | string) => {
+                const n = Number(v);
+                return n >= 0 && n <= 100 ? `${n}%` : '';
+              },
+            },
             border: { display: false },
           },
         },

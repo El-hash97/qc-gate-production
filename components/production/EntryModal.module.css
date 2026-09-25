@@ -207,3 +207,14 @@
   background: var(--bg-secondary);
   border-color: var(--accent-red);
 }
+
+.selectedValue {
+  margin: 6px 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-red-soft, rgba(220, 38, 38, 0.08));
+  border: 1px solid var(--accent-red);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}

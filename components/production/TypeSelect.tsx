@@ -97,10 +97,17 @@ export function TypeSelect({
     }
   }
 
+  const isSearching = search.trim().length > 0;
+
   return (
     <div className={styles.field}>
       <label>
         <span className={styles.fieldLabel}>{label}</span>
+        {!isSearching && value && (
+          <div className={styles.selectedValue} aria-live="polite">
+            Terpilih: <strong>{value}</strong>
+          </div>
+        )}
         <input
           type="text"
           className={`${styles.input} ${styles.searchInput}`}

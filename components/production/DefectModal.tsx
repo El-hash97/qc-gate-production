@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
@@ -19,6 +19,8 @@ interface DefectModalProps {
 export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask' }: DefectModalProps) {
   const [defectType, setDefectType] = useState<string>(types[0]);
   const [customType, setCustomType] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const lotRef = useRef<HTMLInputElement>(null);
   // Products have different defect lists — when the target product changes
   // (e.g. BC 1TR's list to Camshaft's), fall back to that list's first
   // option instead of keeping a selection that no longer exists in it.
@@ -26,6 +28,13 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   useEffect(() => {
     if (defectType !== OTHER_TYPE && !types.includes(defectType)) setDefectType(types[0]);
   }, [types]);
+  // After a type is picked (Enter or tap), jump straight to the next input
+  // stage so the operator doesn't have to manually tab/click.
+  useEffect(() => {
+    if (!isOpen || isSearching) return;
+    if (needsOverDimensiDetail(defectType === OTHER_TYPE ? customType.trim() : defectType)) return;
+    if (defectType !== OTHER_TYPE) lotRef.current?.focus();
+  }, [defectType, isOpen, isSearching, customType]);
   // Held as a string (not a coerced number) so the field can actually go
   // empty while the user is clearing/retyping it — a live `parseInt(...) ||
   // 1` fallback would snap an emptied field straight back to "1" and turn
@@ -62,6 +71,7 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
         onChange={setDefectType}
         isOpen={isOpen}
         searchPlaceholder="Cari jenis defect…"
+        onSearch={(q) => setIsSearching(q.trim().length > 0)}
       />
       {defectType === OTHER_TYPE && (
         <label className={styles.field}>
@@ -74,13 +84,14 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
           />
         </label>
       )}
-      {needsOverDimensiDetail(defectType === OTHER_TYPE ? customType.trim() : defectType) && (
+      {!isSearching && needsOverDimensiDetail(defectType === OTHER_TYPE ? customType.trim() : defectType) && (
         <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />
       )}
       <div className={styles.fieldRow}>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Nomor Lot</span>
           <input
+            ref={lotRef}
             className={styles.input}
             value={lot}
             onChange={(event) => setLot(event.target.value)}

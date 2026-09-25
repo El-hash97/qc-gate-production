@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { DieNumberModal } from './DieNumberModal';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
@@ -20,11 +20,19 @@ interface RepairModalProps {
 export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask' }: RepairModalProps) {
   const [repairType, setRepairType] = useState<string>(types[0]);
   const [customType, setCustomType] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const lotRef = useRef<HTMLInputElement>(null);
   // 'Other' is never in `types` but is a valid choice, so exempt it from the
   // "reset to first option when the product's list changes" guard.
   useEffect(() => {
     if (repairType !== OTHER_TYPE && !types.includes(repairType)) setRepairType(types[0]);
   }, [types]);
+  useEffect(() => {
+    if (!isOpen || isSearching) return;
+    if (needsOverDimensiDetail(repairType === OTHER_TYPE ? customType.trim() : repairType)) return;
+    if (needsDieNumber(repairType)) return;
+    if (repairType !== OTHER_TYPE) lotRef.current?.focus();
+  }, [repairType, isOpen, isSearching, customType]);
   const [qtyInput, setQtyInput] = useState('1');
   const [lot, setLot] = useState('');
   const [flask, setFlask] = useState('');
@@ -86,6 +94,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
         onChange={handleTypeChange}
         isOpen={isOpen}
         searchPlaceholder="Cari jenis repair…"
+        onSearch={(q) => setIsSearching(q.trim().length > 0)}
       />
       {repairType === OTHER_TYPE && (
         <label className={styles.field}>
@@ -98,13 +107,14 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
           />
         </label>
       )}
-      {needsOverDimensiDetail(repairType === OTHER_TYPE ? customType.trim() : repairType) && (
+      {!isSearching && needsOverDimensiDetail(repairType === OTHER_TYPE ? customType.trim() : repairType) && (
         <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />
       )}
       <div className={styles.fieldRow}>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Nomor Lot</span>
           <input
+            ref={lotRef}
             className={styles.input}
             value={lot}
             onChange={(event) => setLot(event.target.value)}

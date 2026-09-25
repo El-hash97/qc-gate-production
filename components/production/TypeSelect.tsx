@@ -34,6 +34,7 @@ interface TypeSelectProps {
   // that reuses the same list (e.g. BC 2TR's).
   isOpen: boolean;
   searchPlaceholder?: string;
+  onSearch?: (query: string) => void;
 }
 
 /**
@@ -50,7 +51,7 @@ interface TypeSelectProps {
  * shows its detail fields.
  */
 export function TypeSelect({
-  label, types, value, onChange, isOpen, searchPlaceholder = 'Cari jenis…',
+  label, types, value, onChange, isOpen, searchPlaceholder = 'Cari jenis…', onSearch,
 }: TypeSelectProps) {
   const [search, setSearch] = useState('');
   const [highlighted, setHighlighted] = useState(0);
@@ -59,6 +60,7 @@ export function TypeSelect({
     if (isOpen) {
       setSearch('');
       setHighlighted(0);
+      onSearch?.('');
     }
   }, [isOpen]);
 
@@ -71,11 +73,21 @@ export function TypeSelect({
     if (highlighted >= allOptions.length) setHighlighted(0);
   }, [allOptions.length, highlighted]);
 
+  function handleSelect(target: string) {
+    onChange(target);
+    // Clear search so the full list shows again and parent can reveal
+    // the next stage (Lot/Flask or Over Dimensi detail). This also makes
+    // isSearching false so the detail popup isn't hidden while typing.
+    setSearch('');
+    setHighlighted(0);
+    onSearch?.('');
+  }
+
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       e.preventDefault();
       const target = allOptions[highlighted] ?? allOptions[0];
-      if (target) onChange(target);
+      if (target) handleSelect(target);
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       setHighlighted((h) => (h + 1) % allOptions.length);
@@ -95,8 +107,10 @@ export function TypeSelect({
           placeholder={searchPlaceholder}
           value={search}
           onChange={(event) => {
-            setSearch(event.target.value);
+            const v = event.target.value;
+            setSearch(v);
             setHighlighted(0);
+            onSearch?.(v);
           }}
           onKeyDown={handleSearchKeyDown}
           aria-label={label}
@@ -120,7 +134,7 @@ export function TypeSelect({
                   ? styles.typeOptionHighlighted
                   : styles.typeOption
             }
-            onClick={() => onChange(type)}
+            onClick={() => handleSelect(type)}
           >
             {type}
           </button>

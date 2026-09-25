@@ -115,6 +115,15 @@ function actualCellText(actual: number, plan: number): string {
   return `${actual} / ${Math.round((actual / plan) * 100)}%`;
 }
 
+// Actual − Plan, signed like the whiteboard's Balance column: "-32" short,
+// "+8" over, "0" exactly on Plan, "—" when the hour has no Plan.
+function BalanceCell({ actual, plan }: { actual: number; plan: number }) {
+  if (plan <= 0) return <td>—</td>;
+  const balance = actual - plan;
+  const className = balance < 0 ? styles.rateBad : balance > 0 ? styles.rateGood : '';
+  return <td className={className}>{balance > 0 ? `+${balance}` : balance}</td>;
+}
+
 function RateCell({ ratio }: { ratio: number }) {
   const percent = toPercent(ratio);
   return <td className={rateClass(percent)}>{percent}%</td>;
@@ -131,7 +140,7 @@ export function HourlyTable({
       <thead>
         <tr>
           <th>Jam</th><th>OK</th><th>Repair</th><th>NG</th>
-          {oee && <><th>Plan</th><th>Actual</th><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
+          {oee && <><th>Plan</th><th>Actual</th><th>Balance</th><th>AV</th><th>PE</th><th>RQ</th><th>OEE</th></>}
           <th>Item Problem</th><th>Countermeasure</th>
         </tr>
       </thead>
@@ -173,6 +182,7 @@ export function HourlyTable({
                 <>
                   <td>{plan || '—'}</td>
                   <td className={actualClass(actual, plan)}>{actualCellText(actual, plan)}</td>
+                  <BalanceCell actual={actual} plan={plan} />
                   <RateCell ratio={factors.av} />
                   <RateCell ratio={factors.pe} />
                   <RateCell ratio={factors.rq} />

@@ -87,7 +87,7 @@ describe('HourlyTable', () => {
     );
     expect(screen.getByRole('columnheader', { name: 'Plan' })).toBeInTheDocument();
     const cells = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell');
-    // Jam, OK, Repair, NG, Plan, Actual, AV, PE, RQ, OEE
+    // Jam, OK, Repair, NG, Plan, Actual, Balance, AV, PE, RQ, OEE, Item Problem, Countermeasure
     expect(cells[4]).toHaveTextContent('72');
     expect(cells[5]).toHaveTextContent('45'); // 40 + 3 + 2
   });
@@ -130,6 +130,41 @@ describe('HourlyTable', () => {
     expect(actual(1).textContent).not.toContain('/');
     expect(actual(2)).toHaveTextContent('80');
     expect(actual(2).textContent).not.toContain('/');
+  });
+
+  it('shows Balance = Actual − Plan, signed, right after Actual', () => {
+    render(
+      <HourlyTable
+        hourlyData={{
+          '07:00': { ok: 40, repair: 0, ng: 0 }, // 40 − 72 -> -32
+          '08:00': { ok: 72, repair: 0, ng: 0 }, // met exactly -> 0
+          '09:00': { ok: 70, repair: 6, ng: 4 }, // 80 − 72 -> +8
+        }}
+        hourlyPlan={{ '07:00': 72, '08:00': 72, '09:00': 72 }}
+        oee={{ '07:00': factors, '08:00': factors, '09:00': factors }}
+      />,
+    );
+    const headers = screen.getAllByRole('columnheader').map((th) => th.textContent);
+    expect(headers.indexOf('Balance')).toBe(headers.indexOf('Actual') + 1);
+    const rows = screen.getAllByRole('row').slice(1);
+    const balance = (i: number) => within(rows[i]).getAllByRole('cell')[6];
+    expect(balance(0)).toHaveTextContent('-32');
+    expect(balance(0).className).toMatch(/rateBad/);
+    expect(balance(1)).toHaveTextContent(/^0$/);
+    expect(balance(2)).toHaveTextContent('+8');
+    expect(balance(2).className).toMatch(/rateGood/);
+  });
+
+  it('shows a dash for Balance when the hour has no Plan', () => {
+    render(
+      <HourlyTable
+        hourlyData={{ '07:00': { ok: 10, repair: 0, ng: 0 } }}
+        hourlyPlan={{}}
+        oee={{ '07:00': factors }}
+      />,
+    );
+    const cell = within(screen.getByRole('row', { name: /07:00/ })).getAllByRole('cell')[6];
+    expect(cell).toHaveTextContent('—');
   });
 
   it('shows the Actual total alone when there is no Plan to compare against', () => {

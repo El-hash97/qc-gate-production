@@ -26,6 +26,8 @@ interface HistoryRow {
   hourly_data_shaft?: Record<string, HourlySnapshot>;
   hourly_data_cam?: Record<string, HourlySnapshot>;
   hourly_data_crank?: Record<string, HourlySnapshot>;
+  hourly_data_bc1?: Record<string, HourlySnapshot>;
+  hourly_data_bc2?: Record<string, HourlySnapshot>;
   hourly_target_bc?: Record<string, number>;
   hourly_target_cam?: Record<string, number>;
   hourly_target_crank?: Record<string, number>;
@@ -60,6 +62,8 @@ function rowToHistory(row: HistoryRow): HistoryRecord {
     hourlyDataShaft: row.hourly_data_shaft ?? {},
     hourlyDataCam: row.hourly_data_cam ?? {},
     hourlyDataCrank: row.hourly_data_crank ?? {},
+    hourlyDataBc1: (row as any).hourly_data_bc1 ?? {},
+    hourlyDataBc2: (row as any).hourly_data_bc2 ?? {},
     hourlyTargetBc: row.hourly_target_bc ?? {},
     hourlyTargetCam: row.hourly_target_cam ?? {},
     hourlyTargetCrank: row.hourly_target_crank ?? {},
@@ -135,6 +139,8 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
         hourly_data_shaft = ${JSON.stringify(row.hourly_data_shaft ?? {})}::jsonb,
         hourly_data_cam = ${JSON.stringify(row.hourly_data_cam ?? {})}::jsonb,
         hourly_data_crank = ${JSON.stringify(row.hourly_data_crank ?? {})}::jsonb,
+        hourly_data_bc1 = ${JSON.stringify((row as any).hourly_data_bc1 ?? {})}::jsonb,
+        hourly_data_bc2 = ${JSON.stringify((row as any).hourly_data_bc2 ?? {})}::jsonb,
         hourly_target_bc = ${JSON.stringify(row.hourly_target_bc ?? {})}::jsonb,
         hourly_target_cam = ${JSON.stringify(row.hourly_target_cam ?? {})}::jsonb,
         hourly_target_crank = ${JSON.stringify(row.hourly_target_crank ?? {})}::jsonb,

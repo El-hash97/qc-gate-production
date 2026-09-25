@@ -32,6 +32,8 @@ interface ProductionStateRow {
   hourly_data_shaft?: Record<string, HourlySnapshot>;
   hourly_data_cam?: Record<string, HourlySnapshot>;
   hourly_data_crank?: Record<string, HourlySnapshot>;
+  hourly_data_bc1?: Record<string, HourlySnapshot>;
+  hourly_data_bc2?: Record<string, HourlySnapshot>;
   hourly_target_bc?: Record<string, number>;
   hourly_target_cam?: Record<string, number>;
   hourly_target_crank?: Record<string, number>;
@@ -74,6 +76,8 @@ function rowToState(row: ProductionStateRow): ProductionState {
     hourlyDataShaft: row.hourly_data_shaft ?? {},
     hourlyDataCam: row.hourly_data_cam ?? {},
     hourlyDataCrank: row.hourly_data_crank ?? {},
+    hourlyDataBc1: (row as any).hourly_data_bc1 ?? {},
+    hourlyDataBc2: (row as any).hourly_data_bc2 ?? {},
     hourlyTargetBc: row.hourly_target_bc ?? {},
     hourlyTargetCam: row.hourly_target_cam ?? {},
     hourlyTargetCrank: row.hourly_target_crank ?? {},
@@ -136,6 +140,8 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       hourly_data_shaft = ${JSON.stringify(state.hourlyDataShaft ?? {})}::jsonb,
       hourly_data_cam = ${JSON.stringify(state.hourlyDataCam ?? {})}::jsonb,
       hourly_data_crank = ${JSON.stringify(state.hourlyDataCrank ?? {})}::jsonb,
+      hourly_data_bc1 = ${JSON.stringify((state as any).hourlyDataBc1 ?? {})}::jsonb,
+      hourly_data_bc2 = ${JSON.stringify((state as any).hourlyDataBc2 ?? {})}::jsonb,
       hourly_target_bc = ${JSON.stringify(state.hourlyTargetBc ?? {})}::jsonb,
       hourly_target_cam = ${JSON.stringify(state.hourlyTargetCam ?? {})}::jsonb,
       hourly_target_crank = ${JSON.stringify(state.hourlyTargetCrank ?? {})}::jsonb,

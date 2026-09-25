@@ -50,12 +50,14 @@ function netSnapshot(cumulative: HourlySnapshot, prior: HourlySnapshot): HourlyS
   };
 }
 
-type HourlyKey = 'hourlyData' | 'hourlyDataShaft' | 'hourlyDataCam' | 'hourlyDataCrank';
+type HourlyKey = 'hourlyData' | 'hourlyDataShaft' | 'hourlyDataCam' | 'hourlyDataCrank' | 'hourlyDataBc1' | 'hourlyDataBc2';
 const GROUPS: [HourlyKey, RateScope][] = [
   ['hourlyData', 'bc'],
   ['hourlyDataShaft', 'shaft'],
   ['hourlyDataCam', 3],
   ['hourlyDataCrank', 4],
+  ['hourlyDataBc1', 1],
+  ['hourlyDataBc2', 2],
 ];
 
 /**
@@ -79,7 +81,7 @@ export function useHourlySnapshot(
   const currentRef = useRef(current);
   const updateStateRef = useRef(updateState);
   const lastWriteRef = useRef<Record<HourlyKey, Record<string, HourlySnapshot>>>({
-    hourlyData: {}, hourlyDataShaft: {}, hourlyDataCam: {}, hourlyDataCrank: {},
+    hourlyData: {}, hourlyDataShaft: {}, hourlyDataCam: {}, hourlyDataCrank: {}, hourlyDataBc1: {}, hourlyDataBc2: {},
   });
 
   useEffect(() => { currentRef.current = current; }, [current]);

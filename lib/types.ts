@@ -129,6 +129,10 @@ export interface ProductionState {
   // stays as their sum for the merged view; every read site defaults to {}.
   hourlyDataCam?: Record<string, HourlySnapshot>;
   hourlyDataCrank?: Record<string, HourlySnapshot>;
+  // Per-line hourly for BC 1TR (line 1) / BC 2TR (line 2) — for pinned-hour
+  // manual input that starts from 0 per line. hourlyData stays as their sum.
+  hourlyDataBc1?: Record<string, HourlySnapshot>;
+  hourlyDataBc2?: Record<string, HourlySnapshot>;
   // Per-hour production target (pcs) per product group, keyed "HH:00". Edited in
   // the dashboard Hourly table; the "Semua" view shows the per-hour sum of the
   // three. Optional for back-compat; every read site defaults to {}.

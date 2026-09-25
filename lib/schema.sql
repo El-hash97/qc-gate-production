@@ -146,6 +146,12 @@ ALTER TABLE production_state ADD COLUMN IF NOT EXISTS pinned_hour TEXT NOT NULL 
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS shift_time TEXT NOT NULL DEFAULT '';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS shift_time TEXT NOT NULL DEFAULT '';
 
+-- Per-line hourly for BC 1TR / 2TR — pin manual input starts from 0 per line.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_data_bc1 JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS hourly_data_bc2 JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_bc1 JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_bc2 JSONB NOT NULL DEFAULT '{}';
+
 -- Suspect defect line master data: which foundry process stage(s) a given
 -- defect name is suspected to come from. Many-to-many — one row per
 -- (line, defect_name) pair, since e.g. "Gas Hole" is suspect for three

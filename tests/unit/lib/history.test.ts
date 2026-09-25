@@ -34,7 +34,7 @@ describe('getHistory', () => {
       ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
       defectData: {}, repairData: {}, hourlyData: {},
       defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
-      hourlyDataCam: {}, hourlyDataCrank: {},
+      hourlyDataCam: {}, hourlyDataCrank: {}, hourlyDataBc1: {}, hourlyDataBc2: {},
       hourlyTargetBc: {}, hourlyTargetCam: {}, hourlyTargetCrank: {},
       hourlyWindow: {},
       cycleTimeBc: 50,

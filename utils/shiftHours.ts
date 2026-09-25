@@ -58,6 +58,8 @@ export function withShiftHours(
     hourlyDataShaft: ensureMapFilled(state.hourlyDataShaft, hours),
     hourlyDataCam: ensureMapFilled(state.hourlyDataCam, hours),
     hourlyDataCrank: ensureMapFilled(state.hourlyDataCrank, hours),
+    hourlyDataBc1: ensureMapFilled((state as any).hourlyDataBc1, hours),
+    hourlyDataBc2: ensureMapFilled((state as any).hourlyDataBc2, hours),
   };
 }
 

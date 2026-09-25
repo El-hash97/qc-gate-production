@@ -72,6 +72,7 @@ const EMPTY_STATE: ProductionState = {
   ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
   defectData: {}, repairData: {}, hourlyData: {},
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
+  hourlyDataCam: {}, hourlyDataCrank: {}, hourlyDataBc1: {}, hourlyDataBc2: {},
   entryLogs: [], lineStops: [], savedAt: '',
 };
 
@@ -136,8 +137,39 @@ export default function InputPage() {
     commit({ [field]: (current[field] ?? 0) + 1 } as Partial<ProductionState>);
   }
 
+  // When pinnedHour is set (manual edit of a previous hour), the input
+  // panels show that hour's production only — starting from 0 for an empty
+  // hour — so the operator doesn't see the shift's cumulative total while
+  // correcting a single hour. Attribution still goes through the global
+  // counters + useHourlySnapshot net (total - sumOther), so unpinning
+  // (realtime) shows the accumulated shift total including manual hours.
+  const isPinned = !!current.pinnedHour;
+  const pinnedH = current.pinnedHour ?? '';
+  function displayFor(field: CounterField): number {
+    if (!isPinned) return (current[field] ?? 0) as number;
+    const bc1 = (current as any).hourlyDataBc1?.[pinnedH] as { ok: number; repair: number; ng: number } | undefined;
+    const bc2 = (current as any).hourlyDataBc2?.[pinnedH] as { ok: number; repair: number; ng: number } | undefined;
+    const cam = (current as any).hourlyDataCam?.[pinnedH] as { ok: number; repair: number; ng: number } | undefined;
+    const crank = (current as any).hourlyDataCrank?.[pinnedH] as { ok: number; repair: number; ng: number } | undefined;
+    switch (field) {
+      case 'ok1': return bc1?.ok ?? 0;
+      case 'repair1': return bc1?.repair ?? 0;
+      case 'ng1': return bc1?.ng ?? 0;
+      case 'ok2': return bc2?.ok ?? 0;
+      case 'repair2': return bc2?.repair ?? 0;
+      case 'ng2': return bc2?.ng ?? 0;
+      case 'ok3': return cam?.ok ?? 0;
+      case 'repair3': return cam?.repair ?? 0;
+      case 'ng3': return cam?.ng ?? 0;
+      case 'ok4': return crank?.ok ?? 0;
+      case 'repair4': return crank?.repair ?? 0;
+      case 'ng4': return crank?.ng ?? 0;
+    }
+  }
+
   function decrement(field: CounterField) {
-    if ((current[field] ?? 0) > 0) {
+    const cur = isPinned ? displayFor(field) : (current[field] ?? 0);
+    if (cur > 0) {
       commit({ [field]: (current[field] ?? 0) - 1 } as Partial<ProductionState>);
     }
   }
@@ -177,7 +209,26 @@ export default function InputPage() {
     setRepairTarget(null);
   }
 
-  const rates = getRates(current);
+  // Display counters: realtime = global shift totals, pinned = that hour's snapshot (starts 0)
+  const displayCounters: ProductionState = isPinned
+    ? {
+        ...current,
+        ok1: displayFor('ok1'),
+        repair1: displayFor('repair1'),
+        ng1: displayFor('ng1'),
+        ok2: displayFor('ok2'),
+        repair2: displayFor('repair2'),
+        ng2: displayFor('ng2'),
+        ok3: displayFor('ok3'),
+        repair3: displayFor('repair3'),
+        ng3: displayFor('ng3'),
+        ok4: displayFor('ok4'),
+        repair4: displayFor('repair4'),
+        ng4: displayFor('ng4'),
+      }
+    : current;
+
+  const rates = getRates(displayCounters);
 
   // Per-product-group targets. `target` is kept as their sum so the History
   // table, Excel export and the dashboard "Semua" view stay unchanged.
@@ -218,12 +269,12 @@ export default function InputPage() {
   const targetCamField = useDraftValue(current.targetCam ?? 0, (v) => commitTarget({ targetCam: v }), parseTarget);
   const targetCrankField = useDraftValue(current.targetCrank ?? 0, (v) => commitTarget({ targetCrank: v }), parseTarget);
 
-  const bcProgress = getProgressPercent(current, current.targetBc ?? 0, 'bc');
-  const bcAchievement = getAchievementPercent(current, current.targetBc ?? 0, 'bc');
-  const camProgress = getProgressPercent(current, current.targetCam ?? 0, 3);
-  const camAchievement = getAchievementPercent(current, current.targetCam ?? 0, 3);
-  const crankProgress = getProgressPercent(current, current.targetCrank ?? 0, 4);
-  const crankAchievement = getAchievementPercent(current, current.targetCrank ?? 0, 4);
+  const bcProgress = getProgressPercent(displayCounters, current.targetBc ?? 0, 'bc');
+  const bcAchievement = getAchievementPercent(displayCounters, current.targetBc ?? 0, 'bc');
+  const camProgress = getProgressPercent(displayCounters, current.targetCam ?? 0, 3);
+  const camAchievement = getAchievementPercent(displayCounters, current.targetCam ?? 0, 3);
+  const crankProgress = getProgressPercent(displayCounters, current.targetCrank ?? 0, 4);
+  const crankAchievement = getAchievementPercent(displayCounters, current.targetCrank ?? 0, 4);
 
   // Block the whole form until the running shift has loaded — otherwise the
   // first click/keystroke would write EMPTY_STATE over live data.
@@ -333,17 +384,17 @@ export default function InputPage() {
         <div className={styles.productSubGroup}>
           <h2 className={styles.productHeaderBc1}>BC 1TR</h2>
           <div className={styles.counterGrid}>
-            <CounterCard label="OK" variant="ok" value={current.ok1} onIncrement={() => increment('ok1')} onDecrement={() => decrement('ok1')} />
-            <CounterCard label="Repair" variant="repair" value={current.repair1} onIncrement={() => setRepairTarget('repair1')} onDecrement={() => decrement('repair1')} />
-            <CounterCard label="NG" variant="ng" value={current.ng1} onIncrement={() => setDefectTarget('ng1')} onDecrement={() => decrement('ng1')} />
+            <CounterCard label="OK" variant="ok" value={displayFor('ok1')} onIncrement={() => increment('ok1')} onDecrement={() => decrement('ok1')} />
+            <CounterCard label="Repair" variant="repair" value={displayFor('repair1')} onIncrement={() => setRepairTarget('repair1')} onDecrement={() => decrement('repair1')} />
+            <CounterCard label="NG" variant="ng" value={displayFor('ng1')} onIncrement={() => setDefectTarget('ng1')} onDecrement={() => decrement('ng1')} />
           </div>
         </div>
         <div className={styles.productSubGroup}>
           <h2 className={styles.productHeaderBc2}>BC 2TR</h2>
           <div className={styles.counterGrid}>
-            <CounterCard label="OK" variant="ok" value={current.ok2} onIncrement={() => increment('ok2')} onDecrement={() => decrement('ok2')} />
-            <CounterCard label="Repair" variant="repair" value={current.repair2} onIncrement={() => setRepairTarget('repair2')} onDecrement={() => decrement('repair2')} />
-            <CounterCard label="NG" variant="ng" value={current.ng2} onIncrement={() => setDefectTarget('ng2')} onDecrement={() => decrement('ng2')} />
+            <CounterCard label="OK" variant="ok" value={displayFor('ok2')} onIncrement={() => increment('ok2')} onDecrement={() => decrement('ok2')} />
+            <CounterCard label="Repair" variant="repair" value={displayFor('repair2')} onIncrement={() => setRepairTarget('repair2')} onDecrement={() => decrement('repair2')} />
+            <CounterCard label="NG" variant="ng" value={displayFor('ng2')} onIncrement={() => setDefectTarget('ng2')} onDecrement={() => decrement('ng2')} />
           </div>
         </div>
       </section>
@@ -352,9 +403,9 @@ export default function InputPage() {
         <h2 className={styles.productHeaderCamshaft}>Camshaft</h2>
         <TargetBar label="Camshaft" field={targetCamField} progress={camProgress} achievement={camAchievement} />
         <div className={styles.counterGrid}>
-          <CounterCard label="OK" variant="ok" value={current.ok3 ?? 0} onIncrement={() => increment('ok3')} onDecrement={() => decrement('ok3')} />
-          <CounterCard label="Repair" variant="repair" value={current.repair3 ?? 0} onIncrement={() => setRepairTarget('repair3')} onDecrement={() => decrement('repair3')} />
-          <CounterCard label="NG" variant="ng" value={current.ng3 ?? 0} onIncrement={() => setDefectTarget('ng3')} onDecrement={() => decrement('ng3')} />
+          <CounterCard label="OK" variant="ok" value={displayFor('ok3')} onIncrement={() => increment('ok3')} onDecrement={() => decrement('ok3')} />
+          <CounterCard label="Repair" variant="repair" value={displayFor('repair3')} onIncrement={() => setRepairTarget('repair3')} onDecrement={() => decrement('repair3')} />
+          <CounterCard label="NG" variant="ng" value={displayFor('ng3')} onIncrement={() => setDefectTarget('ng3')} onDecrement={() => decrement('ng3')} />
         </div>
       </section>
 
@@ -362,9 +413,9 @@ export default function InputPage() {
         <h2 className={styles.productHeaderCrankshaft}>Crankshaft</h2>
         <TargetBar label="Crankshaft" field={targetCrankField} progress={crankProgress} achievement={crankAchievement} />
         <div className={styles.counterGrid}>
-          <CounterCard label="OK" variant="ok" value={current.ok4 ?? 0} onIncrement={() => increment('ok4')} onDecrement={() => decrement('ok4')} />
-          <CounterCard label="Repair" variant="repair" value={current.repair4 ?? 0} onIncrement={() => setRepairTarget('repair4')} onDecrement={() => decrement('repair4')} />
-          <CounterCard label="NG" variant="ng" value={current.ng4 ?? 0} onIncrement={() => setDefectTarget('ng4')} onDecrement={() => decrement('ng4')} />
+          <CounterCard label="OK" variant="ok" value={displayFor('ok4')} onIncrement={() => increment('ok4')} onDecrement={() => decrement('ok4')} />
+          <CounterCard label="Repair" variant="repair" value={displayFor('repair4')} onIncrement={() => setRepairTarget('repair4')} onDecrement={() => decrement('repair4')} />
+          <CounterCard label="NG" variant="ng" value={displayFor('ng4')} onIncrement={() => setDefectTarget('ng4')} onDecrement={() => decrement('ng4')} />
         </div>
       </section>
 

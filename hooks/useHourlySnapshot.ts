@@ -7,7 +7,9 @@ import type { HourlySnapshot, ProductionState } from '@/lib/types';
 
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
-function hourKey(): string {
+// Real current hour, unless a pin redirects it — see ProductionState.pinnedHour.
+function hourKey(pinnedHour?: string): string {
+  if (pinnedHour) return pinnedHour;
   const now = new Date();
   return `${String(now.getHours()).padStart(2, '0')}:00`;
 }
@@ -85,7 +87,7 @@ export function useHourlySnapshot(
 
   function record(state: ProductionState, update: (next: ProductionState) => void) {
     if (getGrandTotal(state) === 0) return;
-    const key = hourKey();
+    const key = hourKey(state.pinnedHour);
 
     const nets = {} as Record<HourlyKey, HourlySnapshot>;
     let changed = false;

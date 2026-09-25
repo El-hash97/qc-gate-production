@@ -102,4 +102,17 @@ describe('useHourlySnapshot', () => {
     const lastCall = updateState.mock.calls[updateState.mock.calls.length - 1];
     expect(lastCall[0].hourlyData['14:00'].ok).toBe(102);
   });
+
+  it('attributes production to the pinned hour instead of the real current hour', () => {
+    const updateState = vi.fn();
+    // Real clock hour is 14:00 (see beforeEach), but pinnedHour redirects to 09:00.
+    const state = { ...baseState, pinnedHour: '09:00' };
+    renderHook(() => useHourlySnapshot(state, updateState));
+
+    vi.advanceTimersByTime(5 * 60 * 1000);
+
+    const [arg] = updateState.mock.calls[0];
+    expect(arg.hourlyData).toEqual({ '09:00': { ok: 8, repair: 1, ng: 1 } });
+    expect(arg.hourlyData['14:00']).toBeUndefined();
+  });
 });

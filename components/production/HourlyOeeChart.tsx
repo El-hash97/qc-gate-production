@@ -47,19 +47,25 @@ export function HourlyOeeChart({ oee }: HourlyOeeChartProps) {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        clip: false,
+        layout: { padding: { top: 10, bottom: 4, left: 4, right: 8 } },
         plugins: {
           legend: { position: 'bottom', labels: { color: ct.tick, padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 10 } } },
           datalabels: { display: false },
           tooltip: { callbacks: { label: (c: { dataset: { label?: string }; parsed: { y: number | null } }) => `${c.dataset.label}: ${c.parsed.y ?? 0}%` } },
         },
         scales: {
-          x: { grid: { display: false }, ticks: { color: ct.tick, font: { size: 9 } } },
+          x: { offset: true, grid: { display: false }, ticks: { color: ct.tick, font: { size: 9 } } },
           y: {
-            min: 0, max: 100,
+            suggestedMin: 0,
+            suggestedMax: 100,
+            grace: '8%',
             grid: { color: ct.grid },
             ticks: { color: ct.tick, stepSize: 20, callback: (v: number | string) => `${v}%` },
+            border: { display: false },
           },
         },
+        elements: { point: { hitRadius: 8 }, line: { capBezierPoints: false } },
       }}
     />
   );

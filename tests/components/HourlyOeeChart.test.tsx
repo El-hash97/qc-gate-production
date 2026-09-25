@@ -33,10 +33,13 @@ describe('HourlyOeeChart', () => {
     expect(byLabel.RQ.data).toEqual([90, 80, null, null]);
   });
 
-  it('locks the y-axis to 0-100%', () => {
+  it('locks the y-axis to 0-100% with breathing room and x offset', () => {
     render(<HourlyOeeChart oee={oee} />);
     const [props] = chartSpy.mock.calls[0];
-    expect(props.options.scales.y.min).toBe(0);
-    expect(props.options.scales.y.max).toBe(100);
+    expect(props.options.scales.y.suggestedMin).toBe(0);
+    expect(props.options.scales.y.suggestedMax).toBe(100);
+    expect(props.options.scales.y.grace).toBe('8%');
+    expect(props.options.scales.x.offset).toBe(true);
+    expect(props.options.clip).toBe(false);
   });
 });

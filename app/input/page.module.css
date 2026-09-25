@@ -11,6 +11,16 @@
   padding: 40px 0;
 }
 
+.pinnedBanner {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-orange);
+  background: var(--accent-orange-soft, rgba(245, 158, 11, 0.15));
+  color: var(--accent-orange);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .topRow {
   display: flex;
   gap: 20px;

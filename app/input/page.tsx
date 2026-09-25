@@ -231,6 +231,11 @@ export default function InputPage() {
 
   return (
     <main className={styles.page}>
+      {current.pinnedHour && (
+        <div className={styles.pinnedBanner} role="status">
+          Input diarahkan ke jam {current.pinnedHour}, bukan jam real-time. Matikan dari tabel Hourly di Dashboard jika sudah selesai.
+        </div>
+      )}
       <div className={styles.topRow}>
       {current.pic && <PicCard pic={current.pic} />}
       <div className={styles.toolbar}>

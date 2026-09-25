@@ -117,4 +117,15 @@ describe('InputPage', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
     expect(screen.getByText('Ireboshi')).toBeInTheDocument();
   });
+
+  it('shows no pinned-hour banner by default (real-time input)', () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    expect(screen.queryByText(/input diarahkan ke jam/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a banner naming the pinned hour when one is set', () => {
+    hookReturn = { state: { ...stateMock, pinnedHour: '09:00' }, updateState: updateStateMock, isLoading: false };
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    expect(screen.getByText(/input diarahkan ke jam 09:00/i)).toBeInTheDocument();
+  });
 });

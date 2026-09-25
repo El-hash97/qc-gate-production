@@ -66,7 +66,19 @@ export function TypeSelect({
 
   const query = search.trim().toLowerCase();
   const filtered = query ? rankBySearch(types, query) : [...types];
-  const allOptions = [...filtered, OTHER_TYPE];
+  // Selected item stays red and is pinned to the top of the search results
+  // so the operator always sees the current choice first.
+  const allOptionsBase = [...filtered, OTHER_TYPE];
+  const allOptions = (() => {
+    const idx = allOptionsBase.indexOf(value);
+    if (idx > 0) {
+      const copy = [...allOptionsBase];
+      copy.splice(idx, 1);
+      copy.unshift(value);
+      return copy;
+    }
+    return allOptionsBase;
+  })();
 
   // Keep highlighted in bounds when filter changes
   useEffect(() => {
@@ -97,17 +109,10 @@ export function TypeSelect({
     }
   }
 
-  const isSearching = search.trim().length > 0;
-
   return (
     <div className={styles.field}>
       <label>
         <span className={styles.fieldLabel}>{label}</span>
-        {!isSearching && value && (
-          <div className={styles.selectedValue} aria-live="polite">
-            Terpilih: <strong>{value}</strong>
-          </div>
-        )}
         <input
           type="text"
           className={`${styles.input} ${styles.searchInput}`}

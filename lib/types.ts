@@ -143,6 +143,12 @@ export interface ProductionState {
   // Plant-wide line stops. Optional for back-compat; every read site defaults
   // a missing value to [].
   lineStops?: LineStop[];
+  // "HH:00" of the hour manual OK/Repair/NG input is currently redirected to,
+  // instead of the real current hour — or '' (the default) for real-time
+  // attribution. Set only while logged in, via the Hourly (Tabel) panel's
+  // per-row toggle (see useHourlySnapshot, HourlyTable). Plant-wide; reset to
+  // '' on every shift reset; not archived to history.
+  pinnedHour?: string;
   savedAt: string;
 }
 

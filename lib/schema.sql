@@ -136,6 +136,12 @@ ALTER TABLE history          ADD COLUMN IF NOT EXISTS hourly_window JSONB NOT NU
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFAULT 50;
 ALTER TABLE history ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFAULT 50;
 
+-- "HH:00" of the hour manual production input is currently redirected to,
+-- instead of the real current hour — '' (the default) means real-time. Live-
+-- editing concept only: production_state, not history (an archived shift has
+-- no "current hour" to redirect).
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS pinned_hour TEXT NOT NULL DEFAULT '';
+
 -- Suspect defect line master data: which foundry process stage(s) a given
 -- defect name is suspected to come from. Many-to-many — one row per
 -- (line, defect_name) pair, since e.g. "Gas Hole" is suspect for three

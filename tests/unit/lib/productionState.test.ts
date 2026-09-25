@@ -35,8 +35,21 @@ describe('getProductionState', () => {
       cycleTimeBc: 50,
       entryLogs: [],
       lineStops: [],
+      pinnedHour: '',
       savedAt: '2026-08-05T07:00:00.000Z',
     });
+  });
+
+  it('reads a stored pinned_hour through', async () => {
+    mockSql.mockResolvedValueOnce([{
+      date: '2026-08-05', shift: 'Shift Red', operator: 'Budi', target: 100,
+      ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
+      defect_data: {}, repair_data: {}, hourly_data: {},
+      pinned_hour: '09:00',
+      saved_at: '2026-08-05T07:00:00.000Z',
+    }]);
+    const result = await getProductionState();
+    expect(result?.pinnedHour).toBe('09:00');
   });
 });
 
@@ -50,6 +63,14 @@ describe('saveProductionState', () => {
     const [strings, ...values] = mockSql.mock.calls[0];
     expect(strings.join('?')).toContain('UPDATE production_state');
     expect(values).toContain('Siti');
+  });
+
+  it('writes pinnedHour through to the UPDATE', async () => {
+    mockSql.mockResolvedValueOnce([]);
+    await saveProductionState({ operator: 'Siti', pinnedHour: '09:00' });
+    const [strings, ...values] = mockSql.mock.calls[0];
+    expect(strings.join('?')).toContain('pinned_hour');
+    expect(values).toContain('09:00');
   });
 
   it('rejects a negative counter value instead of writing it', async () => {

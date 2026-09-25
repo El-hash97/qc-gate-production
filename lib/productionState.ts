@@ -38,6 +38,7 @@ interface ProductionStateRow {
   cycle_time_bc?: number;
   entry_logs: EntryLog[];
   line_stops?: LineStop[];
+  pinned_hour?: string;
   saved_at: string;
 }
 
@@ -78,6 +79,7 @@ function rowToState(row: ProductionStateRow): ProductionState {
     cycleTimeBc: row.cycle_time_bc || DEFAULT_CYCLE_TIME_SEC,
     entryLogs: row.entry_logs ?? [],
     lineStops: row.line_stops ?? [],
+    pinnedHour: row.pinned_hour ?? '',
     savedAt: row.saved_at,
   };
 }
@@ -138,6 +140,7 @@ export async function saveProductionState(state: Partial<ProductionState>): Prom
       cycle_time_bc = ${state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC},
       entry_logs = ${JSON.stringify(state.entryLogs ?? [])}::jsonb,
       line_stops = ${JSON.stringify(state.lineStops ?? [])}::jsonb,
+      pinned_hour = ${state.pinnedHour ?? ''},
       saved_at = now()
     WHERE id = 1
   `;

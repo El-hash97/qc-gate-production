@@ -174,29 +174,36 @@ export function ProductionDashboardView({
 
   // OEE needs a cycle time to measure availability against. The B/C cycle time
   // drives every product (Camshaft and Crankshaft derive theirs from it by
-  // mould ratio), so each product view has one; "Semua" mixes three products
-  // and shows no OEE at all rather than a misleading blend.
-  const showOee = view !== 'all';
+  // mould ratio). "Semua" now shows a combined OEE — AV/PE from plant-wide
+  // stops and RQ from total OK / total produced across BC + Camshaft +
+  // Crankshaft (weighted, not averaged), so the card reflects plant-wide quality.
   const cycleTime = productCycleTime(
     view === 'all' ? 'bc' : view,
     state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC,
   );
+  const cycleTimeCam = productCycleTime('camshaft', state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC);
+  const cycleTimeCrank = productCycleTime('crankshaft', state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC);
 
   // Plan per hour = pieces the worked window allows at the cycle time:
   // round(3600/ct * windowMinutes/60), so a full hour at 50 s is 72 pcs and a
-  // 45-minute window is 54. Per product view — "Semua" has no cycle time.
+  // 45-minute window is 54. "Semua" sums BC + Camshaft + Crankshaft capacities.
   const hourlyPlan = useMemo(() => {
-    if (!showOee) return undefined;
-    const capacity = hourCapacity(cycleTime);
     const out: Record<string, number> = {};
+    if (view === 'all') {
+      const totalCap = hourCapacity(cycleTime) + hourCapacity(cycleTimeCam) + hourCapacity(cycleTimeCrank);
+      for (const hour of Object.keys(hourlyData)) {
+        out[hour] = Math.round(totalCap * windowMinutes(hour, hourlyWindow) / 60);
+      }
+      return out;
+    }
+    const capacity = hourCapacity(cycleTime);
     for (const hour of Object.keys(hourlyData)) {
       out[hour] = Math.round(capacity * windowMinutes(hour, hourlyWindow) / 60);
     }
     return out;
-  }, [showOee, hourlyData, hourlyWindow, cycleTime]);
+  }, [view, hourlyData, hourlyWindow, cycleTime, cycleTimeCam, cycleTimeCrank]);
 
   const oeeByHour = useMemo(() => {
-    if (!showOee) return undefined;
     const avByHour = avMinutesByHour(state.lineStops);
     const peByHour = peMinutesByHour(state.lineStops);
     const out: Record<string, OeeBreakdown> = {};
@@ -205,11 +212,11 @@ export function ProductionDashboardView({
       out[hour] = hourlyOee(snapshot, avByHour[hour] ?? 0, peByHour[hour] ?? 0, elapsed);
     }
     return out;
-  }, [showOee, hourlyData, hourlyWindow, state.lineStops, now]);
+  }, [hourlyData, hourlyWindow, state.lineStops, now]);
 
   const oeeShift = useMemo(
-    () => (showOee ? shiftOee(hourlyData, state.lineStops, now, hourlyWindow) : null),
-    [showOee, hourlyData, hourlyWindow, state.lineStops, now],
+    () => shiftOee(hourlyData, state.lineStops, now, hourlyWindow),
+    [hourlyData, hourlyWindow, state.lineStops, now],
   );
 
   // Export the current view as a PDF via the browser's print-to-PDF. Chart
@@ -283,7 +290,17 @@ export function ProductionDashboardView({
           {state.pic && <PicCard pic={state.pic} />}
         </div>
         <div className={styles.oeeSlot}>
-          {oeeShift && <OeeCard oee={oeeShift} cycleTime={cycleTime} />}
+          {oeeShift && (
+            <OeeCard
+              oee={oeeShift}
+              cycleTime={cycleTime}
+              captionOverride={
+                view === 'all'
+                  ? `Gabungan \u00B7 ${Math.round(hourCapacity(cycleTime) + hourCapacity(cycleTimeCam) + hourCapacity(cycleTimeCrank))} pcs/jam`
+                  : undefined
+              }
+            />
+          )}
         </div>
         {connectionStatus && (
           <span className={styles.statusRight}>

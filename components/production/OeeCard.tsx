@@ -21,9 +21,11 @@ interface OeeCardProps {
   // Seconds per piece, shown as the caption so the basis of AV is never a
   // mystery number.
   cycleTime: number;
+  // For the "Semua" view the OEE is combined (BC+Cam+Crank) — show total pcs/jam instead of single-product CT.
+  captionOverride?: string;
 }
 
-export function OeeCard({ oee, cycleTime }: OeeCardProps) {
+export function OeeCard({ oee, cycleTime, captionOverride }: OeeCardProps) {
   const percent = toPercent(oee.oee);
   const factors = [
     { label: 'AV', value: toPercent(oee.av) },
@@ -64,7 +66,7 @@ export function OeeCard({ oee, cycleTime }: OeeCardProps) {
       </div>
 
       <div className={styles.caption}>
-        CT {formatCycleTime(cycleTime)} dtk &middot; {Math.round(hourCapacity(cycleTime))} pcs/jam
+        {captionOverride ?? `CT ${formatCycleTime(cycleTime)} dtk \u00B7 ${Math.round(hourCapacity(cycleTime))} pcs/jam`}
       </div>
     </div>
   );

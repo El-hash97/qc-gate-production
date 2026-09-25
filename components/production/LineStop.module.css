@@ -24,7 +24,7 @@
 
 .form {
   display: grid;
-  grid-template-columns: 130px 130px 1fr 90px auto;
+  grid-template-columns: 130px 130px 1fr 1fr 90px auto;
   gap: 12px;
   align-items: end;
 }
@@ -91,6 +91,7 @@
 }
 
 .rowProblem { flex: 1; color: var(--text-secondary); }
+.rowCountermeasure { flex: 1; color: var(--text-secondary); }
 
 .badge {
   font-size: 11px;
@@ -150,5 +151,5 @@
 
 @media (max-width: 640px) {
   .form { grid-template-columns: 1fr 1fr; }
-  .form .group:nth-child(3) { grid-column: 1 / -1; }
+  .form .group:nth-child(3), .form .group:nth-child(4) { grid-column: 1 / -1; }
 }

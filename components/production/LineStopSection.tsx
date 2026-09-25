@@ -17,16 +17,20 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [problem, setProblem] = useState('');
+  const [countermeasure, setCountermeasure] = useState('');
   const [category, setCategory] = useState<LineStop['category']>('AV');
 
   const canAdd = start !== '' && end !== '' && problem.trim() !== '';
 
   function add() {
     if (!canAdd) return;
-    onChange([...stops, { start, end, problem: problem.trim(), category }]);
+    onChange([...stops, {
+      start, end, problem: problem.trim(), countermeasure: countermeasure.trim(), category,
+    }]);
     setStart('');
     setEnd('');
     setProblem('');
+    setCountermeasure('');
     setCategory('AV');
   }
 
@@ -64,6 +68,15 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
           />
         </label>
         <label className={styles.group}>
+          <span className={styles.label}>Countermeasure</span>
+          <input
+            className={styles.input}
+            value={countermeasure}
+            onChange={(e) => setCountermeasure(e.target.value)}
+            placeholder="Countermeasure"
+          />
+        </label>
+        <label className={styles.group}>
           <span className={styles.label}>Kategori</span>
           <select
             className={styles.select}
@@ -87,6 +100,7 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
               <span className={styles.rowTime}>{s.start}–{s.end}</span>
               <span>({formatDuration(lineStopMinutes(s.start, s.end))})</span>
               <span className={styles.rowProblem}>{s.problem}</span>
+              <span className={styles.rowCountermeasure}>{s.countermeasure || '—'}</span>
               <span className={styles.badge}>{s.category}</span>
               <button
                 type="button"

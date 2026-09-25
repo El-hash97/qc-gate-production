@@ -10,7 +10,7 @@ describe('LineStopSection', () => {
     expect(screen.getByRole('textbox', { name: 'Jam Selesai' })).toHaveValue('');
   });
 
-  it('adds a line stop once both times, via the clock picker, and a problem are filled in', async () => {
+  it('adds a line stop once both times, a problem, and a countermeasure are filled in', async () => {
     const onChange = vi.fn();
     render(<LineStopSection stops={[]} onChange={onChange} />);
 
@@ -25,14 +25,15 @@ describe('LineStopSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'OK' }));
 
     await userEvent.type(screen.getByPlaceholderText('Problem line stop'), 'Mesin macet');
+    await userEvent.type(screen.getByPlaceholderText('Countermeasure'), 'Ganti oli');
     await userEvent.click(screen.getByRole('button', { name: 'Tambah' }));
 
     expect(onChange).toHaveBeenCalledWith([
-      { start: '07:00', end: '07:30', problem: 'Mesin macet', category: 'AV' },
+      { start: '07:00', end: '07:30', problem: 'Mesin macet', countermeasure: 'Ganti oli', category: 'AV' },
     ]);
   });
 
-  it('adds a line stop typed directly into the manual Jam Mulai/Selesai inputs', async () => {
+  it('adds a line stop typed directly into the manual Jam Mulai/Selesai inputs, with an empty countermeasure by default', async () => {
     const onChange = vi.fn();
     render(<LineStopSection stops={[]} onChange={onChange} />);
 
@@ -42,7 +43,7 @@ describe('LineStopSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Tambah' }));
 
     expect(onChange).toHaveBeenCalledWith([
-      { start: '07:30', end: '08:00', problem: 'Mesin macet', category: 'AV' },
+      { start: '07:30', end: '08:00', problem: 'Mesin macet', countermeasure: '', category: 'AV' },
     ]);
   });
 

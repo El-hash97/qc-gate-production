@@ -156,6 +156,7 @@ export function HourlyTable({
           const plan = (hourlyPlan ?? {})[hour] ?? 0;
           const stops = lineStopsByHour[hour] ?? [];
           const pinned = hour === pinnedHour;
+          const touched = actual > 0 || stops.length > 0;
           return (
             <tr key={hour}>
               <td>
@@ -178,24 +179,39 @@ export function HourlyTable({
                   )}
                 </span>
               </td>
-              <td>{snap.ok}</td>
-              <td>{snap.repair}</td>
-              <td>{snap.ng}</td>
-              {showPlan && factors && (
-                <>
-                  <td>{plan || '—'}</td>
-                  <td className={actualClass(actual, plan)}>{actualCellText(actual, plan)}</td>
-                  <BalanceCell actual={actual} plan={plan} />
-                </>
-              )}
-              {showOee && factors && (
-                <>
-                  <RateCell ratio={factors.av} />
-                  <RateCell ratio={factors.pe} />
-                  <RateCell ratio={factors.rq} />
-                  <RateCell ratio={factors.oee} />
-                </>
-              )}
+              <td className={touched ? undefined : styles.untouched}>{snap.ok}</td>
+              <td className={touched ? undefined : styles.untouched}>{snap.repair}</td>
+              <td className={touched ? undefined : styles.untouched}>{snap.ng}</td>
+              {showPlan &&
+                (touched && factors ? (
+                  <>
+                    <td>{plan || '—'}</td>
+                    <td className={actualClass(actual, plan)}>{actualCellText(actual, plan)}</td>
+                    <BalanceCell actual={actual} plan={plan} />
+                  </>
+                ) : (
+                  <>
+                    <td className={styles.untouched}>—</td>
+                    <td className={styles.untouched}>—</td>
+                    <td className={styles.untouched}>—</td>
+                  </>
+                ))}
+              {showOee &&
+                (touched && factors ? (
+                  <>
+                    <RateCell ratio={factors.av} />
+                    <RateCell ratio={factors.pe} />
+                    <RateCell ratio={factors.rq} />
+                    <RateCell ratio={factors.oee} />
+                  </>
+                ) : (
+                  <>
+                    <td className={styles.untouched}>—</td>
+                    <td className={styles.untouched}>—</td>
+                    <td className={styles.untouched}>—</td>
+                    <td className={styles.untouched}>—</td>
+                  </>
+                ))}
               <td>{stopsText(stops, 'problem')}</td>
               <td>{stopsText(stops, 'countermeasure')}</td>
             </tr>

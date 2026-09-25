@@ -75,3 +75,8 @@
 .rateGood { color: var(--accent-green); }
 .rateWarn { color: var(--accent-orange); }
 .rateBad { color: var(--accent-red); }
+
+.untouched {
+  color: var(--text-secondary);
+  opacity: 0.55;
+}

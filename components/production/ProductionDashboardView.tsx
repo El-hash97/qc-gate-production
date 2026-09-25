@@ -209,21 +209,37 @@ export function ProductionDashboardView({
     return out;
   }, [view, hourlyData, hourlyWindow, cycleTime]);
 
+  // Only hours that have been touched (production >0 or a line stop overlapping it)
+  // count toward OEE. Untouched future hours stay grey in the table and are
+  // excluded from the shift OEE so they don't drag 0% into the average.
+  const touchedHours = useMemo(() => {
+    const out = new Set<string>();
+    for (const [hour, snap] of Object.entries(hourlyData)) {
+      const total = snap.ok + snap.repair + snap.ng;
+      if (total > 0 || (stopsByHour[hour]?.length ?? 0) > 0) out.add(hour);
+    }
+    return out;
+  }, [hourlyData, stopsByHour]);
+
   const oeeByHour = useMemo(() => {
     const avByHour = avMinutesByHour(state.lineStops);
     const peByHour = peMinutesByHour(state.lineStops);
     const out: Record<string, OeeBreakdown> = {};
     for (const [hour, snapshot] of Object.entries(hourlyData)) {
+      if (!touchedHours.has(hour)) continue;
       const elapsed = workedMinutesInHour(hour, hourlyWindow, now);
       out[hour] = hourlyOee(snapshot, avByHour[hour] ?? 0, peByHour[hour] ?? 0, elapsed);
     }
     return out;
-  }, [hourlyData, hourlyWindow, state.lineStops, now]);
+  }, [hourlyData, hourlyWindow, state.lineStops, now, touchedHours]);
 
-  const oeeShift = useMemo(
-    () => shiftOee(hourlyData, state.lineStops, now, hourlyWindow),
-    [hourlyData, hourlyWindow, state.lineStops, now],
-  );
+  const oeeShift = useMemo(() => {
+    const filtered: Record<string, typeof hourlyData[string]> = {};
+    for (const [hour, snap] of Object.entries(hourlyData)) {
+      if (touchedHours.has(hour)) filtered[hour] = snap;
+    }
+    return shiftOee(filtered, state.lineStops, now, hourlyWindow);
+  }, [hourlyData, touchedHours, hourlyWindow, state.lineStops, now]);
 
   // Export the current view as a PDF via the browser's print-to-PDF. Chart
   // canvases can't be recoloured by the print stylesheet, so force the light

@@ -14,7 +14,7 @@ describe('DefectModal', () => {
   it('saves a manually typed defect when Other is selected', async () => {
     const onSave = vi.fn();
     render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Other');
+    await userEvent.click(screen.getByRole('option', { name: 'Other' }));
     await userEvent.type(screen.getByLabelText('Defect Lainnya'), 'Retak halus');
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
@@ -25,7 +25,7 @@ describe('DefectModal', () => {
   it('does not save an empty Other value', async () => {
     const onSave = vi.fn();
     render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Other');
+    await userEvent.click(screen.getByRole('option', { name: 'Other' }));
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
@@ -40,7 +40,7 @@ describe('DefectModal', () => {
   it('calls onSave with the selected defect type, quantity, lot, and flask', async () => {
     const onSave = vi.fn();
     render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Kandama Rear');
+    await userEvent.click(screen.getByRole('option', { name: 'Kandama Rear' }));
     await userEvent.clear(screen.getByRole('spinbutton'));
     await userEvent.type(screen.getByRole('spinbutton'), '3');
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L123');
@@ -73,7 +73,7 @@ describe('DefectModal', () => {
       <DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />,
     );
     rerender(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={['Ireboshi', 'Hike']} />);
-    expect(screen.getByRole('listbox')).toHaveValue('Ireboshi');
+    expect(screen.getByRole('option', { name: 'Ireboshi' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('narrows the defect list to matches when searching', async () => {

@@ -38,22 +38,52 @@ interface TypeSelectProps {
 
 /**
  * The searchable "pick a defect/repair type" control behind DefectModal and
- * RepairModal. The fixed lists run to 20+ entries, so a text filter above the
+ * RepairModal. Fixed lists run to 20+ entries, so a text filter above the
  * list gets an operator to the right one in a couple of keystrokes instead of
  * scrolling. "Other" is always appended, unaffected by the filter, as the
  * manual fallback for anything not in the list.
+ *
+ * Tablet-friendly: options are full-width buttons (44px min tap target),
+ * clicking anywhere on the row selects it. Pressing Enter in the search
+ * field selects the highlighted (first) filtered result — speeds up keyboard
+ * / scanner input. When Over Dimensi is selected the parent immediately
+ * shows its detail fields.
  */
 export function TypeSelect({
   label, types, value, onChange, isOpen, searchPlaceholder = 'Cari jenis…',
 }: TypeSelectProps) {
   const [search, setSearch] = useState('');
+  const [highlighted, setHighlighted] = useState(0);
 
   useEffect(() => {
-    if (isOpen) setSearch('');
+    if (isOpen) {
+      setSearch('');
+      setHighlighted(0);
+    }
   }, [isOpen]);
 
   const query = search.trim().toLowerCase();
-  const filtered = query ? rankBySearch(types, query) : types;
+  const filtered = query ? rankBySearch(types, query) : [...types];
+  const allOptions = [...filtered, OTHER_TYPE];
+
+  // Keep highlighted in bounds when filter changes
+  useEffect(() => {
+    if (highlighted >= allOptions.length) setHighlighted(0);
+  }, [allOptions.length, highlighted]);
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = allOptions[highlighted] ?? allOptions[0];
+      if (target) onChange(target);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlighted((h) => (h + 1) % allOptions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlighted((h) => (h - 1 + allOptions.length) % allOptions.length);
+    }
+  }
 
   return (
     <div className={styles.field}>
@@ -64,18 +94,38 @@ export function TypeSelect({
           className={`${styles.input} ${styles.searchInput}`}
           placeholder={searchPlaceholder}
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setHighlighted(0);
+          }}
+          onKeyDown={handleSearchKeyDown}
+          aria-label={label}
         />
       </label>
-      <select
-        className={styles.select}
-        size={6}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+      <div
+        role="listbox"
+        aria-label={`${label} options`}
+        className={styles.typeList}
       >
-        {filtered.map((type) => <option key={type} value={type}>{type}</option>)}
-        <option value={OTHER_TYPE}>{OTHER_TYPE}</option>
-      </select>
+        {allOptions.map((type, idx) => (
+          <button
+            key={type}
+            type="button"
+            role="option"
+            aria-selected={value === type}
+            className={
+              value === type
+                ? styles.typeOptionActive
+                : idx === highlighted
+                  ? styles.typeOptionHighlighted
+                  : styles.typeOption
+            }
+            onClick={() => onChange(type)}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
       {query && filtered.length === 0 && (
         <p className={styles.searchEmpty}>Tidak ditemukan &mdash; pilih {OTHER_TYPE} untuk jenis lain</p>
       )}

@@ -14,7 +14,7 @@ describe('RepairModal', () => {
   it('saves a manually typed repair when Other is selected', async () => {
     const onSave = vi.fn();
     render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Other');
+    await userEvent.click(screen.getByRole('option', { name: 'Other' }));
     await userEvent.type(screen.getByLabelText('Repair Lainnya'), 'Gerinda ulang');
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
@@ -30,7 +30,7 @@ describe('RepairModal', () => {
   it('calls onSave with the selected repair type, quantity, lot, and flask', async () => {
     const onSave = vi.fn();
     render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Dakon');
+    await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
     await userEvent.clear(screen.getByRole('spinbutton'));
     await userEvent.type(screen.getByRole('spinbutton'), '2');
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L9');
@@ -65,14 +65,14 @@ describe('RepairModal', () => {
 
   it('shows the die popup as soon as a Mejashi Bore type is picked', async () => {
     render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Mejashi Bore 3');
+    await userEvent.click(screen.getByRole('option', { name: 'Mejashi Bore 3' }));
     expect(screen.getByText('Pilih Nomor Die')).toBeInTheDocument();
   });
 
   it('includes the picked die number when saving a Mejashi Bore repair', async () => {
     const onSave = vi.fn();
     render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Mejashi Bore 3');
+    await userEvent.click(screen.getByRole('option', { name: 'Mejashi Bore 3' }));
     await userEvent.click(screen.getByRole('button', { name: '2' }));
     expect(screen.queryByText('Pilih Nomor Die')).not.toBeInTheDocument();
 
@@ -101,7 +101,7 @@ describe('RepairModal', () => {
   it('does not require a die number for a non-Mejashi-Bore repair', async () => {
     const onSave = vi.fn();
     render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
-    await userEvent.selectOptions(screen.getByRole('listbox'), 'Dakon');
+    await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
@@ -114,7 +114,7 @@ describe('RepairModal', () => {
       <RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />,
     );
     rerender(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={['Ireboshi', 'Hike']} />);
-    expect(screen.getByRole('listbox')).toHaveValue('Ireboshi');
+    expect(screen.getByRole('option', { name: 'Ireboshi' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('narrows the repair list to matches when searching', async () => {

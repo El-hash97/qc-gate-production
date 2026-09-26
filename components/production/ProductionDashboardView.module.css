@@ -293,6 +293,24 @@
   .kpiRow { grid-template-columns: repeat(2, 1fr); }
   .progressStrip { flex-direction: column; align-items: stretch; gap: 12px; }
   .achievementBadge { text-align: center; }
+  /* The 1fr-auto-1fr status grid plus the 256px PIC/OEE cards can't sit side
+     by side on a phone (measured 619px wide at a 390px viewport). Stack the
+     row vertically with everything centred instead. */
+  .statusBar,
+  .statusBarNoRight {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 8px;
+  }
+  .statusLeft {
+    min-width: 0;
+    justify-self: center;
+  }
+  .statusRight {
+    justify-self: center;
+    align-items: center;
+    text-align: center;
+  }
 }
 
 /* --- Print / "Export PDF" AND "Download PDF": clean daily report of the

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RepairModal } from '@/components/production/RepairModal';
 import { REPAIR_TYPES } from '@/utils/constants';
@@ -58,15 +58,23 @@ describe('RepairModal', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('does not show the die popup for the default Mejashi Bore 1 selection on mount', () => {
+  it('shows the No. Die boxes inline for the default Mejashi Bore 1 selection', () => {
     render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
-    expect(screen.queryByText('Pilih Nomor Die')).not.toBeInTheDocument();
+    const boxes = within(screen.getByRole('group', { name: 'Pilih No. Die' })).getAllByRole('button');
+    expect(boxes.map((b) => b.textContent)).toEqual(['1', '2', '3', '4']);
+    expect(boxes.every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true);
   });
 
-  it('shows the die popup as soon as a Mejashi Bore type is picked', async () => {
+  it('shows the No. Die boxes when a Mejashi Bore type is picked', async () => {
     render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
     await userEvent.click(screen.getByRole('option', { name: 'Mejashi Bore 3' }));
-    expect(screen.getByText('Pilih Nomor Die')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Pilih No. Die' })).toBeInTheDocument();
+  });
+
+  it('hides the No. Die boxes for a type that has no die', async () => {
+    render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />);
+    await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
+    expect(screen.queryByRole('group', { name: 'Pilih No. Die' })).not.toBeInTheDocument();
   });
 
   it('includes the picked die number when saving a Mejashi Bore repair', async () => {
@@ -74,7 +82,7 @@ describe('RepairModal', () => {
     render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
     await userEvent.click(screen.getByRole('option', { name: 'Mejashi Bore 3' }));
     await userEvent.click(screen.getByRole('button', { name: '2' }));
-    expect(screen.queryByText('Pilih Nomor Die')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
 
     await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
@@ -82,7 +90,7 @@ describe('RepairModal', () => {
     expect(onSave).toHaveBeenCalledWith('Mejashi Bore 3', 1, 'L1', 'F1', 2);
   });
 
-  it('blocks Simpan and opens the die popup if Mejashi Bore was accepted as the default without a die chosen', async () => {
+  it('blocks Simpan if Mejashi Bore is the default and no die was picked', async () => {
     const onSave = vi.fn();
     render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
     // Default selection is already "Mejashi Bore 1" — fill the rest and save
@@ -91,11 +99,21 @@ describe('RepairModal', () => {
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.getByText('Pilih Nomor Die')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '4' }));
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
     expect(onSave).toHaveBeenCalledWith('Mejashi Bore 1', 1, 'L1', 'F1', 4);
+  });
+
+  it('drops a die pick when switching to a type that has no die', async () => {
+    const onSave = vi.fn();
+    render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} />);
+    await userEvent.click(screen.getByRole('button', { name: '3' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith('Dakon', 1, 'L1', 'F1');
   });
 
   it('does not require a die number for a non-Mejashi-Bore repair', async () => {
@@ -106,7 +124,7 @@ describe('RepairModal', () => {
     await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
     expect(onSave).toHaveBeenCalledWith('Dakon', 1, 'L1', 'F1');
-    expect(screen.queryByText('Pilih Nomor Die')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Pilih No. Die' })).not.toBeInTheDocument();
   });
 
   it('resets to the new list\'s first option when the types prop changes', () => {

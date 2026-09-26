@@ -135,6 +135,23 @@
   gap: 8px;
 }
 
+.dieNumberRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dieNumberRow .fieldLabel {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.dieNumberGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 64px);
+  gap: 8px;
+}
+
 .dieCard,
 .dieCardActive {
   aspect-ratio: 1;

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { DieNumberModal } from './DieNumberModal';
+import { DieNumberFields } from './DieNumberFields';
+import type { DieNumber } from './DieNumberFields';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
 import { needsDieNumber, needsOverDimensiDetail } from '@/utils/constants';
@@ -40,19 +41,14 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   // repairs. Deliberately NOT reset after a save (mirrors repairType, which
   // also carries over) so logging several consecutive Mejashi Bore repairs
   // from the same die doesn't force re-picking it each time.
-  const [dieNumber, setDieNumber] = useState<1 | 2 | 3 | 4 | null>(null);
-  const [dieModalOpen, setDieModalOpen] = useState(false);
+  const [dieNumber, setDieNumber] = useState<DieNumber | null>(null);
   const [overDimensi, setOverDimensi] = useState(initialOverDimensiState);
 
-  // Fires only on an actual user selection (not the initial default, and not
-  // the types-prop-changed reset above) — picking any Mejashi Bore type pops
-  // the die picker immediately, per the chosen design.
   function handleTypeChange(value: string) {
     setRepairType(value);
-    if (needsDieNumber(value)) {
-      setDieNumber(null);
-      setDieModalOpen(true);
-    }
+    // Drop a stale pick when moving to a type that has no die field, so it
+    // can't leak into the saved record.
+    if (!needsDieNumber(value)) setDieNumber(null);
   }
 
   function handleSave() {
@@ -61,18 +57,15 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
     if (needsOverDimensiDetail(type) && !isOverDimensiValid(overDimensi)) return;
     const overDetail = needsOverDimensiDetail(type) ? toOverDimensiDetail(overDimensi) : undefined;
-    // Safety net for paths that skip handleTypeChange entirely — e.g. the
-    // default selection (types[0] is "Mejashi Bore 1") accepted without ever
-    // touching the list. A die number is mandatory for these repairs, so
-    // block the save and surface the picker instead of silently omitting it.
-    if (needsDieNumber(type) && dieNumber === null) {
-      setDieModalOpen(true);
-      return;
-    }
-    if (dieNumber !== null && overDetail) {
-      onSave(type, qty, lot.trim(), flask.trim(), dieNumber, overDetail);
-    } else if (dieNumber !== null) {
-      onSave(type, qty, lot.trim(), flask.trim(), dieNumber);
+    // A die number is mandatory for Mejashi Bore repairs. The inline No. Die
+    // boxes are right there on the form, so an unselected one just blocks the
+    // save like a missing lot or flask does.
+    const die = needsDieNumber(type) ? dieNumber : null;
+    if (needsDieNumber(type) && die === null) return;
+    if (die !== null && overDetail) {
+      onSave(type, qty, lot.trim(), flask.trim(), die, overDetail);
+    } else if (die !== null) {
+      onSave(type, qty, lot.trim(), flask.trim(), die);
     } else if (overDetail) {
       onSave(type, qty, lot.trim(), flask.trim(), undefined, overDetail);
     } else {
@@ -106,6 +99,9 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
             placeholder="Ketik jenis repair"
           />
         </label>
+      )}
+      {!isSearching && needsDieNumber(repairType) && (
+        <DieNumberFields value={dieNumber} onChange={setDieNumber} />
       )}
       {!isSearching && needsOverDimensiDetail(repairType === OTHER_TYPE ? customType.trim() : repairType) && (
         <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />
@@ -144,10 +140,6 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
         <button type="button" className={styles.cancelButton} onClick={onClose}>Batal</button>
         <button type="button" className={styles.saveButtonRepair} onClick={handleSave}>Simpan</button>
       </div>
-      <DieNumberModal
-        isOpen={dieModalOpen}
-        onSelect={(die) => { setDieNumber(die); setDieModalOpen(false); }}
-      />
     </Modal>
   );
 }

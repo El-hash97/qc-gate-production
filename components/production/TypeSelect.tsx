@@ -55,16 +55,21 @@ export function TypeSelect({
 }: TypeSelectProps) {
   const [search, setSearch] = useState('');
   const [highlighted, setHighlighted] = useState(0);
+  // True once a type has been picked (Enter or click): the box then just
+  // displays that name instead of filtering by it, so the full list (with
+  // the pick pinned red on top) stays visible until the operator types again.
+  const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setSearch('');
       setHighlighted(0);
+      setConfirmed(false);
       onSearch?.('');
     }
   }, [isOpen]);
 
-  const query = search.trim().toLowerCase();
+  const query = confirmed ? '' : search.trim().toLowerCase();
   const filtered = query ? rankBySearch(types, query) : [...types];
   // Selected item stays red and is pinned to the top of the search results
   // so the operator always sees the current choice first.
@@ -87,10 +92,19 @@ export function TypeSelect({
 
   function handleSelect(target: string) {
     onChange(target);
-    // Clear search so the full list shows again and parent can reveal
-    // the next stage (Lot/Flask or Over Dimensi detail). This also makes
-    // isSearching false so the detail popup isn't hidden while typing.
+    // Show the picked name in the box (confirmed) instead of clearing it, so
+    // the operator can see/fix their pick without re-searching. Reporting an
+    // empty query to the parent still flips isSearching off so the next
+    // stage (Lot/Flask or Over Dimensi detail) shows immediately.
+    setSearch(target);
+    setConfirmed(true);
+    setHighlighted(0);
+    onSearch?.('');
+  }
+
+  function handleClear() {
     setSearch('');
+    setConfirmed(false);
     setHighlighted(0);
     onSearch?.('');
   }
@@ -113,20 +127,33 @@ export function TypeSelect({
     <div className={styles.field}>
       <label>
         <span className={styles.fieldLabel}>{label}</span>
-        <input
-          type="text"
-          className={`${styles.input} ${styles.searchInput}`}
-          placeholder={searchPlaceholder}
-          value={search}
-          onChange={(event) => {
-            const v = event.target.value;
-            setSearch(v);
-            setHighlighted(0);
-            onSearch?.(v);
-          }}
-          onKeyDown={handleSearchKeyDown}
-          aria-label={label}
-        />
+        <div className={styles.searchInputWrap}>
+          <input
+            type="text"
+            className={`${styles.input} ${styles.searchInput}`}
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(event) => {
+              const v = event.target.value;
+              setSearch(v);
+              setConfirmed(false);
+              setHighlighted(0);
+              onSearch?.(v);
+            }}
+            onKeyDown={handleSearchKeyDown}
+            aria-label={label}
+          />
+          {search && (
+            <button
+              type="button"
+              className={styles.searchClearButton}
+              onClick={handleClear}
+              aria-label="Hapus pencarian"
+            >
+              &times;
+            </button>
+          )}
+        </div>
       </label>
       <div
         role="listbox"

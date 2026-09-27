@@ -76,6 +76,14 @@ describe('DefectModal', () => {
     expect(screen.getByRole('option', { name: 'Ireboshi' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('shows the Over Dimensi detail fields immediately after picking it with Enter', async () => {
+    render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />);
+    const search = screen.getByRole('textbox', { name: 'Jenis Defect' });
+    await userEvent.type(search, 'Over Dimensi{enter}');
+    expect((search as HTMLInputElement).value).toBe('Over Dimensi');
+    expect(screen.getByText('Detail Over Dimensi')).toBeInTheDocument();
+  });
+
   it('narrows the defect list to matches when searching', async () => {
     render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />);
     await userEvent.type(screen.getByRole('textbox', { name: 'Jenis Defect' }), 'kandama');

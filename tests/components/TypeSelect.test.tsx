@@ -47,6 +47,34 @@ describe('TypeSelect', () => {
     expect(onChange).toHaveBeenCalledWith('Kandama Rear');
   });
 
+  it('fills the search box with the picked type on Enter and shows a clear button', async () => {
+    render(<TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />);
+    const search = screen.getByRole('textbox', { name: 'Jenis Defect' }) as HTMLInputElement;
+    await userEvent.type(search, 'crack{enter}');
+    expect(search.value).toBe('Crack');
+    expect(screen.getByRole('button', { name: 'Hapus pencarian' })).toBeInTheDocument();
+    // Full list (not just "Crack") still shows, pinned selection on top.
+    expect(screen.getAllByRole('option')).toHaveLength(TYPES.length + 1);
+  });
+
+  it('clears the box and restores the full list when the clear button is clicked', async () => {
+    render(<TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />);
+    const search = screen.getByRole('textbox', { name: 'Jenis Defect' }) as HTMLInputElement;
+    await userEvent.type(search, 'crack{enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Hapus pencarian' }));
+    expect(search.value).toBe('');
+    expect(screen.queryByRole('button', { name: 'Hapus pencarian' })).not.toBeInTheDocument();
+  });
+
+  it('resumes filtering once the operator types over a confirmed pick', async () => {
+    render(<TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />);
+    const search = screen.getByRole('textbox', { name: 'Jenis Defect' }) as HTMLInputElement;
+    await userEvent.type(search, 'crack{enter}');
+    await userEvent.type(search, 'x');
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual([OTHER_TYPE]);
+  });
+
   it('clears the search box each time isOpen turns true', () => {
     const { rerender } = render(
       <TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />,

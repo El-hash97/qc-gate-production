@@ -46,8 +46,35 @@
   border-radius: var(--radius-sm);
 }
 
-.searchInput {
+.searchInputWrap {
+  position: relative;
   margin-bottom: 8px;
+}
+
+.searchInput {
+  margin-bottom: 0;
+  padding-right: 36px;
+}
+
+.searchClearButton {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.searchClearButton:hover {
+  background: var(--bg-hover, rgba(128, 128, 128, 0.15));
+  color: var(--text-primary);
 }
 
 .searchEmpty {

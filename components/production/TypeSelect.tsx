@@ -130,6 +130,7 @@ export function TypeSelect({
         <div className={styles.searchInputWrap}>
           <input
             type="text"
+            enterKeyHint="done"
             className={`${styles.input} ${styles.searchInput}`}
             placeholder={searchPlaceholder}
             value={search}

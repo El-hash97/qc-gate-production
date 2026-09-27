@@ -75,6 +75,12 @@ describe('TypeSelect', () => {
     expect(options).toEqual([OTHER_TYPE]);
   });
 
+  it('hints "done" on the mobile keyboard so it never auto-advances to the next field', () => {
+    render(<TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />);
+    const search = screen.getByRole('textbox', { name: 'Jenis Defect' }) as HTMLInputElement;
+    expect(search.getAttribute('enterkeyhint')).toBe('done');
+  });
+
   it('clears the search box each time isOpen turns true', () => {
     const { rerender } = render(
       <TypeSelect label="Jenis Defect" types={TYPES} value={TYPES[0]} onChange={() => {}} isOpen />,

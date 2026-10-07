@@ -118,21 +118,34 @@ describe('InputPage', () => {
     expect(screen.getByText('Ireboshi')).toBeInTheDocument();
   });
 
-  it('BC NG/Repair pick the flask from boxes, greying out flasks already logged under the lot', async () => {
-    hookReturn = {
-      state: {
-        ...stateMock,
-        entryLogs: [{ kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: '2' }],
-      },
-      updateState: updateStateMock,
-      isLoading: false,
-    };
-    render(<ToastProvider><InputPage /></ToastProvider>);
-    // BC 2TR Repair: a different line and kind than the logged BC 1TR NG, same lot — still blocked.
-    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah Repair' })[1]);
-    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
-    expect(screen.getByRole('button', { name: 'Flask 2' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Flask 1' })).toBeEnabled();
+  describe('BC flask boxes', () => {
+    beforeEach(() => {
+      hookReturn = {
+        state: {
+          ...stateMock,
+          entryLogs: [{ kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: '2' }],
+        },
+        updateState: updateStateMock,
+        isLoading: false,
+      };
+    });
+
+    it('greys out a flask already logged under the lot for the same product, across NG and Repair', async () => {
+      render(<ToastProvider><InputPage /></ToastProvider>);
+      // BC 1TR Repair: same product as the logged BC 1TR NG, same lot — blocked.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Tambah Repair' })[0]);
+      await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+      expect(screen.getByRole('button', { name: 'Flask 2' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Flask 1' })).toBeEnabled();
+    });
+
+    it('leaves the flask free for a different product with the same lot number', async () => {
+      render(<ToastProvider><InputPage /></ToastProvider>);
+      // BC 2TR is a different product — its lot L1 flask 2 is a different piece.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Tambah Repair' })[1]);
+      await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+      expect(screen.getByRole('button', { name: 'Flask 2' })).toBeEnabled();
+    });
   });
 
   it('keeps the free-text Nomor Cavity field for Camshaft/Crankshaft', async () => {

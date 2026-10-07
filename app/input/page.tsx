@@ -180,9 +180,13 @@ export default function InputPage() {
     }
   }
 
-  // Flasks already entered (NG or Repair, either BC line) under a lot this shift.
-  function findTakenFlasks(lot: string): string[] {
-    return takenFlasks(current.entryLogs, lot);
+  // Lookup of flasks already entered (NG or Repair) under a lot this shift for
+  // the target's own product — BC 1TR and BC 2TR don't block each other.
+  // Undefined for Camshaft/Crankshaft, which keep the free-text cavity field.
+  function takenFlasksFor(target: DefectTarget | RepairTarget | null) {
+    if (!target || !usesFlaskBoxes(target)) return undefined;
+    const line = lineForTarget(target);
+    return (lot: string) => takenFlasks(current.entryLogs, lot, line);
   }
 
   function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
@@ -454,7 +458,7 @@ export default function InputPage() {
         onSave={handleSaveDefect}
         types={defectTypesFor(defectTarget)}
         flaskLabel={flaskLabelFor(defectTarget)}
-        takenFlasks={usesFlaskBoxes(defectTarget) ? findTakenFlasks : undefined}
+        takenFlasks={takenFlasksFor(defectTarget)}
       />
       <RepairModal
         isOpen={repairTarget !== null}
@@ -462,7 +466,7 @@ export default function InputPage() {
         onSave={handleSaveRepair}
         types={repairTypesFor(repairTarget)}
         flaskLabel={flaskLabelFor(repairTarget)}
-        takenFlasks={usesFlaskBoxes(repairTarget) ? findTakenFlasks : undefined}
+        takenFlasks={takenFlasksFor(repairTarget)}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

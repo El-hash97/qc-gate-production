@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
+import { FlaskNumberFields } from './FlaskNumberFields';
 import { needsOverDimensiDetail } from '@/utils/constants';
 import type { OverDimensiDetail } from '@/lib/types';
 import styles from './EntryModal.module.css';
@@ -14,9 +15,13 @@ interface DefectModalProps {
   onSave: (defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) => void;
   types: readonly string[];
   flaskLabel?: string;
+  // Block Cylinder only: when given, the flask is picked from boxes 1-5 and
+  // any flask this returns for the typed lot is greyed out. Omitted (Camshaft/
+  // Crankshaft cavity specs like "1-6") keeps the free-text field.
+  takenFlasks?: (lot: string) => readonly string[];
 }
 
-export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask' }: DefectModalProps) {
+export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks }: DefectModalProps) {
   const [defectType, setDefectType] = useState<string>(types[0]);
   const [customType, setCustomType] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -43,11 +48,20 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   const [lot, setLot] = useState('');
   const [flask, setFlask] = useState('');
   const [overDimensi, setOverDimensi] = useState(initialOverDimensiState);
+  const taken = takenFlasks ? takenFlasks(lot) : [];
+
+  // A flask picked before the lot was typed may already be logged under that
+  // lot — drop it rather than let the duplicate through.
+  function handleLotChange(value: string) {
+    setLot(value);
+    if (takenFlasks?.(value).includes(flask)) setFlask('');
+  }
 
   function handleSave() {
     const qty = parseInt(qtyInput, 10);
     const type = defectType === OTHER_TYPE ? customType.trim() : defectType;
     if (!type || !qty || qty < 1 || !lot.trim() || !flask.trim()) return;
+    if (taken.includes(flask.trim())) return;
     if (needsOverDimensiDetail(type) && !isOverDimensiValid(overDimensi)) return;
     const detail = needsOverDimensiDetail(type) ? toOverDimensiDetail(overDimensi) : undefined;
     if (detail) {
@@ -94,17 +108,21 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
             ref={lotRef}
             className={styles.input}
             value={lot}
-            onChange={(event) => setLot(event.target.value)}
+            onChange={(event) => handleLotChange(event.target.value)}
           />
         </label>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>{flaskLabel}</span>
-          <input
-            className={styles.input}
-            value={flask}
-            onChange={(event) => setFlask(event.target.value)}
-          />
-        </label>
+        {takenFlasks ? (
+          <FlaskNumberFields label={flaskLabel} value={flask} onChange={setFlask} taken={taken} />
+        ) : (
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>{flaskLabel}</span>
+            <input
+              className={styles.input}
+              value={flask}
+              onChange={(event) => setFlask(event.target.value)}
+            />
+          </label>
+        )}
       </div>
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Jumlah</span>

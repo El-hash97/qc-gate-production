@@ -91,3 +91,51 @@ describe('DefectModal', () => {
     expect(options).toEqual(['Kandama Front', 'Kandama Rear', 'Kandama Drag', 'Kandama Cope', 'Other']);
   });
 });
+
+describe('DefectModal flask boxes (Block Cylinder)', () => {
+  // Stand-in for the Input page's lookup: flasks 2 and 4 are already logged under lot L1.
+  const taken = (lot: string) => (lot.trim().toLowerCase() === 'l1' ? ['2', '4'] : []);
+
+  it('replaces the flask text field with boxes 1-5', () => {
+    render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} takenFlasks={taken} />);
+    const group = screen.getByRole('group', { name: 'Nomor Flask' });
+    expect(group).toBeInTheDocument();
+    for (const n of ['1', '2', '3', '4', '5']) {
+      expect(screen.getByRole('button', { name: `Flask ${n}` })).toBeEnabled();
+    }
+    expect(screen.queryByRole('textbox', { name: 'Nomor Flask' })).not.toBeInTheDocument();
+  });
+
+  it('saves the picked flask box', async () => {
+    const onSave = vi.fn();
+    render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} takenFlasks={taken} />);
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L9');
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 3' }));
+    expect(screen.getByRole('button', { name: 'Flask 3' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith(DEFECT_TYPES[0], 1, 'L9', '3');
+  });
+
+  it('greys out and disables flasks already logged under the typed lot', async () => {
+    render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} takenFlasks={taken} />);
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    expect(screen.getByRole('button', { name: 'Flask 2' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Flask 4' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Flask 1' })).toBeEnabled();
+  });
+
+  it('drops a picked flask once the lot changes to one that already has it', async () => {
+    const onSave = vi.fn();
+    render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} takenFlasks={taken} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 2' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    expect(screen.getByRole('button', { name: 'Flask 2' })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('does not wrap the boxes in a native <label> (would re-click the first box)', () => {
+    render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} takenFlasks={taken} />);
+    expect(screen.getByRole('button', { name: 'Flask 1' }).closest('label')).toBeNull();
+  });
+});

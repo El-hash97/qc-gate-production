@@ -207,6 +207,50 @@
   border-color: var(--accent-red);
 }
 
+/* Flask 1-5 boxes: one row filling the flask column, each box the same height
+   as the Nomor Lot input beside it (same vertical padding, font and border). */
+.flaskGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.flaskBox,
+.flaskBoxActive {
+  min-width: 0;
+  padding: 10px 0;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.flaskBox:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.flaskBoxActive {
+  background: var(--accent-red);
+  color: #fff;
+  border-color: var(--accent-red);
+}
+
+/* Already logged under this lot — grey and unclickable. */
+.flaskBox:disabled {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .typeList {
   display: flex;
   flex-direction: column;

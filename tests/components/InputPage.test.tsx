@@ -118,6 +118,30 @@ describe('InputPage', () => {
     expect(screen.getByText('Ireboshi')).toBeInTheDocument();
   });
 
+  it('BC NG/Repair pick the flask from boxes, greying out flasks already logged under the lot', async () => {
+    hookReturn = {
+      state: {
+        ...stateMock,
+        entryLogs: [{ kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: '2' }],
+      },
+      updateState: updateStateMock,
+      isLoading: false,
+    };
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    // BC 2TR Repair: a different line and kind than the logged BC 1TR NG, same lot — still blocked.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah Repair' })[1]);
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    expect(screen.getByRole('button', { name: 'Flask 2' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Flask 1' })).toBeEnabled();
+  });
+
+  it('keeps the free-text Nomor Cavity field for Camshaft/Crankshaft', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
+    expect(screen.getByRole('textbox', { name: 'Nomor Cavity' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Flask 1' })).not.toBeInTheDocument();
+  });
+
   it('shows no pinned-hour banner by default (real-time input)', () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
     expect(screen.queryByText(/input diarahkan ke jam/i)).not.toBeInTheDocument();

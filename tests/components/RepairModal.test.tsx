@@ -142,3 +142,44 @@ describe('RepairModal', () => {
     expect(options).toEqual(['Mejashi Bore 1', 'Mejashi Bore 2', 'Mejashi Bore 3', 'Mejashi Bore 4', 'Other']);
   });
 });
+
+describe('RepairModal flask boxes (Block Cylinder)', () => {
+  // Stand-in for the Input page's lookup: flasks 2 and 4 are already logged under lot L1.
+  const taken = (lot: string) => (lot.trim().toLowerCase() === 'l1' ? ['2', '4'] : []);
+
+  it('replaces the flask text field with boxes 1-5', () => {
+    render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} takenFlasks={taken} />);
+    expect(screen.getByRole('group', { name: 'Nomor Flask' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Flask 5' })).toBeEnabled();
+    expect(screen.queryByRole('textbox', { name: 'Nomor Flask' })).not.toBeInTheDocument();
+  });
+
+  it('saves the picked flask box', async () => {
+    const onSave = vi.fn();
+    render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} takenFlasks={taken} />);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Pilih No. Die' })).getByRole('button', { name: '2' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L9');
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 3' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith(REPAIR_TYPES[0], 1, 'L9', '3', 2);
+  });
+
+  it('greys out and disables flasks already logged under the typed lot', async () => {
+    render(<RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} takenFlasks={taken} />);
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    expect(screen.getByRole('button', { name: 'Flask 2' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Flask 4' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Flask 3' })).toBeEnabled();
+  });
+
+  it('drops a picked flask once the lot changes to one that already has it', async () => {
+    const onSave = vi.fn();
+    render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} takenFlasks={taken} />);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Pilih No. Die' })).getByRole('button', { name: '1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 4' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+    expect(screen.getByRole('button', { name: 'Flask 4' })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});

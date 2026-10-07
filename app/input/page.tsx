@@ -17,6 +17,7 @@ import {
 import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
+import { takenFlasks } from '@/utils/flask';
 import {
   SHIFTS, SHIFT_TIMES, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
@@ -104,6 +105,11 @@ function flaskLabelFor(target: DefectTarget | RepairTarget | null): string {
   return lineGroup(lineForTarget(target)) === 'shaft' ? 'Nomor Cavity' : 'Nomor Flask';
 }
 
+// BC picks its flask from boxes 1-5; a cavity spec ("1-6", "1,4") stays free text.
+function usesFlaskBoxes(target: DefectTarget | RepairTarget | null): boolean {
+  return target !== null && lineGroup(lineForTarget(target)) === 'bc';
+}
+
 export default function InputPage() {
   const { state, updateState, isLoading } = useProductionState();
   const { showToast } = useToast();
@@ -172,6 +178,11 @@ export default function InputPage() {
     if (cur > 0) {
       commit({ [field]: (current[field] ?? 0) - 1 } as Partial<ProductionState>);
     }
+  }
+
+  // Flasks already entered (NG or Repair, either BC line) under a lot this shift.
+  function findTakenFlasks(lot: string): string[] {
+    return takenFlasks(current.entryLogs, lot);
   }
 
   function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
@@ -443,6 +454,7 @@ export default function InputPage() {
         onSave={handleSaveDefect}
         types={defectTypesFor(defectTarget)}
         flaskLabel={flaskLabelFor(defectTarget)}
+        takenFlasks={usesFlaskBoxes(defectTarget) ? findTakenFlasks : undefined}
       />
       <RepairModal
         isOpen={repairTarget !== null}
@@ -450,6 +462,7 @@ export default function InputPage() {
         onSave={handleSaveRepair}
         types={repairTypesFor(repairTarget)}
         flaskLabel={flaskLabelFor(repairTarget)}
+        takenFlasks={usesFlaskBoxes(repairTarget) ? findTakenFlasks : undefined}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

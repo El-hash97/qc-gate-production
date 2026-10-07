@@ -25,4 +25,5 @@
 qcgate.db.backup
 
 # editor
-.obsidian/
+.obsidian
+.claude

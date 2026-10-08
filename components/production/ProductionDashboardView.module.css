@@ -98,6 +98,12 @@
   color: var(--accent-green);
 }
 
+.exportActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Report header — only rendered on paper. */
 .printHeader { display: none; }
 

@@ -20,6 +20,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useDashboardSettings } from '@/hooks/useDashboardSettings';
 import { useToast } from '@/components/ui/ToastProvider';
 import { findPic } from '@/utils/constants';
+import { exportShiftToExcel } from '@/utils/excelExport';
 import {
   getOkTotal, getRepairTotal, getNgTotal, getRates,
   getAchievementPercent, getProgressPercent, mergeCounts, mergeHourly,
@@ -90,12 +91,13 @@ export interface ProductionDashboardViewProps {
   // falls back to a centered 2-column layout — the same one the print
   // stylesheet already uses to drop this column from the report.
   connectionStatus?: 'online' | 'syncing' | 'offline';
-  // 'print' (default): the existing window.print()-based "Export PDF",
-  // matching the live Dashboard exactly. 'download' shows "Download PDF"
-  // instead, which fetches an already-rendered .pdf file from `downloadPdfUrl`
-  // (see app/api/history/[id]/pdf — a headless-browser print of this same
-  // view, so the layout is guaranteed identical to the print export, unlike
-  // an in-browser screenshot) and saves it with no print dialog.
+  // 'print' (default): the legacy window.print()-based "Export PDF".
+  // 'download' shows "Download PDF" instead, which fetches an
+  // already-rendered .pdf file from `downloadPdfUrl`
+  // (see app/api/history/[id]/pdf and app/api/dashboard/pdf — a
+  // headless-browser print of this same view, so the layout is guaranteed
+  // identical to the print export, unlike an in-browser screenshot) and
+  // saves it with no print dialog.
   exportMode?: 'print' | 'download';
   downloadPdfUrl?: string;
 }
@@ -255,9 +257,9 @@ export function ProductionDashboardView({
   }
 
   // Downloads a real .pdf file — no print dialog, unlike handlePrintPdf
-  // above. `downloadPdfUrl` (app/api/history/[id]/pdf) is a headless-browser
-  // print of this exact view/record, done server-side, so the PDF is
-  // guaranteed to look like the print export — a client-side DOM screenshot
+  // above. `downloadPdfUrl` (app/api/history/[id]/pdf or
+  // app/api/dashboard/pdf) is a headless-browser print of this exact
+  // view/record, done server-side, so the PDF is guaranteed to look like the print export — a client-side DOM screenshot
   // can't reliably reproduce this app's CSS Grid layout the way a real
   // browser's print engine does. Fetched as a blob (rather than a plain
   // navigation) so a failure surfaces as a toast instead of a broken tab,
@@ -269,10 +271,12 @@ export function ProductionDashboardView({
       const res = await fetch(downloadPdfUrl);
       if (!res.ok) throw new Error('Gagal membuat PDF');
       const blob = await res.blob();
+      const disposition = res.headers?.get?.('Content-Disposition') ?? '';
+      const fromHeader = /filename="?([^";]+)"?/i.exec(disposition)?.[1]?.trim();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = '';
+      link.download = fromHeader || 'QC_Gate.pdf';
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -346,9 +350,14 @@ export function ProductionDashboardView({
             </button>
           ))}
         </div>
-        <button type="button" className={styles.exportBtn} onClick={handleExport} disabled={downloading}>
-          {exportMode === 'download' ? (downloading ? 'Menyiapkan PDF…' : 'Download PDF') : 'Export PDF'}
-        </button>
+        <div className={styles.exportActions}>
+          <button type="button" className={styles.exportBtn} onClick={handleExport} disabled={downloading}>
+            {exportMode === 'download' ? (downloading ? 'Menyiapkan PDF…' : 'Download PDF') : 'Export PDF'}
+          </button>
+          <button type="button" className={styles.exportBtn} onClick={() => exportShiftToExcel(state)}>
+            Download Excel
+          </button>
+        </div>
       </div>
 
       <div className={styles.kpiRow}>

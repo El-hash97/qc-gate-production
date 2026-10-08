@@ -47,6 +47,10 @@ const mockAuth = { authed: false, openLoginModal: vi.fn() };
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockAuth,
 }));
+const excelMock = vi.fn();
+vi.mock('@/utils/excelExport', () => ({
+  exportShiftToExcel: (...args: any[]) => excelMock(...args),
+}));
 
 import DashboardPage from '@/app/dashboard/page';
 
@@ -133,19 +137,35 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Real-time Connected')).toBeInTheDocument();
   });
 
-  it('Export PDF button triggers the browser print dialog', () => {
-    vi.useFakeTimers();
+  it('Download PDF button fetches the server-rendered file (no print dialog)', async () => {
+    const blob = new Blob(['%PDF-1.4'], { type: 'application/pdf' });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(blob),
+      headers: { get: () => 'attachment; filename="QC_Gate_Shift_Red.pdf"' },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:mock-url'),
+      revokeObjectURL: vi.fn(),
+    });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     const printSpy = vi.fn();
     const original = window.print;
     window.print = printSpy;
     try {
       render(<ToastProvider><DashboardPage /></ToastProvider>);
-      fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
-      vi.advanceTimersByTime(300);
-      expect(printSpy).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: 'Export PDF' })).not.toBeInTheDocument();
+      const button = screen.getByRole('button', { name: 'Download PDF' });
+      await userEvent.click(button);
+      expect(fetchMock).toHaveBeenCalledWith('/api/dashboard/pdf?view=bc');
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(printSpy).not.toHaveBeenCalled();
     } finally {
       window.print = original;
-      vi.useRealTimers();
+      vi.unstubAllGlobals();
+      clickSpy.mockRestore();
     }
   });
 
@@ -153,6 +173,14 @@ describe('DashboardPage', () => {
     render(<ToastProvider><DashboardPage /></ToastProvider>);
     expect(screen.getByText('Laporan Harian Produksi')).toBeInTheDocument();
     expect(screen.getByText('Produk: BC 1TR + BC 2TR')).toBeInTheDocument();
+  });
+
+  it('Download Excel button exports the current shift as xlsx', async () => {
+    excelMock.mockClear();
+    render(<ToastProvider><DashboardPage /></ToastProvider>);
+    await userEvent.click(screen.getByRole('button', { name: 'Download Excel' }));
+    expect(excelMock).toHaveBeenCalledTimes(1);
+    expect(excelMock).toHaveBeenCalledWith(expect.objectContaining({ shift: 'Shift Red' }));
   });
 
   it('scopes the numbers to Block Cylinder when B/C is selected', async () => {

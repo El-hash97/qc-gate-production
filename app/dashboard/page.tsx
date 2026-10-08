@@ -70,6 +70,7 @@ export default function DashboardPage() {
         hasPhoto={hasPhoto}
         onPhotoBarClick={(chartType, defectType) => setPhotoModal({ chartType, defectType })}
         connectionStatus={isError ? 'offline' : isFetching ? 'syncing' : 'online'}
+        exportMode="download" downloadPdfUrl={`/api/dashboard/pdf?view=${view}`}
       />
 
       {photoGroup && photoModal && (

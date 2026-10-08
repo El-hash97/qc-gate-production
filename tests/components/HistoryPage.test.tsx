@@ -20,6 +20,10 @@ vi.mock('@/lib/chartSetup', () => ({}));
 vi.mock('@/hooks/useDefectLines', () => ({
   useDefectLines: () => ({ mappings: [], isLoading: false }),
 }));
+const excelMock = vi.fn();
+vi.mock('@/utils/excelExport', () => ({
+  exportShiftToExcel: (...args: any[]) => excelMock(...args),
+}));
 
 import HistoryPage from '@/app/history/page';
 
@@ -50,9 +54,20 @@ describe('HistoryPage', () => {
     expect(screen.getByRole('group', { name: 'Filter produk' })).toBeInTheDocument();
     expect(screen.getByText('Total Produksi')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
-    // No print-dialog-based export or separate Excel export anymore.
+    expect(screen.getByRole('button', { name: 'Download Excel' })).toBeInTheDocument();
+    // No print-dialog-based export anymore.
     expect(screen.queryByRole('button', { name: 'Export PDF' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+  });
+
+  it('Download Excel exports the expanded record as xlsx', async () => {
+    excelMock.mockClear();
+    useHistoryMock.mockReturnValue({ data: [record], isLoading: false, isError: false });
+    render(<ToastProvider><HistoryPage /></ToastProvider>);
+    await userEvent.click(screen.getByText('Budi'));
+    await userEvent.click(screen.getByRole('button', { name: 'Download Excel' }));
+    expect(excelMock).toHaveBeenCalledTimes(1);
+    expect(excelMock).toHaveBeenCalledWith(expect.objectContaining({ shift: 'Shift Red' }));
   });
 
   it('restores a record after confirming the Edit dialog', async () => {

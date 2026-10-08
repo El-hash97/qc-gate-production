@@ -7,6 +7,10 @@ vi.mock('@/lib/chartSetup', () => ({}));
 vi.mock('@/hooks/useDefectLines', () => ({
   useDefectLines: () => ({ mappings: [], isLoading: false }),
 }));
+const excelMock = vi.fn();
+vi.mock('@/utils/excelExport', () => ({
+  exportShiftToExcel: (...args: any[]) => excelMock(...args),
+}));
 
 import { ProductionDashboardView } from '@/components/production/ProductionDashboardView';
 import type { ProductionState } from '@/lib/types';
@@ -25,7 +29,7 @@ describe('ProductionDashboardView export button', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults to "Export PDF" via window.print (unchanged live-Dashboard behaviour)', async () => {
+  it('defaults to "Export PDF" via window.print (legacy print mode)', async () => {
     vi.useFakeTimers();
     const printSpy = vi.fn();
     const original = window.print;
@@ -116,6 +120,22 @@ describe('ProductionDashboardView export button', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
     expect(await screen.findByText('Gagal membuat PDF')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
+  });
+
+  it('shows "Download Excel" and exports the current state as xlsx', async () => {
+    excelMock.mockClear();
+    render(
+      <ToastProvider>
+        <ProductionDashboardView
+          state={state} view="bc" onViewChange={() => {}} now={null}
+          exportMode="download" downloadPdfUrl="/api/history/7/pdf?view=bc"
+        />
+      </ToastProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download Excel' }));
+    expect(excelMock).toHaveBeenCalledTimes(1);
+    expect(excelMock).toHaveBeenCalledWith(state);
   });
 });
 

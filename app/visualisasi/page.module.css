@@ -1,0 +1,77 @@
+.page {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 6px solid var(--tile-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.tileLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tileValue {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--tile-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.tilePct {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stage {
+  position: relative;
+  height: calc(100vh - 230px);
+  min-height: 360px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.overlay,
+.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.overlay {
+  background: color-mix(in srgb, var(--bg-primary) 45%, transparent);
+}
+
+@media (max-width: 640px) {
+  .page { padding: 16px; }
+  .tiles { gap: 8px; }
+  .tile { padding: 10px 12px; }
+  .tileValue { font-size: 26px; }
+}

@@ -12,6 +12,7 @@ import styles from './TopNav.module.css';
 
 const LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/visualisasi', label: 'Visualisasi' },
   { href: '/input', label: 'Input' },
   { href: '/history', label: 'History' },
   { href: '/master-data', label: 'Master Data' },

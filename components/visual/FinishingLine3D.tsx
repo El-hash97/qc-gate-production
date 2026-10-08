@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
@@ -84,12 +84,20 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
   const live = useRef({ counts, running });
   live.current = { counts, running };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
+  const [noWebGL, setNoWebGL] = useState(false);
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      // Old plant PCs/TVs without WebGL: keep the page (and its count tiles) alive.
+      setNoWebGL(true);
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mount.appendChild(renderer.domElement);
 
@@ -226,5 +234,12 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     applyTheme.current(theme);
   }, [theme]);
 
+  if (noWebGL) {
+    return (
+      <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+        3D tidak didukung di perangkat ini
+      </div>
+    );
+  }
   return <div ref={mountRef} style={{ width: '100%', height: '100%' }} />;
 }

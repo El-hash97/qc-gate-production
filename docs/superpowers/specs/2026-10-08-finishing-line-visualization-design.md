@@ -27,7 +27,8 @@ current OK / Repair / NG counts are clearly visible.
 ```
 Baritori → HSB05 → HSB06 → Grinding → Hanten MC → Final Proses
   → QC Gate 1 → QC Gate 2 ─┬─ OK     → Spray Booth → Junbiki → Truk
-                           ├─ Repair → Meja Repair → QC Gate 2 → (OK route)
+                           ├─ Repair → (forklift) Line Repair → (forklift) QC Gate 2
+                           │            → re-inspect: OK route or Box Merah
                            └─ NG     → Box Merah
 ```
 
@@ -37,17 +38,20 @@ Baritori → HSB05 → HSB06 → Grinding → Hanten MC → Final Proses
 - `STATIONS`: id, label, position `[x, z]`, shape (`box` | `cylinder`), size.
   One table — moving a station means editing one row.
 - `ROUTES`: waypoint station-id lists for `main` (Baritori → QC Gate 2),
-  `ok` (QC Gate 2 → Spray Booth → Junbiki), `repair` (QC Gate 2 → Meja Repair →
-  QC Gate 2), `ng` (QC Gate 2 → Box Merah).
+  `ok` (QC Gate 2 → Spray Booth → Junbiki), `forklift` (QC Gate 2 ↔ Line
+  Repair, driven by the forklift), `ng` (QC Gate 2 → Box Merah).
 - `bcCounts(state)` → `{ ok, repair, ng }` = line1 + line2.
 - `isRunning(counts)` → `ok + repair + ng > 0` (reset zeroes them → stops).
 - `pickOutcome(counts, r)` with `r ∈ [0,1)` → `'ok' | 'repair' | 'ng'`
   proportional to the counts.
+- `pickReinspect(counts, r)` → `'ok' | 'ng'`: a repaired block is NG with
+  probability `ng / (ok + ng)`, otherwise OK (no separate post-repair data
+  exists; assumption).
 
 ### `components/visual/FinishingLine3D.tsx` (client only, `dynamic` ssr:false)
 - Builds the scene from `STATIONS`: floor, conveyors between consecutive
   stations, machines (HSB05/06 as cylinders), floating text labels
-  (canvas sprites), red NG box, repair table, Junbiki, truck.
+  (canvas sprites), red NG box, Line Repair area, forklift, Junbiki, truck.
 - Isometric camera + `OrbitControls` (rotate/zoom).
 - One `requestAnimationFrame` loop; paused while the tab is hidden; all
   geometry/material/renderer disposed on unmount.
@@ -58,10 +62,17 @@ Baritori → HSB05 → HSB06 → Grinding → Hanten MC → Final Proses
 - Spawn a block every ~2 s at Baritori while `running`.
 - It moves along `main` at constant speed. At QC Gate 2 it draws its outcome
   and changes colour: green (OK), yellow (Repair), red (NG).
-- Repair blocks go to Meja Repair, pause, return to QC Gate 2, turn green and
-  continue on the OK route.
+- Repair blocks wait in a repair pallet beside QC Gate 2.
 - NG blocks drop into Box Merah, pile briefly, then disappear.
 - OK blocks reach Junbiki, then load onto the truck bed.
+
+### Forklift (repair)
+- Parked near QC Gate 2. When the repair pallet has ≥ 1 block and the
+  forklift is idle, it lifts the pallet (`FORKLIFT_BATCH` max 3 blocks),
+  drives to **Line Repair**, waits (repair time), and drives back to QC Gate 2.
+- At QC Gate 2 each repaired block is re-inspected (`pickReinspect`):
+  **NG** → thrown into Box Merah; **OK** → turns green and joins the OK route
+  (Spray Booth → Junbiki → Truk).
 
 ### Truck
 - Parked beside Junbiki. OK blocks stack in the bed.
@@ -85,8 +96,9 @@ Baritori → HSB05 → HSB06 → Grinding → Hanten MC → Final Proses
 - Vitest unit tests for `finishingFlow.ts`: `bcCounts`, `isRunning`,
   `pickOutcome` ratio boundaries, and that every route starts/ends on
   existing stations.
+  plus `pickReinspect` boundaries.
 - Manual/browser verification of the page in the preview (running vs reset,
-  theme toggle, truck cycle).
+  theme toggle, forklift round trip, truck cycle).
 
 ## Out of scope (later)
 - Exact station names/positions (user will point them out).

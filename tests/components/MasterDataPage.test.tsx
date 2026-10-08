@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mockMappings = [
@@ -21,6 +21,10 @@ vi.mock('@/components/ui/ToastProvider', () => ({
 
 import MasterDataPage from '@/app/master-data/page';
 
+function lineColumn(line: string) {
+  return screen.getByText(line).closest('div')!;
+}
+
 describe('MasterDataPage', () => {
   beforeEach(() => {
     addMutate.mockClear();
@@ -28,19 +32,31 @@ describe('MasterDataPage', () => {
     mockShowToast.mockClear();
   });
 
-  it('renders all four fixed line columns', () => {
+  it('renders all four fixed line columns, each with its own 3 product buttons', () => {
     render(<MasterDataPage />);
-    expect(screen.getByText('Melting')).toBeInTheDocument();
-    expect(screen.getByText('Moulding')).toBeInTheDocument();
-    expect(screen.getByText('Core Making')).toBeInTheDocument();
-    expect(screen.getByText('Finishing')).toBeInTheDocument();
+    for (const line of ['Melting', 'Moulding', 'Core Making', 'Finishing']) {
+      const column = lineColumn(line);
+      const group = within(column).getByRole('group', { name: `Produk untuk ${line}` });
+      expect(within(group).getByRole('button', { name: 'B/C' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(group).getByRole('button', { name: 'Camshaft' })).toBeInTheDocument();
+      expect(within(group).getByRole('button', { name: 'Crankshaft' })).toBeInTheDocument();
+    }
   });
 
-  it('lists every product group under its line, all visible at once', () => {
+  it('shows only the picked product per column', () => {
     render(<MasterDataPage />);
+    // Defaults to B/C everywhere: Bari (Camshaft) stays hidden.
     expect(screen.getByText('Kandama')).toBeInTheDocument();
-    expect(screen.getByText('Gomi')).toBeInTheDocument();
-    expect(screen.getByText('Bari')).toBeInTheDocument();
+    expect(screen.queryByText('Bari')).not.toBeInTheDocument();
+  });
+
+  it('swaps one column to another product without touching the others', async () => {
+    render(<MasterDataPage />);
+    const finishing = lineColumn('Finishing');
+    await userEvent.click(within(finishing).getByRole('button', { name: 'Camshaft' }));
+    expect(within(finishing).getByText('Bari')).toBeInTheDocument();
+    // Other columns still show B/C.
+    expect(screen.getByText('Kandama')).toBeInTheDocument();
   });
 
   it("adds a defect name typed into a specific product and line's input", async () => {
@@ -52,11 +68,15 @@ describe('MasterDataPage', () => {
     expect(addMutate.mock.calls[0][0]).toEqual({ product: 'bc', line: 'Melting', defectName: 'Yuzakai' });
   });
 
-  it('adds under another product of the same line', async () => {
+  it('adds under the picked product after switching one column', async () => {
     render(<MasterDataPage />);
-    const input = screen.getByRole('textbox', { name: 'Tambah defect Camshaft untuk Finishing' });
-    await userEvent.type(input, 'Kake');
-    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke Camshaft Finishing' }));
+    const finishing = lineColumn('Finishing');
+    await userEvent.click(within(finishing).getByRole('button', { name: 'Camshaft' }));
+    await userEvent.type(
+      within(finishing).getByRole('textbox', { name: 'Tambah defect Camshaft untuk Finishing' }),
+      'Kake',
+    );
+    await userEvent.click(within(finishing).getByRole('button', { name: 'Tambah ke Camshaft Finishing' }));
     expect(addMutate).toHaveBeenCalledTimes(1);
     expect(addMutate.mock.calls[0][0]).toEqual({ product: 'camshaft', line: 'Finishing', defectName: 'Kake' });
   });

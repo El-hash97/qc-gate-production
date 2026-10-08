@@ -9,18 +9,29 @@
   color: var(--text-primary);
 }
 
-.productGroup {
-  margin-bottom: 14px;
+.productBtns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
 }
 
-.productGroup:last-child {
-  margin-bottom: 0;
-}
-
-.productLabel {
+.productBtn,
+.productBtnActive {
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 700;
-  margin: 0 0 8px;
+  font-weight: 600;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.productBtnActive {
+  background: var(--accent-green-soft);
+  border-color: var(--accent-green);
   color: var(--accent-green);
 }
 

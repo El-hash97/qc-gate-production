@@ -15,15 +15,14 @@ export default function MasterDataPage() {
   const addMutation = useAddDefectLine();
   const deleteMutation = useDeleteDefectLine();
   const { showToast } = useToast();
-  const [product, setProduct] = useState<DefectProduct>('bc');
   const [drafts, setDrafts] = useState<Drafts>({});
 
-  function draftKey(line: DefectLineName) {
+  function draftKey(product: DefectProduct, line: DefectLineName) {
     return `${product}:${line}`;
   }
 
-  function handleAdd(line: DefectLineName) {
-    const key = draftKey(line);
+  function handleAdd(product: DefectProduct, line: DefectLineName) {
+    const key = draftKey(product, line);
     const defectName = (drafts[key] ?? '').trim();
     if (!defectName) return;
     addMutation.mutate(
@@ -45,58 +44,50 @@ export default function MasterDataPage() {
     <main className={styles.page}>
       <h1 className={styles.title}>Master Data — Suspect Defect Line</h1>
       {/* Tiap produk sumber line-nya beda (mis. Dross di B/C dari Moulding,
-          di Camshaft dari stage lain), jadi mapping diisi per produk. */}
-      <div className={styles.productTabs} role="group" aria-label="Filter produk">
-        {DEFECT_PRODUCTS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={product === option.value ? styles.productTabActive : styles.productTab}
-            aria-pressed={product === option.value}
-            onClick={() => setProduct(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+          di Camshaft dari stage lain), jadi tiap line diisi per produk. */}
       {isLoading && <p>Memuat data…</p>}
       <div className={styles.columns}>
         {DEFECT_LINE_NAMES.map((line) => (
           <div key={line} className={styles.column}>
             <h2 className={styles.columnTitle}>{line}</h2>
-            <ul className={styles.list}>
-              {mappings.filter((m) => m.product === product && m.line === line).map((m) => (
-                <li key={m.id} className={styles.item}>
-                  <span>{m.defectName}</span>
+            {DEFECT_PRODUCTS.map((option) => (
+              <div key={option.value} className={styles.productGroup}>
+                <h3 className={styles.productLabel}>{option.label}</h3>
+                <ul className={styles.list}>
+                  {mappings.filter((m) => m.product === option.value && m.line === line).map((m) => (
+                    <li key={m.id} className={styles.item}>
+                      <span>{m.defectName}</span>
+                      <button
+                        type="button"
+                        className={styles.deleteButton}
+                        onClick={() => handleDelete(m.id)}
+                        aria-label={`Hapus ${m.defectName} (${option.label})`}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className={styles.addRow}>
+                  <input
+                    className={modalStyles.input}
+                    aria-label={`Tambah defect ${option.label} untuk ${line}`}
+                    placeholder="Tambah nama defect"
+                    value={drafts[draftKey(option.value, line)] ?? ''}
+                    onChange={(event) => setDrafts((prev) => ({ ...prev, [draftKey(option.value, line)]: event.target.value }))}
+                    onKeyDown={(event) => event.key === 'Enter' && handleAdd(option.value, line)}
+                  />
                   <button
                     type="button"
-                    className={styles.deleteButton}
-                    onClick={() => handleDelete(m.id)}
-                    aria-label={`Hapus ${m.defectName}`}
+                    className={styles.addButton}
+                    onClick={() => handleAdd(option.value, line)}
+                    aria-label={`Tambah ke ${option.label} ${line}`}
                   >
-                    ×
+                    Tambah
                   </button>
-                </li>
-              ))}
-            </ul>
-            <div className={styles.addRow}>
-              <input
-                className={modalStyles.input}
-                aria-label={`Tambah defect untuk ${line}`}
-                placeholder="Tambah nama defect"
-                value={drafts[draftKey(line)] ?? ''}
-                onChange={(event) => setDrafts((prev) => ({ ...prev, [draftKey(line)]: event.target.value }))}
-                onKeyDown={(event) => event.key === 'Enter' && handleAdd(line)}
-              />
-              <button
-                type="button"
-                className={styles.addButton}
-                onClick={() => handleAdd(line)}
-                aria-label={`Tambah ke ${line}`}
-              >
-                Tambah
-              </button>
-            </div>
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </div>

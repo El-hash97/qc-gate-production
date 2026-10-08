@@ -28,60 +28,48 @@ describe('MasterDataPage', () => {
     mockShowToast.mockClear();
   });
 
-  it('renders the three product tabs and all four fixed line columns', () => {
+  it('renders all four fixed line columns', () => {
     render(<MasterDataPage />);
-    expect(screen.getByRole('button', { name: 'B/C' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Camshaft' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Crankshaft' })).toBeInTheDocument();
     expect(screen.getByText('Melting')).toBeInTheDocument();
     expect(screen.getByText('Moulding')).toBeInTheDocument();
     expect(screen.getByText('Core Making')).toBeInTheDocument();
     expect(screen.getByText('Finishing')).toBeInTheDocument();
   });
 
-  it('lists each defect under its own line for the active product', () => {
+  it('lists every product group under its line, all visible at once', () => {
     render(<MasterDataPage />);
     expect(screen.getByText('Kandama')).toBeInTheDocument();
     expect(screen.getByText('Gomi')).toBeInTheDocument();
-    // Camshaft-only entry stays hidden until its tab is active.
-    expect(screen.queryByText('Bari')).not.toBeInTheDocument();
-  });
-
-  it('switches the listed defects when another product tab is picked', async () => {
-    render(<MasterDataPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
-    expect(screen.queryByText('Kandama')).not.toBeInTheDocument();
     expect(screen.getByText('Bari')).toBeInTheDocument();
   });
 
-  it("adds a defect name typed into a specific line's input, scoped to the active product", async () => {
+  it("adds a defect name typed into a specific product and line's input", async () => {
     render(<MasterDataPage />);
-    const input = screen.getByRole('textbox', { name: 'Tambah defect untuk Melting' });
+    const input = screen.getByRole('textbox', { name: 'Tambah defect B/C untuk Melting' });
     await userEvent.type(input, 'Yuzakai');
-    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke Melting' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke B/C Melting' }));
     expect(addMutate).toHaveBeenCalledTimes(1);
     expect(addMutate.mock.calls[0][0]).toEqual({ product: 'bc', line: 'Melting', defectName: 'Yuzakai' });
   });
 
-  it('adds under the newly active product after switching tabs', async () => {
+  it('adds under another product of the same line', async () => {
     render(<MasterDataPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Crankshaft' }));
-    const input = screen.getByRole('textbox', { name: 'Tambah defect untuk Finishing' });
+    const input = screen.getByRole('textbox', { name: 'Tambah defect Camshaft untuk Finishing' });
     await userEvent.type(input, 'Kake');
-    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke Finishing' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke Camshaft Finishing' }));
     expect(addMutate).toHaveBeenCalledTimes(1);
-    expect(addMutate.mock.calls[0][0]).toEqual({ product: 'crankshaft', line: 'Finishing', defectName: 'Kake' });
+    expect(addMutate.mock.calls[0][0]).toEqual({ product: 'camshaft', line: 'Finishing', defectName: 'Kake' });
   });
 
   it('does not add an empty defect name', async () => {
     render(<MasterDataPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke Melting' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah ke B/C Melting' }));
     expect(addMutate).not.toHaveBeenCalled();
   });
 
   it('deletes a defect by its id via its own delete button', async () => {
     render(<MasterDataPage />);
-    await userEvent.click(screen.getByRole('button', { name: 'Hapus Kandama' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Hapus Kandama (B/C)' }));
     expect(deleteMutate).toHaveBeenCalledTimes(1);
     expect(deleteMutate.mock.calls[0][0]).toBe(1);
   });

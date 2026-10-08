@@ -5,8 +5,38 @@
 .title {
   font-size: 18px;
   font-weight: 700;
-  margin: 0 0 20px;
+  margin: 0 0 16px;
   color: var(--text-primary);
+}
+
+.productTabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 99px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
+.productTab,
+.productTabActive {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 99px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.productTabActive {
+  background: var(--accent-green-soft);
+  color: var(--accent-green);
 }
 
 .columns {

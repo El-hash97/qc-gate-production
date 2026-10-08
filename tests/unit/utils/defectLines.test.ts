@@ -28,8 +28,8 @@ describe('paretoByLine', () => {
 
   it('counts a defect matching multiple lines in full for each line', () => {
     const mappings: DefectLineMapping[] = [
-      { id: 1, line: 'Melting', defectName: 'Gas Hole' },
-      { id: 2, line: 'Moulding', defectName: 'Gas Hole' },
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Gas Hole' },
+      { id: 2, product: 'bc', line: 'Moulding', defectName: 'Gas Hole' },
     ];
     const bars = paretoByLine({ 'Gas Hole Cope': 10 }, mappings);
     const melting = bars.find((b) => b.line === 'Melting')!;
@@ -40,8 +40,8 @@ describe('paretoByLine', () => {
 
   it('computes each line percent as its share of the sum of all 4 line totals', () => {
     const mappings: DefectLineMapping[] = [
-      { id: 1, line: 'Melting', defectName: 'Gas Hole' },
-      { id: 2, line: 'Moulding', defectName: 'Gas Hole' },
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Gas Hole' },
+      { id: 2, product: 'bc', line: 'Moulding', defectName: 'Gas Hole' },
     ];
     const bars = paretoByLine({ 'Gas Hole Cope': 10 }, mappings);
     const percents = Object.fromEntries(bars.map((b) => [b.line, b.percent]));
@@ -49,7 +49,7 @@ describe('paretoByLine', () => {
   });
 
   it('gives a zero-match line a 0 total and 0 percent, not an omitted bar', () => {
-    const mappings: DefectLineMapping[] = [{ id: 1, line: 'Melting', defectName: 'Kandama' }];
+    const mappings: DefectLineMapping[] = [{ id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' }];
     const bars = paretoByLine({ 'Kandama Front': 5 }, mappings);
     const finishing = bars.find((b) => b.line === 'Finishing')!;
     expect(finishing.total).toBe(0);
@@ -64,8 +64,8 @@ describe('paretoByLine', () => {
 
   it('breaks a line total down by contributing defect type, sorted by count descending, with its own percent of that line', () => {
     const mappings: DefectLineMapping[] = [
-      { id: 1, line: 'Melting', defectName: 'Kandama' },
-      { id: 2, line: 'Melting', defectName: 'Gas Hole' },
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' },
+      { id: 2, product: 'bc', line: 'Melting', defectName: 'Gas Hole' },
     ];
     const bars = paretoByLine({ 'Kandama Front': 10, 'Gas Hole Cope': 30 }, mappings);
     const melting = bars.find((b) => b.line === 'Melting')!;
@@ -77,35 +77,54 @@ describe('paretoByLine', () => {
   });
 
   it('ignores a defectData entry with a zero or negative count', () => {
-    const mappings: DefectLineMapping[] = [{ id: 1, line: 'Melting', defectName: 'Kandama' }];
+    const mappings: DefectLineMapping[] = [{ id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' }];
     const bars = paretoByLine({ 'Kandama Front': 0 }, mappings);
     const melting = bars.find((b) => b.line === 'Melting')!;
     expect(melting.total).toBe(0);
     expect(melting.breakdown).toEqual([]);
   });
+
+  it('scopes bars to one product when given, ignoring other products', () => {
+    const mappings: DefectLineMapping[] = [
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Gas Hole' },
+      { id: 2, product: 'camshaft', line: 'Moulding', defectName: 'Gas Hole' },
+    ];
+    const bars = paretoByLine({ 'Gas Hole Cope': 10 }, mappings, 'camshaft');
+    expect(bars.find((b) => b.line === 'Melting')!.total).toBe(0);
+    expect(bars.find((b) => b.line === 'Moulding')!.total).toBe(10);
+  });
 });
 
 describe('suspectLinesFor', () => {
   it('returns the single matching line for a defect name', () => {
-    const mappings: DefectLineMapping[] = [{ id: 1, line: 'Melting', defectName: 'Kandama' }];
+    const mappings: DefectLineMapping[] = [{ id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' }];
     expect(suspectLinesFor('Kandama Front', mappings)).toEqual(['Melting']);
   });
 
   it('returns every matching line, in the fixed Melting/Moulding/Core Making/Finishing order', () => {
     const mappings: DefectLineMapping[] = [
-      { id: 1, line: 'Moulding', defectName: 'Gas Hole' },
-      { id: 2, line: 'Melting', defectName: 'Gas Hole' },
-      { id: 3, line: 'Core Making', defectName: 'Gas Hole' },
+      { id: 1, product: 'bc', line: 'Moulding', defectName: 'Gas Hole' },
+      { id: 2, product: 'bc', line: 'Melting', defectName: 'Gas Hole' },
+      { id: 3, product: 'bc', line: 'Core Making', defectName: 'Gas Hole' },
     ];
     expect(suspectLinesFor('Gas Hole Cope', mappings)).toEqual(['Melting', 'Moulding', 'Core Making']);
   });
 
   it('returns an empty array when nothing matches', () => {
-    const mappings: DefectLineMapping[] = [{ id: 1, line: 'Melting', defectName: 'Kandama' }];
+    const mappings: DefectLineMapping[] = [{ id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' }];
     expect(suspectLinesFor('Crack', mappings)).toEqual([]);
   });
 
   it('returns an empty array when there are no mappings', () => {
     expect(suspectLinesFor('Kandama Front', [])).toEqual([]);
+  });
+
+  it('scopes hints to one product when given', () => {
+    const mappings: DefectLineMapping[] = [
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' },
+      { id: 2, product: 'camshaft', line: 'Finishing', defectName: 'Kandama' },
+    ];
+    expect(suspectLinesFor('Kandama Front', mappings, 'camshaft')).toEqual(['Finishing']);
+    expect(suspectLinesFor('Kandama Front', mappings)).toEqual(['Melting', 'Finishing']);
   });
 });

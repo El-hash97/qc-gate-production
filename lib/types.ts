@@ -175,6 +175,20 @@ export type DefectLineName = (typeof DEFECT_LINE_NAMES)[number];
 
 export interface DefectLineMapping {
   id: number;
+  // Which product this suspect-line entry applies to — B/C (BC 1TR + BC 2TR),
+  // Camshaft, or Crankshaft. Different products come from different process
+  // stages, so the same defect name can map to different lines per product.
+  product: DefectProduct;
   line: DefectLineName;
   defectName: string;
 }
+
+// Product scope for the suspect-defect-line master data: 'bc' = BC 1TR +
+// BC 2TR. Stored in defect_lines.product.
+export type DefectProduct = 'bc' | 'camshaft' | 'crankshaft';
+
+export const DEFECT_PRODUCTS: { value: DefectProduct; label: string }[] = [
+  { value: 'bc', label: 'B/C' },
+  { value: 'camshaft', label: 'Camshaft' },
+  { value: 'crankshaft', label: 'Crankshaft' },
+];

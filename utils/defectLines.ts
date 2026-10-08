@@ -1,4 +1,4 @@
-import { DEFECT_LINE_NAMES, type DefectLineMapping, type DefectLineName } from '@/lib/types';
+import { DEFECT_LINE_NAMES, type DefectLineMapping, type DefectLineName, type DefectProduct } from '@/lib/types';
 
 // Master-data names are short/generic ("Kandama"); logged defect types are
 // the full DEFECT_TYPES/SHAFT_DEFECT_TYPES strings ("Kandama Front"). Strip
@@ -39,9 +39,13 @@ export interface LineParetoBar {
 export function paretoByLine(
   defectData: Record<string, number>,
   mappings: DefectLineMapping[],
+  // Scope to one product's master data (B/C vs Camshaft vs Crankshaft map the
+  // same defect to different lines). Omitted = all products, the "Semua" view.
+  product?: DefectProduct,
 ): LineParetoBar[] {
+  const scoped = product ? mappings.filter((m) => m.product === product) : mappings;
   const bars: LineParetoBar[] = DEFECT_LINE_NAMES.map((line) => {
-    const namesForLine = mappings.filter((m) => m.line === line).map((m) => m.defectName);
+    const namesForLine = scoped.filter((m) => m.line === line).map((m) => m.defectName);
     const breakdown: LineParetoBreakdownItem[] = [];
     let total = 0;
     for (const [type, count] of Object.entries(defectData)) {
@@ -71,7 +75,8 @@ export function paretoByLine(
  * Used by the Defect/Repair Details lists to hint "go check this line" next
  * to each row.
  */
-export function suspectLinesFor(name: string, mappings: DefectLineMapping[]): DefectLineName[] {
-  const matched = new Set(mappings.filter((m) => matchesDefectLine(name, m.defectName)).map((m) => m.line));
+export function suspectLinesFor(name: string, mappings: DefectLineMapping[], product?: DefectProduct): DefectLineName[] {
+  const scoped = product ? mappings.filter((m) => m.product === product) : mappings;
+  const matched = new Set(scoped.filter((m) => matchesDefectLine(name, m.defectName)).map((m) => m.line));
   return DEFECT_LINE_NAMES.filter((line) => matched.has(line));
 }

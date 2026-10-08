@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DefectLineMapping, DefectLineName } from '@/lib/types';
+import type { DefectLineMapping, DefectLineName, DefectProduct } from '@/lib/types';
 
 interface ListResponse {
   success: boolean;
@@ -28,11 +28,11 @@ export function useDefectLines() {
 export function useAddDefectLine() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ line, defectName }: { line: DefectLineName; defectName: string }) => {
+    mutationFn: async ({ product, line, defectName }: { product: DefectProduct; line: DefectLineName; defectName: string }) => {
       const res = await fetch('/api/defect-lines', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ line, defectName }),
+        body: JSON.stringify({ product, line, defectName }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Gagal menambah defect');

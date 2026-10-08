@@ -121,6 +121,10 @@ export function ProductionDashboardView({
   // Scope passed to the rate helpers: undefined = all, 'bc' = lines 1-2,
   // 3/4 = a single shaft line.
   const scope = view === 'all' ? undefined : view === 'bc' ? 'bc' : LINE_FOR[view];
+  // Same scoping for the suspect-defect-line master data: each product maps
+  // defects to different source lines, so the Pareto-by-line chart and the
+  // Details hints only use the active view's mappings ('Semua' uses all).
+  const defectProduct = view === 'all' ? undefined : view;
 
   const ok = getOkTotal(state, scope);
   const repair = getRepairTotal(state, scope);
@@ -487,7 +491,7 @@ export function ProductionDashboardView({
           <section className={`${styles.panel} ${styles.spanHalf} ${styles.hPareto}`}>
             <div className={styles.panelTitle}>Pareto Defect per Line</div>
             <div className={styles.panelBody}>
-              <LineParetoChart bars={paretoByLine(defectData, defectLineMappings)} />
+              <LineParetoChart bars={paretoByLine(defectData, defectLineMappings, defectProduct)} />
             </div>
           </section>
         )}
@@ -495,7 +499,7 @@ export function ProductionDashboardView({
         {!hidden.has('defectDetails') && (
           <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
             <div className={styles.scrollBody}>
-              <DefectRepairSummary title="Defect Details" data={defectData} mappings={defectLineMappings} />
+              <DefectRepairSummary title="Defect Details" data={defectData} mappings={defectLineMappings} product={defectProduct} />
             </div>
           </section>
         )}
@@ -503,7 +507,7 @@ export function ProductionDashboardView({
         {!hidden.has('repairDetails') && (
           <section className={`${styles.panel} ${styles.spanList} ${styles.hDetail}`}>
             <div className={styles.scrollBody}>
-              <DefectRepairSummary title="Repair Details" data={repairData} mappings={defectLineMappings} />
+              <DefectRepairSummary title="Repair Details" data={repairData} mappings={defectLineMappings} product={defectProduct} />
             </div>
           </section>
         )}

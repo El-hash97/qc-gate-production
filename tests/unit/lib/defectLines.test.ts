@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockSql = vi.fn();
 vi.mock('@/lib/db', () => ({ sql: (...args: any[]) => mockSql(...args) }));
 
-import { isDefectLineName, listDefectLines, addDefectLine, deleteDefectLine } from '@/lib/defectLines';
+import { isDefectLineName, isDefectProduct, listDefectLines, addDefectLine, deleteDefectLine } from '@/lib/defectLines';
 
 describe('isDefectLineName', () => {
   it('accepts only the four fixed line names', () => {
@@ -15,18 +15,37 @@ describe('isDefectLineName', () => {
   });
 });
 
+describe('isDefectProduct', () => {
+  it('accepts only bc, camshaft, and crankshaft', () => {
+    expect(isDefectProduct('bc')).toBe(true);
+    expect(isDefectProduct('camshaft')).toBe(true);
+    expect(isDefectProduct('crankshaft')).toBe(true);
+    expect(isDefectProduct('all')).toBe(false);
+    expect(isDefectProduct('')).toBe(false);
+  });
+});
+
 describe('listDefectLines', () => {
   beforeEach(() => mockSql.mockReset());
 
   it('maps rows to camelCase mappings', async () => {
     mockSql.mockResolvedValueOnce([
-      { id: 1, line: 'Melting', defect_name: 'Kandama' },
-      { id: 2, line: 'Moulding', defect_name: 'Gomi' },
+      { id: 1, product: 'bc', line: 'Melting', defect_name: 'Kandama' },
+      { id: 2, product: 'camshaft', line: 'Moulding', defect_name: 'Gomi' },
     ]);
     const result = await listDefectLines();
     expect(result).toEqual([
-      { id: 1, line: 'Melting', defectName: 'Kandama' },
-      { id: 2, line: 'Moulding', defectName: 'Gomi' },
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' },
+      { id: 2, product: 'camshaft', line: 'Moulding', defectName: 'Gomi' },
+    ]);
+  });
+
+  it("reads pre-migration rows (NULL product) as bc", async () => {
+    mockSql.mockResolvedValueOnce([
+      { id: 1, product: null, line: 'Melting', defect_name: 'Kandama' },
+    ]);
+    expect(await listDefectLines()).toEqual([
+      { id: 1, product: 'bc', line: 'Melting', defectName: 'Kandama' },
     ]);
   });
 
@@ -40,22 +59,23 @@ describe('addDefectLine', () => {
   beforeEach(() => mockSql.mockReset());
 
   it('rejects an empty defect name without touching the database', async () => {
-    await expect(addDefectLine('Melting', '   ')).rejects.toThrow('wajib diisi');
+    await expect(addDefectLine('Melting', '   ', 'bc')).rejects.toThrow('wajib diisi');
     expect(mockSql).not.toHaveBeenCalled();
   });
 
-  it('inserts a trimmed defect name under the given line', async () => {
+  it('inserts a trimmed defect name under the given product and line', async () => {
     mockSql.mockResolvedValueOnce([]);
-    await addDefectLine('Melting', '  Yuzakai  ');
+    await addDefectLine('Melting', '  Yuzakai  ', 'camshaft');
     expect(mockSql).toHaveBeenCalledTimes(1);
     const [, ...values] = mockSql.mock.calls[0];
+    expect(values).toContain('camshaft');
     expect(values).toContain('Melting');
     expect(values).toContain('Yuzakai');
   });
 
   it('propagates a duplicate-key error from the database', async () => {
     mockSql.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'));
-    await expect(addDefectLine('Melting', 'Kandama')).rejects.toThrow('duplicate key');
+    await expect(addDefectLine('Melting', 'Kandama', 'bc')).rejects.toThrow('duplicate key');
   });
 });
 

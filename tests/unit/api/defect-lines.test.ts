@@ -7,6 +7,7 @@ vi.mock('@/lib/defectLines', () => ({
   listDefectLines: (...args: any[]) => mockList(...args),
   addDefectLine: (...args: any[]) => mockAdd(...args),
   isDefectLineName: (value: string) => ['Melting', 'Moulding', 'Core Making', 'Finishing'].includes(value),
+  isDefectProduct: (value: string) => ['bc', 'camshaft', 'crankshaft'].includes(value),
 }));
 
 import { GET, POST } from '@/app/api/defect-lines/route';
@@ -37,18 +38,28 @@ describe('POST /api/defect-lines', () => {
     mockAdd.mockResolvedValueOnce(undefined);
     const request = new NextRequest('http://localhost/api/defect-lines', {
       method: 'POST',
-      body: JSON.stringify({ line: 'Melting', defectName: 'Yuzakai' }),
+      body: JSON.stringify({ product: 'camshaft', line: 'Melting', defectName: 'Yuzakai' }),
     });
     const res = await POST(request);
     const json = await res.json();
     expect(json).toEqual({ success: true });
-    expect(mockAdd).toHaveBeenCalledWith('Melting', 'Yuzakai');
+    expect(mockAdd).toHaveBeenCalledWith('Melting', 'Yuzakai', 'camshaft');
+  });
+
+  it('rejects a product that is not bc, camshaft, or crankshaft', async () => {
+    const request = new NextRequest('http://localhost/api/defect-lines', {
+      method: 'POST',
+      body: JSON.stringify({ product: 'all', line: 'Melting', defectName: 'Yuzakai' }),
+    });
+    const res = await POST(request);
+    expect(res.status).toBe(400);
+    expect(mockAdd).not.toHaveBeenCalled();
   });
 
   it('rejects a line that is not one of the four fixed names', async () => {
     const request = new NextRequest('http://localhost/api/defect-lines', {
       method: 'POST',
-      body: JSON.stringify({ line: 'Casting', defectName: 'Yuzakai' }),
+      body: JSON.stringify({ product: 'bc', line: 'Casting', defectName: 'Yuzakai' }),
     });
     const res = await POST(request);
     expect(res.status).toBe(400);
@@ -58,7 +69,7 @@ describe('POST /api/defect-lines', () => {
   it('rejects a missing defectName', async () => {
     const request = new NextRequest('http://localhost/api/defect-lines', {
       method: 'POST',
-      body: JSON.stringify({ line: 'Melting', defectName: '' }),
+      body: JSON.stringify({ product: 'bc', line: 'Melting', defectName: '' }),
     });
     const res = await POST(request);
     expect(res.status).toBe(400);
@@ -69,7 +80,7 @@ describe('POST /api/defect-lines', () => {
     mockAdd.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'));
     const request = new NextRequest('http://localhost/api/defect-lines', {
       method: 'POST',
-      body: JSON.stringify({ line: 'Melting', defectName: 'Kandama' }),
+      body: JSON.stringify({ product: 'bc', line: 'Melting', defectName: 'Kandama' }),
     });
     const res = await POST(request);
     expect(res.status).toBe(400);

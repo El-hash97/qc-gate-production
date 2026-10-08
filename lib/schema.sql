@@ -153,26 +153,42 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_bc1 JSONB NOT NULL DEFA
 ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_bc2 JSONB NOT NULL DEFAULT '{}';
 
 -- Suspect defect line master data: which foundry process stage(s) a given
--- defect name is suspected to come from. Many-to-many — one row per
--- (line, defect_name) pair, since e.g. "Gas Hole" is suspect for three
--- different lines at once.
+-- defect name is suspected to come from. Many-to-many per product — one row
+-- per (product, line, defect_name), since e.g. "Gas Hole" is suspect for
+-- three different lines at once, and different products come from different
+-- process stages ('bc' = BC 1TR + BC 2TR).
 CREATE TABLE IF NOT EXISTS defect_lines (
   id          SERIAL PRIMARY KEY,
+  product     TEXT NOT NULL DEFAULT 'bc',
   line        TEXT NOT NULL,
   defect_name TEXT NOT NULL,
-  UNIQUE (line, defect_name)
+  CONSTRAINT defect_lines_product_line_defect_name_key UNIQUE (product, line, defect_name)
 );
 
-INSERT INTO defect_lines (line, defect_name) VALUES
-  ('Melting', 'Kandama'), ('Melting', 'Yuzakai'), ('Melting', 'Pinhole'),
-  ('Melting', 'Gas Hole'), ('Melting', 'Ireboshi'), ('Melting', 'Dross'),
-  ('Moulding', 'Dakon'), ('Moulding', 'Youmouyo'), ('Moulding', 'Gomi'),
-  ('Moulding', 'Ihada'), ('Moulding', 'Kake'), ('Moulding', 'Kataochi'),
-  ('Moulding', 'Mikui'), ('Moulding', 'Crack'), ('Moulding', 'Gas Hole'),
-  ('Core Making', 'Mejashi'), ('Core Making', 'Vinning'), ('Core Making', 'Gyakubari'),
-  ('Core Making', 'Gomi'), ('Core Making', 'Togata Tare'), ('Core Making', 'Gas Hole'),
-  ('Finishing', 'Kake'), ('Finishing', 'Tsurikomi')
-ON CONFLICT (line, defect_name) DO NOTHING;
+INSERT INTO defect_lines (product, line, defect_name) VALUES
+  ('bc', 'Melting', 'Kandama'), ('bc', 'Melting', 'Yuzakai'), ('bc', 'Melting', 'Pinhole'),
+  ('bc', 'Melting', 'Gas Hole'), ('bc', 'Melting', 'Ireboshi'), ('bc', 'Melting', 'Dross'),
+  ('bc', 'Moulding', 'Dakon'), ('bc', 'Moulding', 'Youmouyo'), ('bc', 'Moulding', 'Gomi'),
+  ('bc', 'Moulding', 'Ihada'), ('bc', 'Moulding', 'Kake'), ('bc', 'Moulding', 'Kataochi'),
+  ('bc', 'Moulding', 'Mikui'), ('bc', 'Moulding', 'Crack'), ('bc', 'Moulding', 'Gas Hole'),
+  ('bc', 'Core Making', 'Mejashi'), ('bc', 'Core Making', 'Vinning'), ('bc', 'Core Making', 'Gyakubari'),
+  ('bc', 'Core Making', 'Gomi'), ('bc', 'Core Making', 'Togata Tare'), ('bc', 'Core Making', 'Gas Hole'),
+  ('bc', 'Finishing', 'Kake'), ('bc', 'Finishing', 'Tsurikomi')
+ON CONFLICT (product, line, defect_name) DO NOTHING;
+
+-- Upgrade path for DBs created before the product column existed: the old
+-- table has UNIQUE (line, defect_name) and all rows are BC data.
+ALTER TABLE defect_lines ADD COLUMN IF NOT EXISTS product TEXT NOT NULL DEFAULT 'bc';
+UPDATE defect_lines SET product = 'bc' WHERE product IS NULL OR product = '';
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'defect_lines_line_defect_name_key') THEN
+    ALTER TABLE defect_lines DROP CONSTRAINT defect_lines_line_defect_name_key;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'defect_lines_product_line_defect_name_key') THEN
+    ALTER TABLE defect_lines ADD CONSTRAINT defect_lines_product_line_defect_name_key UNIQUE (product, line, defect_name);
+  END IF;
+END $$;
 
 -- Current-defect photo per Pareto chart (NG/Repair) x product group (bc/
 -- camshaft/crankshaft) x defect type. Live-only: cleared on every shift reset,

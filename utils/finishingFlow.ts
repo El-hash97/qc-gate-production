@@ -1,6 +1,7 @@
-// Static layout of the BC finishing line for /visualisasi, plus the pure
-// outcome pickers. Positions are [x, z] on the floor; move a station by
-// editing its row here (the real layout will be pointed out later).
+// Layout of the BC finishing line for /visualisasi, plus the pure outcome
+// pickers. The 3D layout itself is the GLB exported from the user's Blender
+// file (scripts/export-finishing-glb.py); stations below are the waypoints
+// blocks travel through, read off that file in Blender coordinates.
 
 export type Vec2 = readonly [number, number];
 export type Outcome = 'ok' | 'repair' | 'ng';
@@ -19,26 +20,35 @@ export interface Station {
   id: StationId;
   label: string;
   pos: Vec2;
-  shape: 'box' | 'cylinder';
-  // [width, height, depth]; a cylinder uses width as its diameter.
-  size: readonly [number, number, number];
+  // Height of the floating name tag.
+  labelY: number;
+  // Drawn as a simple prop only where the Blender layout has no model.
+  prop?: { size: readonly [number, number, number]; color: number };
 }
 
-// Tall stations hide the block "inside the machine"; low ones (QC gates,
-// Junbiki) stay under belt height so blocks ride visibly over them.
+// GLB placement: Blender units are 10 cm, its floor sits at z = -5.6.
+export const MODEL_URL = '/models/finishing-line.glb';
+export const MODEL_SCALE = 0.1;
+export const MODEL_LIFT = 0.56;
+
+// Blender top view (x, y) → scene floor [x, z] (glTF turns Blender -y into +z).
+const b = (x: number, y: number): Vec2 => [x * MODEL_SCALE, -y * MODEL_SCALE];
+
+// ponytail: positions are a best guess from the Blender layout (objects are
+// unnamed); correct a row here once the real station spots are pointed out.
 export const STATIONS: readonly Station[] = [
-  { id: 'baritori', label: 'Baritori', pos: [-16, 6], shape: 'box', size: [3, 2, 3] },
-  { id: 'hsb05', label: 'HSB05', pos: [-11, 6], shape: 'cylinder', size: [3.5, 3, 3.5] },
-  { id: 'hsb06', label: 'HSB06', pos: [-6, 6], shape: 'cylinder', size: [3.5, 3, 3.5] },
-  { id: 'grinding', label: 'Grinding', pos: [-1, 6], shape: 'box', size: [3, 2.2, 2.5] },
-  { id: 'hanten', label: 'Hanten MC', pos: [4, 6], shape: 'box', size: [3, 2.5, 2.5] },
-  { id: 'final', label: 'Final Proses', pos: [9, 6], shape: 'box', size: [3.5, 2.2, 2.5] },
-  { id: 'qc1', label: 'QC Gate 1', pos: [14, 6], shape: 'box', size: [2.5, 0.6, 2] },
-  { id: 'qc2', label: 'QC Gate 2', pos: [14, 0], shape: 'box', size: [2.5, 0.6, 2] },
-  { id: 'spray', label: 'Spray Booth', pos: [8, -4], shape: 'box', size: [4, 3, 3] },
-  { id: 'junbiki', label: 'Junbiki', pos: [0, -4], shape: 'box', size: [3, 0.6, 2.5] },
-  { id: 'ngBox', label: 'Box Merah (NG)', pos: [19, 0], shape: 'box', size: [2, 1, 2] },
-  { id: 'lineRepair', label: 'Line Repair', pos: [20, -8], shape: 'box', size: [4, 1.5, 3] },
+  { id: 'baritori', label: 'Baritori', pos: b(0, 8), labelY: 2.2 },
+  { id: 'hsb05', label: 'HSB05', pos: b(18, -65), labelY: 4.4 },
+  { id: 'hsb06', label: 'HSB06', pos: b(18, -117), labelY: 4.4 },
+  { id: 'grinding', label: 'Grinding', pos: b(6, -150), labelY: 2.6 },
+  { id: 'hanten', label: 'Hanten MC', pos: b(6.5, -174), labelY: 2.6 },
+  { id: 'final', label: 'Final Proses', pos: b(6.5, -201), labelY: 2.9 },
+  { id: 'qc1', label: 'QC Gate 1', pos: b(6.5, -231), labelY: 2.6 },
+  { id: 'qc2', label: 'QC Gate 2', pos: b(6.4, -262), labelY: 2.6 },
+  { id: 'spray', label: 'Spray Booth', pos: b(-5, -295), labelY: 3.8 },
+  { id: 'junbiki', label: 'Junbiki', pos: b(-60, -300), labelY: 2.4 },
+  { id: 'ngBox', label: 'Box Merah (NG)', pos: b(30, -275), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
+  { id: 'lineRepair', label: 'Line Repair', pos: b(48, -215), labelY: 2.2, prop: { size: [2.4, 0.9, 1.6], color: 0xd6c4a1 } },
 ];
 
 export const ROUTES = {
@@ -47,14 +57,14 @@ export const ROUTES = {
   ng: ['qc2', 'ngBox'],
 } as const satisfies Record<string, readonly StationId[]>;
 
-export const REPAIR_PALLET: Vec2 = [16.5, -2.5];
-export const FORKLIFT_HOME: Vec2 = [16.5, -4.5];
-export const TRUCK_DOCK: Vec2 = [-5, -4];
+export const REPAIR_PALLET: Vec2 = b(24, -250);
+export const FORKLIFT_HOME: Vec2 = b(30, -245);
+export const TRUCK_DOCK: Vec2 = b(-75, -350);
 
 // Tuning knobs (seconds, floor units per second).
 export const SPAWN_INTERVAL_S = 2;
 export const BLOCK_SPEED = 4;
-export const FORKLIFT_SPEED = 5;
+export const FORKLIFT_SPEED = 2;
 export const REPAIR_TIME_S = 4;
 export const NG_LINGER_S = 3;
 export const TRUCK_SPEED = 10;

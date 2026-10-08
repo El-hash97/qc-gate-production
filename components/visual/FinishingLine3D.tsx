@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  REPAIR_PALLET, ROUTES, STATIONS, TRUCK_DOCK, stationPos,
-  type Counts, type Vec2,
+  MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
+  type Counts,
 } from '@/utils/finishingFlow';
 import { createSim, step, type BlockColor } from '@/utils/finishingSim';
 import type { Theme } from '@/hooks/useTheme';
@@ -37,17 +39,8 @@ function makeLabel(text: string): THREE.Sprite {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }),
   );
-  sprite.scale.set(4, 1, 1);
+  sprite.scale.set(3.2, 0.8, 1);
   return sprite;
-}
-
-function belt(a: Vec2, b: Vec2, mat: THREE.Material): THREE.Mesh {
-  const dx = b[0] - a[0];
-  const dz = b[1] - a[1];
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx, dz), 0.2, 1.1), mat);
-  mesh.position.set((a[0] + b[0]) / 2, 0.6, (a[1] + b[1]) / 2);
-  mesh.rotation.y = -Math.atan2(dz, dx);
-  return mesh;
 }
 
 function makeForklift(): THREE.Group {
@@ -103,9 +96,10 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
-    camera.position.set(10, 38, 34);
+    // Looks down the line from the Baritori end, like the reference video.
+    camera.position.set(-22, 20, 2);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(2, 0, 0);
+    controls.target.set(-1, 0, 17);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2.2;
     controls.update();
@@ -116,30 +110,31 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     scene.add(sun);
 
     const floorMat = new THREE.MeshStandardMaterial();
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(70, 34), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 80), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(2, 0, -1);
+    floor.position.set(2, -0.02, 20);
     scene.add(floor);
 
-    // Beige machines, like the reference video.
-    const machineMat = new THREE.MeshStandardMaterial({ color: 0xd6c4a1 });
-    const ngMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c });
-    for (const s of STATIONS) {
-      const [w, h, d] = s.size;
-      const geo = s.shape === 'cylinder'
-        ? new THREE.CylinderGeometry(w / 2, w / 2, h, 32)
-        : new THREE.BoxGeometry(w, h, d);
-      const mesh = new THREE.Mesh(geo, s.id === 'ngBox' ? ngMat : machineMat);
-      mesh.position.set(s.pos[0], h / 2, s.pos[1]);
-      scene.add(mesh);
-      const label = makeLabel(s.label);
-      label.position.set(s.pos[0], Math.max(h, 1) + 1.4, s.pos[1]);
-      scene.add(label);
-    }
+    // The plant layout exported from the user's Blender file.
+    let disposed = false;
+    const draco = new DRACOLoader().setDecoderPath('/draco/');
+    new GLTFLoader().setDRACOLoader(draco).load(MODEL_URL, (gltf) => {
+      if (disposed) return;
+      gltf.scene.scale.setScalar(MODEL_SCALE);
+      gltf.scene.position.y = MODEL_LIFT;
+      scene.add(gltf.scene);
+    });
 
-    const beltMat = new THREE.MeshStandardMaterial({ color: 0x4b5563 });
-    for (const route of [ROUTES.main, ROUTES.ok]) {
-      for (let i = 1; i < route.length; i++) scene.add(belt(stationPos(route[i - 1]), stationPos(route[i]), beltMat));
+    for (const s of STATIONS) {
+      if (s.prop) {
+        const [w, h, d] = s.prop.size;
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: s.prop.color }));
+        mesh.position.set(s.pos[0], h / 2, s.pos[1]);
+        scene.add(mesh);
+      }
+      const label = makeLabel(s.label);
+      label.position.set(s.pos[0], s.labelY, s.pos[1]);
+      scene.add(label);
     }
 
     const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.15, 1.4), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
@@ -213,6 +208,8 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     raf = requestAnimationFrame(frame);
 
     return () => {
+      disposed = true;
+      draco.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();
       controls.dispose();

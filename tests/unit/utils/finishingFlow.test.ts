@@ -1,0 +1,56 @@
+import { describe, it, expect } from 'vitest';
+import {
+  STATIONS, ROUTES, stationPos, routePoints, isRunning, pickOutcome, pickReinspect,
+} from '@/utils/finishingFlow';
+
+describe('finishing line layout', () => {
+  it('has unique station ids', () => {
+    const ids = STATIONS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('runs the main route in process order and splits at QC Gate 2', () => {
+    expect(ROUTES.main).toEqual(['baritori', 'hsb05', 'hsb06', 'grinding', 'hanten', 'final', 'qc1', 'qc2']);
+    expect(ROUTES.ok).toEqual(['qc2', 'spray', 'junbiki']);
+    expect(ROUTES.ng).toEqual(['qc2', 'ngBox']);
+  });
+
+  it('resolves routes to station positions', () => {
+    expect(routePoints('ng')).toEqual([stationPos('qc2'), stationPos('ngBox')]);
+  });
+});
+
+describe('isRunning', () => {
+  it('is false right after a reset (all zero)', () => {
+    expect(isRunning({ ok: 0, repair: 0, ng: 0 })).toBe(false);
+  });
+  it('is true once anything is counted', () => {
+    expect(isRunning({ ok: 0, repair: 1, ng: 0 })).toBe(true);
+  });
+});
+
+describe('pickOutcome', () => {
+  const c = { ok: 80, repair: 15, ng: 5 };
+  it('splits r proportionally: ng band, then repair, then ok', () => {
+    expect(pickOutcome(c, 0)).toBe('ng');
+    expect(pickOutcome(c, 0.049)).toBe('ng');
+    expect(pickOutcome(c, 0.05)).toBe('repair');
+    expect(pickOutcome(c, 0.199)).toBe('repair');
+    expect(pickOutcome(c, 0.2)).toBe('ok');
+    expect(pickOutcome(c, 0.999)).toBe('ok');
+  });
+  it('defaults to ok with no counts', () => {
+    expect(pickOutcome({ ok: 0, repair: 0, ng: 0 }, 0)).toBe('ok');
+  });
+});
+
+describe('pickReinspect', () => {
+  it('fails at ng / (ok + ng)', () => {
+    const c = { ok: 90, repair: 50, ng: 10 };
+    expect(pickReinspect(c, 0.099)).toBe('ng');
+    expect(pickReinspect(c, 0.1)).toBe('ok');
+  });
+  it('passes as ok when only repairs exist (no divide by zero)', () => {
+    expect(pickReinspect({ ok: 0, repair: 3, ng: 0 }, 0)).toBe('ok');
+  });
+});

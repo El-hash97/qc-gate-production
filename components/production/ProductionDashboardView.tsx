@@ -269,7 +269,20 @@ export function ProductionDashboardView({
     setDownloading(true);
     try {
       const res = await fetch(downloadPdfUrl);
-      if (!res.ok) throw new Error('Gagal membuat PDF');
+      if (!res.ok) {
+        // The API route answers failures as JSON ({ error }), so surface its
+        // message instead of a generic one — otherwise a server-side failure
+        // (e.g. the headless browser in production) is indistinguishable
+        // from a network error on the client.
+        let detail = '';
+        try {
+          const body = typeof res.json === 'function' ? await res.json() : null;
+          if (body && typeof body.error === 'string') detail = body.error;
+        } catch {
+          // Non-JSON error body — fall back to the generic message below.
+        }
+        throw new Error(detail || 'Gagal membuat PDF');
+      }
       const blob = await res.blob();
       const disposition = res.headers?.get?.('Content-Disposition') ?? '';
       const fromHeader = /filename="?([^";]+)"?/i.exec(disposition)?.[1]?.trim();

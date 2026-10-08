@@ -122,6 +122,25 @@ describe('ProductionDashboardView export button', () => {
     expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
   });
 
+  it('surfaces the server error message when the PDF API answers JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({ success: false, error: 'Chromium gagal dibuka' }),
+    }));
+
+    render(
+      <ToastProvider>
+        <ProductionDashboardView
+          state={state} view="bc" onViewChange={() => {}} now={null}
+          exportMode="download" downloadPdfUrl="/api/history/7/pdf?view=bc"
+        />
+      </ToastProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    expect(await screen.findByText('Chromium gagal dibuka')).toBeInTheDocument();
+  });
+
   it('shows "Download Excel" and exports the current state as xlsx', async () => {
     excelMock.mockClear();
     render(

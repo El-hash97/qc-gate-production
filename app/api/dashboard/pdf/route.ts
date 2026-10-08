@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductionState } from '@/lib/productionState';
+import { launchPdfBrowser } from '@/lib/pdfBrowser';
 import { pdfFileName } from '@/utils/pdfExport';
 import type { DashboardView } from '@/components/production/ProductionDashboardView';
 
@@ -10,35 +11,6 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const VALID_VIEWS: DashboardView[] = ['all', 'bc', 'camshaft', 'crankshaft'];
-
-// Vercel and AWS Lambda both set one of these for a running function; a
-// plain `next dev` / `next start` on a normal machine sets neither.
-function isServerlessEnvironment(): boolean {
-  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-}
-
-async function launchBrowser() {
-  if (!isServerlessEnvironment()) {
-    // Local dev: the full `puppeteer` package (devDependency) bundles its
-    // own matching Chromium, so this doesn't depend on the developer having
-    // a browser installed at some specific path.
-    const puppeteer = (await import('puppeteer')).default;
-    return puppeteer.launch({ headless: true });
-  }
-  // Production (Vercel): puppeteer-core has no bundled browser — paired here
-  // with @sparticuz/chromium, a Chromium build sized to fit a serverless
-  // function's deployment limits (see next.config.mjs's
-  // serverComponentsExternalPackages, which keeps webpack from mangling it).
-  const [{ default: chromium }, { default: puppeteer }] = await Promise.all([
-    import('@sparticuz/chromium'),
-    import('puppeteer-core'),
-  ]);
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: true,
-  });
-}
 
 // Merender shift berjalan menjadi file PDF sungguhan — ini yang dipakai tombol
 // "Download PDF" di Dashboard live (lihat ProductionDashboardView). Membuka
@@ -57,9 +29,9 @@ export async function GET(request: NextRequest) {
     ? (requestedView as DashboardView)
     : 'bc';
 
-  let browser: Awaited<ReturnType<typeof launchBrowser>> | undefined;
+  let browser: Awaited<ReturnType<typeof launchPdfBrowser>> | undefined;
   try {
-    browser = await launchBrowser();
+    browser = await launchPdfBrowser();
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.goto(`${request.nextUrl.origin}/print/dashboard?view=${view}`, {

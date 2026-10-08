@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import * as XLSX from 'xlsx';
+import type ExcelJS from 'exceljs';
 import { buildShiftWorkbook, buildShiftFileName } from '@/utils/excelExport';
 import type { ProductionState } from '@/lib/types';
 
@@ -25,67 +25,93 @@ const state: ProductionState = {
   savedAt: '',
 };
 
-function rowsOf(workbook: XLSX.WorkBook, name: string): (string | number)[][] {
-  return XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 }) as (string | number)[][];
+function sheetOf(workbook: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
+  const ws = workbook.getWorksheet(name);
+  expect(ws).toBeDefined();
+  return ws!;
+}
+
+function findRow(ws: ExcelJS.Worksheet, firstCell: string): ExcelJS.Row {
+  let found: ExcelJS.Row | undefined;
+  ws.eachRow((row) => {
+    if (row.getCell(1).value === firstCell) found = row;
+  });
+  expect(found).toBeDefined();
+  return found!;
+}
+
+function values(row: ExcelJS.Row): unknown[] {
+  const out: unknown[] = [];
+  row.eachCell({ includeEmpty: true }, (cell) => { out.push(cell.value); });
+  return out;
 }
 
 describe('buildShiftWorkbook sheets', () => {
   it('creates one sheet per product plus summary, line stop, and entry log', () => {
     const workbook = buildShiftWorkbook(state);
-    expect(workbook.SheetNames).toEqual([
+    expect(workbook.worksheets.map((ws) => ws.name)).toEqual([
       'Ringkasan', 'BC 1TR', 'BC 2TR', 'Camshaft', 'Crankshaft', 'Line Stop', 'Entry Log',
     ]);
   });
 
+  it('centers every cell and bolds the headline', () => {
+    const ws = sheetOf(buildShiftWorkbook(state), 'Ringkasan');
+    expect(ws.getRow(1).font).toMatchObject({ bold: true });
+    ws.eachRow((row) => row.eachCell((cell) => {
+      expect(cell.alignment).toMatchObject({ horizontal: 'center', vertical: 'middle' });
+    }));
+  });
+
   it('Ringkasan opens with a headline and ends with a correct TOTAL row', () => {
-    const rows = rowsOf(buildShiftWorkbook(state), 'Ringkasan');
-    expect(rows[0][0]).toBe('Ringkasan Shift');
-    const total = rows[rows.length - 1];
+    const ws = sheetOf(buildShiftWorkbook(state), 'Ringkasan');
+    expect(ws.getCell('A1').value).toBe('Ringkasan Shift');
+    const total = values(ws.getRow(ws.rowCount));
     // OK 240 + Repair 12 + NG 6 = 258 against target 300.
     expect(total[0]).toBe('TOTAL');
     expect(total.slice(2, 6)).toEqual([240, 12, 6, 258]);
   });
 
   it('each product sheet opens with its own headline and production counters', () => {
-    const workbook = buildShiftWorkbook(state);
-    const bc1 = rowsOf(workbook, 'BC 1TR');
-    expect(bc1[0][0]).toContain('BC 1TR');
-    const produksiIdx = bc1.findIndex((r) => r[0] === 'Produksi');
-    expect(bc1[produksiIdx + 2]).toEqual([100, 5, 3, 108, '93%', '5%', '3%']);
+    const ws = sheetOf(buildShiftWorkbook(state), 'BC 1TR');
+    expect(String(ws.getCell('A1').value)).toContain('BC 1TR');
+    const produksi = findRow(ws, 'Produksi');
+    expect(values(ws.getRow(produksi.number + 2))).toEqual([100, 5, 3, 108, '93%', '5%', '3%']);
   });
 
   it('Camshaft shows its target, actual, and achievement', () => {
-    const rows = rowsOf(buildShiftWorkbook(state), 'Camshaft');
-    const targetIdx = rows.findIndex((r) => r[0] === 'Target');
+    const ws = sheetOf(buildShiftWorkbook(state), 'Camshaft');
+    const target = findRow(ws, 'Target');
     // 43 pcs against target 60 = 72%.
-    expect(rows[targetIdx + 1]).toEqual([60, 43, '72%']);
+    expect(values(ws.getRow(target.number + 1))).toEqual([60, 43, '72%']);
   });
 
   it('attributes defects per line from the entry logs, sorted biggest first', () => {
-    const rows = rowsOf(buildShiftWorkbook(state), 'BC 1TR');
-    const defectIdx = rows.findIndex((r) => r[0] === 'Defect (NG)');
-    expect(rows[defectIdx + 2]).toEqual(['Gas Hole Cope', 3]);
+    const ws = sheetOf(buildShiftWorkbook(state), 'BC 1TR');
+    const defect = findRow(ws, 'Defect (NG)');
+    expect(values(ws.getRow(defect.number + 2))).toEqual(['Gas Hole Cope', 3]);
     // The line-2 Dross must not leak into BC 1TR.
-    const body = rows.flat().join(' ');
+    let body = '';
+    ws.eachRow((row) => { body += `${row.getCell(1).value ?? ''} `; });
     expect(body).not.toContain('Dross');
   });
 
   it('lists hourly rows in production order with a target column when known', () => {
-    const rows = rowsOf(buildShiftWorkbook(state), 'Camshaft');
-    const hourlyIdx = rows.findIndex((r) => r[0] === 'Hourly');
-    expect(rows[hourlyIdx + 1]).toEqual(['Jam', 'OK', 'Repair', 'NG', 'Total', 'Target']);
-    expect(rows[hourlyIdx + 2]).toEqual(['20:00', 20, 1, 1, 22, 25]);
-    expect(rows[hourlyIdx + 3]).toEqual(['23:00', 20, 1, 0, 21, 25]);
+    const ws = sheetOf(buildShiftWorkbook(state), 'Camshaft');
+    const hourly = findRow(ws, 'Hourly');
+    expect(values(ws.getRow(hourly.number + 1))).toEqual(['Jam', 'OK', 'Repair', 'NG', 'Total', 'Target']);
+    expect(values(ws.getRow(hourly.number + 2))).toEqual(['20:00', 20, 1, 1, 22, 25]);
+    expect(values(ws.getRow(hourly.number + 3))).toEqual(['23:00', 20, 1, 0, 21, 25]);
   });
 
   it('Line Stop sheet spells out the category and countermeasure', () => {
-    const rows = rowsOf(buildShiftWorkbook(state), 'Line Stop');
-    expect(rows[rows.length - 1]).toEqual(['07:10', '07:20', 'AV (Availability)', 'Ganti tooling', 'Stok tool']);
+    const ws = sheetOf(buildShiftWorkbook(state), 'Line Stop');
+    expect(values(ws.getRow(ws.rowCount))).toEqual(['07:10', '07:20', 'AV (Availability)', 'Ganti tooling', 'Stok tool']);
   });
 
   it('Entry Log sheet lists every log with its product', () => {
-    const rows = rowsOf(buildShiftWorkbook(state), 'Entry Log');
-    const body = rows.map((r) => r.join('|')).join('\n');
+    const ws = sheetOf(buildShiftWorkbook(state), 'Entry Log');
+    let body = '';
+    ws.eachRow((row) => { body += `${values(row).join('|')}\n`; });
     expect(body).toContain('Defect (NG)|BC 1TR|Gas Hole Cope|3|L1|F1');
     expect(body).toContain('Repair|BC 1TR|Finishing|5|L1|F1');
   });
@@ -99,8 +125,10 @@ describe('buildShiftWorkbook sheets', () => {
       hourlyDataCam: {}, hourlyDataCrank: {}, entryLogs: [], lineStops: [],
     };
     const workbook = buildShiftWorkbook(empty);
-    expect(workbook.SheetNames).toHaveLength(7);
-    const body = rowsOf(workbook, 'BC 2TR').flat().join(' ');
+    expect(workbook.worksheets).toHaveLength(7);
+    const ws = sheetOf(workbook, 'BC 2TR');
+    let body = '';
+    ws.eachRow((row) => { body += `${row.getCell(1).value ?? ''} `; });
     expect(body).toContain('(Belum ada data)');
   });
 });

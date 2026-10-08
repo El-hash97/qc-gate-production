@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { EntryLog, HourlySnapshot, ProductionState, ProductLine } from '@/lib/types';
 import { PRODUCT_LINE_LABELS } from '@/lib/types';
 import { findPic } from '@/utils/constants';
@@ -7,33 +7,44 @@ import {
   getAchievementPercent, getGrandTotal, getNgTotal, getOkTotal, getRates, getRepairTotal,
 } from '@/utils/rates';
 
-type Row = (string | number)[];
+type Cell = string | number;
 
-// SheetJS community edition has no cell styling — "rapi" here means structure:
-// one headline (merged across the table width), a meta block, then one table
-// per section separated by a blank row, plus fitted column widths.
-function sheetFromRows(rows: Row[], widths: number[]): XLSX.WorkSheet {
-  const sheet = XLSX.utils.aoa_to_sheet(rows);
-  const lastCol = rows.reduce((max, row) => Math.max(max, row.length), 1) - 1;
-  if (lastCol > 0) {
-    sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
-  }
-  sheet['!cols'] = widths.map((wch) => ({ wch }));
-  return sheet;
+// ExcelJS (unlike the SheetJS community edition) supports cell styling, so
+// every cell is center-aligned and headlines/headers are bold. Structure per
+// sheet stays the same: one merged headline, a meta block, then one table per
+// section separated by a blank row, plus fitted column widths.
+const CENTER: Partial<ExcelJS.Alignment> = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+function headline(ws: ExcelJS.Worksheet, text: string, spanCols: number): void {
+  const row = ws.addRow([text]);
+  row.font = { bold: true, size: 14 };
+  if (spanCols > 1) ws.mergeCells(row.number, 1, row.number, spanCols);
 }
 
-function metaRows(state: ProductionState): Row[] {
+function section(ws: ExcelJS.Worksheet, text: string): void {
+  ws.addRow([text]).font = { bold: true };
+}
+
+function header(ws: ExcelJS.Worksheet, cells: Cell[]): void {
+  ws.addRow(cells).font = { bold: true };
+}
+
+function finishSheet(ws: ExcelJS.Worksheet, widths: number[]): void {
+  ws.columns = widths.map((width) => ({ width }));
+  ws.eachRow((row) => row.eachCell((cell) => {
+    cell.alignment = CENTER;
+  }));
+}
+
+function addMeta(ws: ExcelJS.Worksheet, state: ProductionState): void {
   const pic = findPic(state.pic);
-  const rows: Row[] = [
-    ['Tanggal', state.date || '—'],
-    ['Shift', state.shift],
-    ['Operator', state.operator || '—'],
-    ['PIC', pic?.name ?? state.pic ?? '—'],
-  ];
+  ws.addRow(['Tanggal', state.date || '—']);
+  ws.addRow(['Shift', state.shift]);
   if (state.shiftTime === 'day' || state.shiftTime === 'night') {
-    rows.splice(2, 0, ['Jam Shift', state.shiftTime === 'day' ? 'Day (07:00–19:00)' : 'Night (20:00–08:00)']);
+    ws.addRow(['Jam Shift', state.shiftTime === 'day' ? 'Day (07:00–19:00)' : 'Night (20:00–08:00)']);
   }
-  return rows;
+  ws.addRow(['Operator', state.operator || '—']);
+  ws.addRow(['PIC', pic?.name ?? state.pic ?? '—']);
 }
 
 function sortedEntries(map: Record<string, number> | undefined): [string, number][] {
@@ -51,36 +62,34 @@ function bucketFromLogs(logs: EntryLog[], line: ProductLine, kind: 'defect' | 'r
   return out;
 }
 
-function countTable(title: string, map: Record<string, number> | undefined, labelCol: string): Row[] {
+function addCountTable(ws: ExcelJS.Worksheet, title: string, map: Record<string, number> | undefined, labelCol: string): void {
   const entries = sortedEntries(map);
-  const rows: Row[] = [[title], [labelCol, 'Jumlah']];
+  section(ws, title);
+  header(ws, [labelCol, 'Jumlah']);
   if (entries.length === 0) {
-    rows.push(['(Belum ada data)', '']);
+    ws.addRow(['(Belum ada data)', '']);
   } else {
-    for (const [name, count] of entries) rows.push([name, count]);
+    for (const [name, count] of entries) ws.addRow([name, count]);
   }
-  return rows;
 }
 
-function hourlyTable(
-  title: string, hourly: Record<string, HourlySnapshot> | undefined, targetByHour?: Record<string, number>,
-): Row[] {
+function addHourlyTable(
+  ws: ExcelJS.Worksheet, hourly: Record<string, HourlySnapshot> | undefined, targetByHour?: Record<string, number>,
+): void {
   const keys = sortHourKeys(Object.keys(hourly ?? {}));
   const withTarget = targetByHour !== undefined;
-  const rows: Row[] = [[title], withTarget ? ['Jam', 'OK', 'Repair', 'NG', 'Total', 'Target'] : ['Jam', 'OK', 'Repair', 'NG', 'Total']];
+  section(ws, 'Hourly');
+  header(ws, withTarget ? ['Jam', 'OK', 'Repair', 'NG', 'Total', 'Target'] : ['Jam', 'OK', 'Repair', 'NG', 'Total']);
   if (keys.length === 0) {
-    rows.push(['(Belum ada data)', '', '', '', '']);
-    if (withTarget) rows[rows.length - 1].push('');
+    ws.addRow(withTarget ? ['(Belum ada data)', '', '', '', '', ''] : ['(Belum ada data)', '', '', '', '']);
   } else {
     for (const hour of keys) {
       const snap = (hourly ?? {})[hour];
-      const total = snap.ok + snap.repair + snap.ng;
-      const row: Row = [hour, snap.ok, snap.repair, snap.ng, total];
+      const row: Cell[] = [hour, snap.ok, snap.repair, snap.ng, snap.ok + snap.repair + snap.ng];
       if (withTarget) row.push(targetByHour?.[hour] ?? '');
-      rows.push(row);
+      ws.addRow(row);
     }
   }
-  return rows;
 }
 
 interface LineConfig {
@@ -90,7 +99,7 @@ interface LineConfig {
   hourlyTarget?: Record<string, number>;
 }
 
-function productSheet(state: ProductionState, config: LineConfig): XLSX.WorkSheet {
+function productSheet(workbook: ExcelJS.Workbook, state: ProductionState, config: LineConfig): void {
   const { line, target, hourly, hourlyTarget } = config;
   const label = PRODUCT_LINE_LABELS[line];
   const ok = getOkTotal(state, line);
@@ -99,48 +108,48 @@ function productSheet(state: ProductionState, config: LineConfig): XLSX.WorkShee
   const total = getGrandTotal(state, line);
   const rates = getRates(state, line);
 
-  const rows: Row[] = [
-    [`Laporan Shift — ${label}`],
-    [],
-    ...metaRows(state),
-    [],
-    ['Produksi'],
-    ['OK', 'Repair', 'NG', 'Total', 'OK%', 'Repair%', 'NG%'],
-    [ok, repair, ng, total, `${rates.okRate}%`, `${rates.repairRate}%`, `${rates.ngRate}%`],
-  ];
+  const ws = workbook.addWorksheet(label);
+  headline(ws, `Laporan Shift — ${label}`, 7);
+  ws.addRow([]);
+  addMeta(ws, state);
+  ws.addRow([]);
+  section(ws, 'Produksi');
+  header(ws, ['OK', 'Repair', 'NG', 'Total', 'OK%', 'Repair%', 'NG%']);
+  ws.addRow([ok, repair, ng, total, `${rates.okRate}%`, `${rates.repairRate}%`, `${rates.ngRate}%`]);
   if (target !== undefined && target > 0) {
-    rows.push(['Target', 'Tercapai', 'Achievement']);
-    rows.push([target, total, `${getAchievementPercent(state, target, line)}%`]);
+    header(ws, ['Target', 'Tercapai', 'Achievement']);
+    ws.addRow([target, total, `${getAchievementPercent(state, target, line)}%`]);
   }
-  rows.push([], ...countTable('Defect (NG)', bucketFromLogs(state.entryLogs, line, 'defect'), 'Jenis Defect'));
-  rows.push([], ...countTable('Repair', bucketFromLogs(state.entryLogs, line, 'repair'), 'Jenis Repair'));
-  rows.push([], ...hourlyTable('Hourly', hourly, hourlyTarget));
-
-  return sheetFromRows(rows, [22, 18, 14, 14, 14, 14, 14]);
+  ws.addRow([]);
+  addCountTable(ws, 'Defect (NG)', bucketFromLogs(state.entryLogs, line, 'defect'), 'Jenis Defect');
+  ws.addRow([]);
+  addCountTable(ws, 'Repair', bucketFromLogs(state.entryLogs, line, 'repair'), 'Jenis Repair');
+  ws.addRow([]);
+  addHourlyTable(ws, hourly, hourlyTarget);
+  finishSheet(ws, [22, 18, 14, 14, 14, 14, 14]);
 }
 
-function summarySheet(state: ProductionState): XLSX.WorkSheet {
+function summarySheet(workbook: ExcelJS.Workbook, state: ProductionState): void {
   const groups: { label: string; scope: 1 | 2 | 3 | 4 | 'bc' | undefined; target: number }[] = [
     { label: 'BC 1TR + BC 2TR', scope: 'bc', target: state.targetBc ?? 0 },
     { label: 'Camshaft', scope: 3, target: state.targetCam ?? 0 },
     { label: 'Crankshaft', scope: 4, target: state.targetCrank ?? 0 },
   ];
-  const rows: Row[] = [
-    ['Ringkasan Shift'],
-    [],
-    ...metaRows(state),
-    ['Target Total', state.target],
-    [],
-    ['Produksi per Produk'],
-    ['Produk', 'Target', 'OK', 'Repair', 'NG', 'Total', 'OK%', 'Achievement%'],
-  ];
+  const ws = workbook.addWorksheet('Ringkasan');
+  headline(ws, 'Ringkasan Shift', 8);
+  ws.addRow([]);
+  addMeta(ws, state);
+  ws.addRow(['Target Total', state.target]);
+  ws.addRow([]);
+  section(ws, 'Produksi per Produk');
+  header(ws, ['Produk', 'Target', 'OK', 'Repair', 'NG', 'Total', 'OK%', 'Achievement%']);
   for (const group of groups) {
     const ok = getOkTotal(state, group.scope);
     const repair = getRepairTotal(state, group.scope);
     const ng = getNgTotal(state, group.scope);
     const total = getGrandTotal(state, group.scope);
     const rates = getRates(state, group.scope);
-    rows.push([
+    ws.addRow([
       group.label,
       group.target > 0 ? group.target : '—',
       ok, repair, ng, total,
@@ -149,74 +158,71 @@ function summarySheet(state: ProductionState): XLSX.WorkSheet {
     ]);
   }
   const rates = getRates(state);
-  rows.push([
+  ws.addRow([
     'TOTAL', state.target,
     getOkTotal(state), getRepairTotal(state), getNgTotal(state), getGrandTotal(state),
     `${rates.okRate}%`,
     state.target > 0 ? `${getAchievementPercent(state, state.target)}%` : '—',
   ]);
-  return sheetFromRows(rows, [22, 14, 12, 12, 12, 12, 12, 14]);
+  finishSheet(ws, [22, 14, 12, 12, 12, 12, 12, 14]);
 }
 
 const CATEGORY_LABEL: Record<string, string> = { AV: 'AV (Availability)', PE: 'PE (Performance)', RQ: 'RQ (Quality)' };
 
-function lineStopSheet(state: ProductionState): XLSX.WorkSheet {
+function lineStopSheet(workbook: ExcelJS.Workbook, state: ProductionState): void {
   const stops = state.lineStops ?? [];
-  const rows: Row[] = [
-    ['Line Stop'],
-    [],
-    ...metaRows(state),
-    [],
-    ['Daftar Line Stop'],
-    ['Mulai', 'Selesai', 'Kategori', 'Item Problem', 'Countermeasure'],
-  ];
+  const ws = workbook.addWorksheet('Line Stop');
+  headline(ws, 'Line Stop', 5);
+  ws.addRow([]);
+  addMeta(ws, state);
+  ws.addRow([]);
+  section(ws, 'Daftar Line Stop');
+  header(ws, ['Mulai', 'Selesai', 'Kategori', 'Item Problem', 'Countermeasure']);
   if (stops.length === 0) {
-    rows.push(['(Belum ada data)', '', '', '', '']);
+    ws.addRow(['(Belum ada data)', '', '', '', '']);
   } else {
     for (const stop of stops) {
-      rows.push([stop.start, stop.end, CATEGORY_LABEL[stop.category] ?? stop.category, stop.problem, stop.countermeasure || '—']);
+      ws.addRow([stop.start, stop.end, CATEGORY_LABEL[stop.category] ?? stop.category, stop.problem, stop.countermeasure || '—']);
     }
   }
-  return sheetFromRows(rows, [12, 12, 20, 36, 36]);
+  finishSheet(ws, [12, 12, 20, 36, 36]);
 }
 
-function entryLogSheet(state: ProductionState): XLSX.WorkSheet {
-  const rows: Row[] = [
-    ['Entry Log (Lot / Flask)'],
-    [],
-    ...metaRows(state),
-    [],
-    ['Daftar Entry'],
-    ['Jenis', 'Produk', 'Tipe', 'Qty', 'Lot', 'Flask / Cavity', 'No. Die'],
-  ];
+function entryLogSheet(workbook: ExcelJS.Workbook, state: ProductionState): void {
+  const ws = workbook.addWorksheet('Entry Log');
+  headline(ws, 'Entry Log (Lot / Flask)', 7);
+  ws.addRow([]);
+  addMeta(ws, state);
+  ws.addRow([]);
+  section(ws, 'Daftar Entry');
+  header(ws, ['Jenis', 'Produk', 'Tipe', 'Qty', 'Lot', 'Flask / Cavity', 'No. Die']);
   if (state.entryLogs.length === 0) {
-    rows.push(['(Belum ada data)', '', '', '', '', '', '']);
+    ws.addRow(['(Belum ada data)', '', '', '', '', '', '']);
   } else {
     for (const log of state.entryLogs) {
-      rows.push([
+      ws.addRow([
         log.kind === 'defect' ? 'Defect (NG)' : 'Repair',
         log.line ? PRODUCT_LINE_LABELS[log.line] : (log.group === 'shaft' ? 'Shaft' : 'BC'),
         log.type, log.qty, log.lot, log.flask, log.die ?? '—',
       ]);
     }
   }
-  return sheetFromRows(rows, [14, 14, 28, 8, 16, 16, 10]);
+  finishSheet(ws, [14, 14, 28, 8, 16, 16, 10]);
 }
 
-export function buildShiftWorkbook(state: ProductionState) {
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, summarySheet(state), 'Ringkasan');
+export function buildShiftWorkbook(state: ProductionState): ExcelJS.Workbook {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'QC Gate';
+  summarySheet(workbook, state);
   const lines: LineConfig[] = [
     { line: 1, hourly: state.hourlyDataBc1 },
     { line: 2, hourly: state.hourlyDataBc2 },
     { line: 3, target: state.targetCam, hourly: state.hourlyDataCam, hourlyTarget: state.hourlyTargetCam },
     { line: 4, target: state.targetCrank, hourly: state.hourlyDataCrank, hourlyTarget: state.hourlyTargetCrank },
   ];
-  for (const config of lines) {
-    XLSX.utils.book_append_sheet(workbook, productSheet(state, config), PRODUCT_LINE_LABELS[config.line]);
-  }
-  XLSX.utils.book_append_sheet(workbook, lineStopSheet(state), 'Line Stop');
-  XLSX.utils.book_append_sheet(workbook, entryLogSheet(state), 'Entry Log');
+  for (const config of lines) productSheet(workbook, state, config);
+  lineStopSheet(workbook, state);
+  entryLogSheet(workbook, state);
   return workbook;
 }
 
@@ -226,7 +232,17 @@ export function buildShiftFileName(state: ProductionState): string {
   return `QC_Gate_${shiftPart}_${datePart}.xlsx`;
 }
 
-export function exportShiftToExcel(state: ProductionState): void {
+export async function exportShiftToExcel(state: ProductionState): Promise<void> {
   const workbook = buildShiftWorkbook(state);
-  XLSX.writeFile(workbook, buildShiftFileName(state));
+  const buffer = await workbook.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = buildShiftFileName(state);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

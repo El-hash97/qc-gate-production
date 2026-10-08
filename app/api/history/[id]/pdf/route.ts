@@ -25,23 +25,27 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ success: false, error: 'Invalid history id' }, { status: 400 });
   }
 
-  const record = await getHistoryById(id);
-  if (!record) {
-    return NextResponse.json({ success: false, error: 'History record not found' }, { status: 404 });
-  }
-
-  const requestedView = request.nextUrl.searchParams.get('view');
-  const view: DashboardView = VALID_VIEWS.includes(requestedView as DashboardView)
-    ? (requestedView as DashboardView)
-    : 'bc';
-
   let browser: Awaited<ReturnType<typeof launchPdfBrowser>> | undefined;
   try {
+    // Inside try on purpose: a DB throw here must come back as JSON (which
+    // the client surfaces in its toast), not as Next's generic HTML 500 page.
+    const record = await getHistoryById(id);
+    if (!record) {
+      return NextResponse.json({ success: false, error: 'History record not found' }, { status: 404 });
+    }
+
+    const requestedView = request.nextUrl.searchParams.get('view');
+    const view: DashboardView = VALID_VIEWS.includes(requestedView as DashboardView)
+      ? (requestedView as DashboardView)
+      : 'bc';
+
     browser = await launchPdfBrowser();
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.goto(`${request.nextUrl.origin}/print/history/${id}?view=${view}`, {
-      waitUntil: 'networkidle0',
+      // networkidle2, not networkidle0: chart/data fetches settle in waves,
+      // and a single straggler must not fail the whole export.
+      waitUntil: 'networkidle2',
       timeout: 30_000,
     });
     await page.emulateMediaType('print');
@@ -58,7 +62,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       },
     });
   } catch (err) {
+    // console.error lands in Vercel's Runtime Logs — without this, a
+    // production-only failure (e.g. headless-browser launch) is invisible.
     const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[api/history/${id}/pdf] gagal membuat PDF:`, message);
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   } finally {
     await browser?.close();

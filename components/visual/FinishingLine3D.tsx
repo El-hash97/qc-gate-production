@@ -24,6 +24,34 @@ interface Props {
   theme: Theme;
 }
 
+// Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
+function makeBadge(color: string): { sprite: THREE.Sprite; set: (text: string) => void } {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 80;
+  const g = canvas.getContext('2d')!;
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
+  sprite.scale.set(3.2, 1, 1);
+  let current = '';
+  return {
+    sprite,
+    set(text) {
+      if (text === current) return;
+      current = text;
+      g.clearRect(0, 0, 256, 80);
+      g.fillStyle = color;
+      g.fillRect(0, 0, 256, 80);
+      g.fillStyle = '#ffffff';
+      g.font = 'bold 40px sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(text, 128, 42);
+      texture.needsUpdate = true;
+    },
+  };
+}
+
 function makeLabel(text: string): THREE.Sprite {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -102,6 +130,8 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     controls.target.set(-1, 0, 17);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2.2;
+    controls.minDistance = 6;
+    controls.maxDistance = 40;
     controls.update();
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
@@ -110,9 +140,9 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     scene.add(sun);
 
     const floorMat = new THREE.MeshStandardMaterial();
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 80), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 50), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(2, -0.02, 20);
+    floor.position.set(-2, -0.02, 19);
     scene.add(floor);
 
     // The plant layout exported from the user's Blender file.
@@ -140,6 +170,17 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.15, 1.4), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
     pallet.position.set(REPAIR_PALLET[0], 0.08, REPAIR_PALLET[1]);
     scene.add(pallet);
+
+    // OK sits by Junbiki (where the truck loads), Repair by Line Repair, NG by the red box.
+    const badges = (
+      [['ok', 'junbiki', '#16a34a'], ['repair', 'lineRepair', '#d97706'], ['ng', 'ngBox', '#dc2626']] as const
+    ).map(([key, id, color]) => {
+      const s = STATIONS.find((st) => st.id === id)!;
+      const badge = makeBadge(color);
+      badge.sprite.position.set(s.pos[0], s.labelY + 1, s.pos[1]);
+      scene.add(badge.sprite);
+      return { key, label: key === 'ok' ? 'OK' : key === 'repair' ? 'Repair' : 'NG', badge };
+    });
 
     const forklift = makeForklift();
     scene.add(forklift);
@@ -201,6 +242,8 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       }
       forklift.position.set(sim.forklift.pos[0], 0, sim.forklift.pos[1]);
       truck.position.x = TRUCK_DOCK[0] + sim.truck.offset;
+
+      for (const { key, label, badge } of badges) badge.set(`${label} ${live.current.counts[key]}`);
 
       controls.update();
       renderer.render(scene, camera);

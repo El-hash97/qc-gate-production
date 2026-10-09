@@ -10,12 +10,13 @@ DROP = re.compile(r'^(Human 2|Low Poly Human|metarig|outfit_top|Camera|Plane$|Fo
 for o in list(bpy.data.objects):
     if o.type != 'MESH' or DROP.match(o.name) or any(m.type == 'ARMATURE' for m in o.modifiers):
         bpy.data.objects.remove(o, do_unlink=True)
-# drop far-away outliers (the stray square seen in the top view)
+# keep only the plant floor: the sunken road area at x > 100 (z -15) hides
+# under the web floor and left a wall panel + railing floating in mid-air
 def ctr(o):
     pts=[o.matrix_world @ Vector(c) for c in o.bound_box]; return sum(pts, Vector())/8
 for o in list(bpy.data.objects):
     c = ctr(o)
-    if not (-160 < c.x < 200 and -420 < c.y < 30): bpy.data.objects.remove(o, do_unlink=True)
+    if not (-160 < c.x < 100 and -420 < c.y < 30): bpy.data.objects.remove(o, do_unlink=True)
 for o in bpy.data.objects: o.animation_data_clear()
 before = 0
 for o in bpy.data.objects:

@@ -148,11 +148,23 @@ describe('InputPage', () => {
     });
   });
 
-  it('keeps the free-text Nomor Cavity field for Camshaft/Crankshaft', async () => {
+  it('keeps the free-text Nomor Cavity field for Crankshaft', async () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
-    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[3]);
     expect(screen.getByRole('textbox', { name: 'Nomor Cavity' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Flask 1' })).not.toBeInTheDocument();
+  });
+
+  it('generates Camshaft cavity boxes from the TR KAI and No. Die toggles', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
+    expect(screen.queryByRole('textbox', { name: 'Nomor Cavity' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cavity 1-1' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '2' }));
+    expect(screen.getByRole('button', { name: 'Cavity 1-5' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'TR KAI 2 - EX' }));
+    expect(screen.getByRole('button', { name: 'Cavity 2-8' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cavity 1-5' })).not.toBeInTheDocument();
   });
 
   it('shows no pinned-hour banner by default (real-time input)', () => {

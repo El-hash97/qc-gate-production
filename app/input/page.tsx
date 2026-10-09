@@ -110,6 +110,11 @@ function usesFlaskBoxes(target: DefectTarget | RepairTarget | null): boolean {
   return target !== null && lineGroup(lineForTarget(target)) === 'bc';
 }
 
+// Line 3 is Camshaft: its cavity is picked via TR KAI + No. Die toggles.
+function isCamshaft(target: DefectTarget | RepairTarget | null): boolean {
+  return target !== null && lineForTarget(target) === 3;
+}
+
 export default function InputPage() {
   const { state, updateState, isLoading } = useProductionState();
   const { showToast } = useToast();
@@ -459,6 +464,7 @@ export default function InputPage() {
         types={defectTypesFor(defectTarget)}
         flaskLabel={flaskLabelFor(defectTarget)}
         takenFlasks={takenFlasksFor(defectTarget)}
+        cavityPicker={isCamshaft(defectTarget)}
       />
       <RepairModal
         isOpen={repairTarget !== null}
@@ -467,6 +473,7 @@ export default function InputPage() {
         types={repairTypesFor(repairTarget)}
         flaskLabel={flaskLabelFor(repairTarget)}
         takenFlasks={takenFlasksFor(repairTarget)}
+        cavityPicker={isCamshaft(repairTarget)}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

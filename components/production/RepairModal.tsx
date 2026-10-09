@@ -7,6 +7,7 @@ import type { DieNumber } from './DieNumberFields';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
 import { FlaskNumberFields } from './FlaskNumberFields';
+import { CavityFields } from './CavityFields';
 import { needsDieNumber, needsOverDimensiDetail } from '@/utils/constants';
 import type { OverDimensiDetail } from '@/lib/types';
 import styles from './EntryModal.module.css';
@@ -21,9 +22,11 @@ interface RepairModalProps {
   // any flask this returns for the typed lot is greyed out. Omitted (Camshaft/
   // Crankshaft cavity specs like "1-6") keeps the free-text field.
   takenFlasks?: (lot: string) => readonly string[];
+  // Camshaft only: pick the cavity via TR KAI + No. Die toggles instead of typing.
+  cavityPicker?: boolean;
 }
 
-export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks }: RepairModalProps) {
+export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker }: RepairModalProps) {
   const [repairType, setRepairType] = useState<string>(types[0]);
   const [customType, setCustomType] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -130,7 +133,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
             onChange={(event) => handleLotChange(event.target.value)}
           />
         </label>
-        {takenFlasks ? (
+        {cavityPicker ? null : takenFlasks ? (
           <FlaskNumberFields label={flaskLabel} value={flask} onChange={setFlask} taken={taken} />
         ) : (
           <label className={styles.field}>
@@ -143,6 +146,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
           </label>
         )}
       </div>
+      {cavityPicker && <CavityFields label={flaskLabel} value={flask} onChange={setFlask} />}
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Jumlah</span>
         <input

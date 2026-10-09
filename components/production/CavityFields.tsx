@@ -37,6 +37,7 @@ export function CavityFields({ label, value, onChange }: Props) {
 
   return (
     <>
+      <div className={styles.fieldRow}>
       <div className={styles.field}>
         <span className={styles.fieldLabel}>TR KAI</span>
         <div className={styles.cavityGrid2} role="group" aria-label="Pilih TR KAI">
@@ -68,6 +69,7 @@ export function CavityFields({ label, value, onChange }: Props) {
             </button>
           ))}
         </div>
+      </div>
       </div>
       <div className={styles.field}>
         <span className={styles.fieldLabel}>{label}</span>

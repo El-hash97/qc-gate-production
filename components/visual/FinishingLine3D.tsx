@@ -27,26 +27,26 @@ interface Props {
 // Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
 function makeBadge(color: string): { sprite: THREE.Sprite; set: (text: string) => void } {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
+  canvas.width = 384;
   canvas.height = 80;
   const g = canvas.getContext('2d')!;
   const texture = new THREE.CanvasTexture(canvas);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
-  sprite.scale.set(3.2, 1, 1);
+  sprite.scale.set(4.8, 1, 1);
   let current = '';
   return {
     sprite,
     set(text) {
       if (text === current) return;
       current = text;
-      g.clearRect(0, 0, 256, 80);
+      g.clearRect(0, 0, 384, 80);
       g.fillStyle = color;
-      g.fillRect(0, 0, 256, 80);
+      g.fillRect(0, 0, 384, 80);
       g.fillStyle = '#ffffff';
-      g.font = 'bold 40px sans-serif';
+      g.font = 'bold 36px sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText(text, 128, 42);
+      g.fillText(text, 192, 42);
       texture.needsUpdate = true;
     },
   };
@@ -243,7 +243,12 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       forklift.position.set(sim.forklift.pos[0], 0, sim.forklift.pos[1]);
       truck.position.x = TRUCK_DOCK[0] + sim.truck.offset;
 
-      for (const { key, label, badge } of badges) badge.set(`${label} ${live.current.counts[key]}`);
+      const c = live.current.counts;
+      const total = c.ok + c.repair + c.ng;
+      for (const { key, label, badge } of badges) {
+        const pct = total ? ((c[key] / total) * 100).toFixed(1) : '0.0';
+        badge.set(`${label} ${c[key]} · ${pct}%`);
+      }
 
       controls.update();
       renderer.render(scene, camera);

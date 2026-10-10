@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createSim, step, type Sim } from '@/utils/finishingSim';
-import { stationPos, TRUCK_CAPACITY, type Counts } from '@/utils/finishingFlow';
+import { routePoints, TRUCK_CAPACITY, type Counts } from '@/utils/finishingFlow';
 
 // Advance in 0.1 s ticks; `watch` sees the sim after every tick.
 function run(sim: Sim, seconds: number, counts: Counts, rand: () => number, watch?: (s: Sim) => void) {
@@ -26,7 +26,7 @@ describe('finishing simulation', () => {
     step(sim, 0.1, { ok: 1, repair: 0, ng: 0 });
     expect(sim.blocks).toHaveLength(1);
     expect(sim.blocks[0].color).toBe('raw');
-    expect(sim.blocks[0].path[0]).toEqual(stationPos('baritori'));
+    expect(sim.blocks[0].path[0]).toEqual(routePoints('main')[0]);
   });
 
   it('sends NG to the red box, piles it, then removes it', () => {

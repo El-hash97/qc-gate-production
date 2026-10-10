@@ -184,7 +184,7 @@ function layout(sim: Sim): void {
   let pallet = 0;
   let queue = 0;
   const [ngX, ngZ] = stationPos('ngBox');
-  const [jx, jz] = stationPos('junbiki');
+  const [jx, jz] = routePoints('ok').at(-1)!;
   for (const b of sim.blocks) {
     if (b.phase === 'atPallet') {
       b.pos = [REPAIR_PALLET[0], 0.4 + BLOCK * pallet++, REPAIR_PALLET[1]];

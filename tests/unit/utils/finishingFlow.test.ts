@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  STATIONS, ROUTES, stationPos, routePoints, isRunning, pickOutcome, pickReinspect,
+  STATIONS, stationPos, routePoints, isRunning, pickOutcome, pickReinspect,
 } from '@/utils/finishingFlow';
 
 describe('finishing line layout', () => {
@@ -9,13 +9,23 @@ describe('finishing line layout', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('runs the main route in process order and splits at QC Gate 2', () => {
-    expect(ROUTES.main).toEqual(['baritori', 'hsb05', 'hsb06', 'grinding', 'hanten', 'final', 'qc1', 'qc2']);
-    expect(ROUTES.ok).toEqual(['qc2', 'spray', 'junbiki']);
-    expect(ROUTES.ng).toEqual(['qc2', 'ngBox']);
-  });
-
-  it('resolves routes to station positions', () => {
+  it('passes every station in process order and splits at QC Gate 2', () => {
+    const main = routePoints('main');
+    expect(main.at(-1)).toEqual(stationPos('qc2'));
+    // each station lies on the route, in this order
+    const order = ['hsb05', 'hsb06', 'grinding', 'hanten', 'final', 'qc1', 'qc2'] as const;
+    const nearest = (id: (typeof order)[number]) => {
+      const [sx, sz] = stationPos(id);
+      let best = 0;
+      main.forEach(([x, z], i) => {
+        if (Math.hypot(x - sx, z - sz) < Math.hypot(main[best][0] - sx, main[best][1] - sz)) best = i;
+      });
+      expect(Math.hypot(main[best][0] - sx, main[best][1] - sz)).toBeLessThan(1.2);
+      return best;
+    };
+    const idx = order.map(nearest);
+    expect(idx).toEqual([...idx].sort((p, q) => p - q));
+    expect(routePoints('ok')[0]).toEqual(stationPos('qc2'));
     expect(routePoints('ng')).toEqual([stationPos('qc2'), stationPos('ngBox')]);
   });
 });

@@ -2,7 +2,7 @@
 // and leaves every block's world position in `pos`; the Three.js renderer
 // only mirrors it. Called only while production is running.
 import {
-  BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_SPEED, NG_LINGER_S,
+  BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_SPEED, NG_LINGER_S,
   REPAIR_PALLET, REPAIR_TIME_S, SPAWN_INTERVAL_S, TRUCK_AWAY_OFFSET,
   TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
   pickOutcome, pickReinspect, routePoints, stationPos,
@@ -34,8 +34,13 @@ export interface Sim {
   truck: { state: 'docked' | 'leaving' | 'returning'; offset: number; load: number };
 }
 
-const BELT_Y = 1;
-const BLOCK = 0.6;
+// Block centre height on the conveyors (Blender block z ≈ 6.2 above a -5.6 floor).
+const BELT_Y = 1.18;
+const BLOCK = BLOCK_SIZE[1];
+const HALF = BLOCK / 2;
+
+// Cargo floor height of the box truck drawn by the renderer.
+export const TRUCK_BED_Y = 1.05;
 
 export function createSim(): Sim {
   return {
@@ -187,20 +192,21 @@ function layout(sim: Sim): void {
   const [jx, jz] = routePoints('ok').at(-1)!;
   for (const b of sim.blocks) {
     if (b.phase === 'atPallet') {
-      b.pos = [REPAIR_PALLET[0], 0.4 + BLOCK * pallet++, REPAIR_PALLET[1]];
+      b.pos = [REPAIR_PALLET[0], 0.15 + HALF + BLOCK * pallet++, REPAIR_PALLET[1]];
     } else if (b.phase === 'onForklift') {
       const i = sim.forklift.load.indexOf(b.id);
-      b.pos = [sim.forklift.pos[0], 1.2 + BLOCK * i, sim.forklift.pos[1] - 0.8];
+      b.pos = [sim.forklift.pos[0], 0.5 + HALF + BLOCK * i, sim.forklift.pos[1] - 1.3];
     } else if (b.phase === 'waitJunbiki') {
-      b.pos = [jx + 0.8 * queue++, BELT_Y, jz];
+      b.pos = [jx + 0.6 * queue++, BELT_Y, jz];
     } else if (b.phase === 'loaded') {
       b.pos = [
-        TRUCK_DOCK[0] + sim.truck.offset - 1.4 + (b.slot % 5) * 0.7,
-        1.6 + Math.floor(b.slot / 5) * BLOCK,
-        TRUCK_DOCK[1],
+        // inside the cargo box: 5 along the bed x 2 across
+        TRUCK_DOCK[0] + sim.truck.offset - 1.6 + (b.slot % 5) * 0.75,
+        TRUCK_BED_Y + HALF,
+        TRUCK_DOCK[1] - 0.45 + Math.floor(b.slot / 5) * 0.9,
       ];
     } else if (b.phase === 'binned') {
-      b.pos = [ngX + ((b.id % 3) - 1) * 0.5, 1.3, ngZ];
+      b.pos = [ngX + ((b.id % 3) - 1) * 0.35, 0.8 + HALF, ngZ];
     }
   }
 }

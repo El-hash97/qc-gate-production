@@ -79,6 +79,9 @@ export const REPAIR_PALLET: Vec2 = b(22, -268);
 export const FORKLIFT_HOME: Vec2 = b(22, -273);
 export const TRUCK_DOCK: Vec2 = b(-85, -348);
 
+// BC block as modelled in the Blender file: 47.5 x 37.1 x 33.6 cm (L x W x H).
+export const BLOCK_SIZE = [0.475, 0.336, 0.371] as const;
+
 // Tuning knobs (seconds, floor units per second).
 export const SPAWN_INTERVAL_S = 2;
 export const BLOCK_SPEED = 4;

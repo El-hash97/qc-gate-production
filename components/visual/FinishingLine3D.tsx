@@ -6,10 +6,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
   type Counts,
 } from '@/utils/finishingFlow';
-import { createSim, step, type BlockColor } from '@/utils/finishingSim';
+import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
 import type { Theme } from '@/hooks/useTheme';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
@@ -81,21 +81,59 @@ function makeForklift(): THREE.Group {
   return g;
 }
 
+// Box truck, cab facing -x, open rear doors facing +x. Local origin = centre of
+// the cargo floor footprint at ground level; cargo floor sits at TRUCK_BED_Y.
 function makeTruck(): THREE.Group {
   const g = new THREE.Group();
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(2, 2.2, 2.4), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
-  cab.position.set(-3.4, 1.4, 0);
-  const bed = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.3, 2.4), new THREE.MeshStandardMaterial({ color: 0x6b7280 }));
-  bed.position.set(0, 1.15, 0);
-  const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.3, 16);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  for (const [x, z] of [[-3.4, 1.2], [-3.4, -1.2], [1.2, 1.2], [1.2, -1.2]]) {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
+  const mat = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
+    new THREE.MeshStandardMaterial({ color, ...extra });
+  const box = (size: [number, number, number], pos: [number, number, number], m: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), m);
+    mesh.position.set(...pos);
+    g.add(mesh);
+    return mesh;
+  };
+  const white = mat(0xf3f4f6);
+  const cabPaint = mat(0x1d4ed8);
+  const dark = mat(0x1f2937);
+  const glass = mat(0x0f172a, { metalness: 0.4, roughness: 0.15 });
+  const grey = mat(0x9ca3af);
+
+  // chassis + bumper
+  box([6.2, 0.25, 1.9], [-0.9, 0.7, 0], dark);
+  box([0.15, 0.35, 2.3], [-4.05, 0.7, 0], dark);
+  // cab with windscreen, side windows and headlights
+  box([1.7, 1.9, 2.3], [-3.15, 1.75, 0], cabPaint);
+  box([0.05, 0.75, 1.9], [-4.01, 2.15, 0], glass);
+  box([0.9, 0.6, 0.04], [-3.3, 2.2, 1.16], glass);
+  box([0.9, 0.6, 0.04], [-3.3, 2.2, -1.16], glass);
+  box([0.06, 0.18, 0.4], [-4.02, 1.05, 0.85], mat(0xfde68a, { emissive: 0xfde68a, emissiveIntensity: 0.4 }));
+  box([0.06, 0.18, 0.4], [-4.02, 1.05, -0.85], mat(0xfde68a, { emissive: 0xfde68a, emissiveIntensity: 0.4 }));
+  // cargo box: floor, roof, walls; rear left open so the loaded blocks show
+  box([4.6, 0.1, 2.3], [0, TRUCK_BED_Y - 0.05, 0], grey);
+  box([4.6, 0.08, 2.3], [0, TRUCK_BED_Y + 2.2, 0], white);
+  box([4.6, 2.2, 0.06], [0, TRUCK_BED_Y + 1.1, 1.15], white);
+  box([4.6, 2.2, 0.06], [0, TRUCK_BED_Y + 1.1, -1.15], white);
+  box([0.06, 2.2, 2.3], [-2.3, TRUCK_BED_Y + 1.1, 0], white);
+  // company stripe on both sides
+  box([4.6, 0.25, 0.02], [0, TRUCK_BED_Y + 0.6, 1.19], cabPaint);
+  box([4.6, 0.25, 0.02], [0, TRUCK_BED_Y + 0.6, -1.19], cabPaint);
+  // rear doors swung fully open
+  box([1.15, 2.2, 0.05], [2.88, TRUCK_BED_Y + 1.1, 1.2], white);
+  box([1.15, 2.2, 0.05], [2.88, TRUCK_BED_Y + 1.1, -1.2], white);
+  // wheels: single front axle, dual rear axle
+  const wheelGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.3, 20);
+  const hubGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.32, 12);
+  const tyre = mat(0x111111);
+  for (const [x, z] of [[-3.15, 1.0], [-3.15, -1.0], [1.2, 1.0], [1.2, -1.0], [1.2, 0.68], [1.2, -0.68]]) {
+    const w = new THREE.Mesh(wheelGeo, tyre);
     w.rotation.x = Math.PI / 2;
     w.position.set(x, 0.45, z);
-    g.add(w);
+    const hub = new THREE.Mesh(hubGeo, grey);
+    hub.rotation.x = Math.PI / 2;
+    hub.position.set(x, 0.45, z);
+    g.add(w, hub);
   }
-  g.add(cab, bed);
   return g;
 }
 
@@ -188,7 +226,7 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     truck.position.set(TRUCK_DOCK[0], 0, TRUCK_DOCK[1]);
     scene.add(truck);
 
-    const blockGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    const blockGeo = new THREE.BoxGeometry(...BLOCK_SIZE);
     const blockMats = Object.fromEntries(
       Object.entries(BLOCK_COLORS).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c })]),
     ) as Record<BlockColor, THREE.MeshStandardMaterial>;
@@ -232,6 +270,10 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
           scene.add(m);
         }
         m.material = blockMats[b.color];
+        // face the direction of travel; parked blocks keep their last heading
+        const dx = b.pos[0] - m.position.x;
+        const dz = b.pos[2] - m.position.z;
+        if (dx * dx + dz * dz > 1e-6) m.rotation.y = Math.atan2(-dz, dx);
         m.position.set(b.pos[0], b.pos[1], b.pos[2]);
       }
       for (const [id, m] of meshes) {

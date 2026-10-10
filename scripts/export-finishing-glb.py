@@ -1,13 +1,34 @@
 # Lightweight GLB of the finishing-line layout for /visualisasi.
 # Never saves the .blend. Usage (Blender 5.x):
 #   blender -b "animasi/line finishing before improvement.blend" #     --python scripts/export-finishing-glb.py -- public/models/finishing-line.glb 600
-# Last arg = max triangles per object (decimate cap). People, cameras, the
-# huge ground plane and the forklift (animated in the web scene) are dropped.
+# Last arg = max triangles per object (decimate cap). Cameras, the huge ground
+# plane and the forklift (animated in the web scene) are dropped; the 14 rigged
+# operators are frozen in their frame-1 pose.
 import bpy, sys, json, re
 from mathutils import Vector
 out = sys.argv[-2]; MAX_TRIS = int(sys.argv[-1])
 DROP = re.compile(r'^(Human 2|Low Poly Human|metarig|outfit_top|Camera|Plane$|Forklif)')
+HUMAN_TRIS = 2000
+# Operators: bake the rig pose into plain meshes before the rigs are deleted.
+# Rig-less "Human 2" copies sit unused at the origin and stay dropped.
+dg = bpy.context.evaluated_depsgraph_get()
+operators = set()
 for o in list(bpy.data.objects):
+    if o.type == 'MESH' and o.name.startswith('Human 2') and any(m.type == 'ARMATURE' and m.object for m in o.modifiers):
+        mw = o.matrix_world.copy()
+        o.data = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
+        o.modifiers.clear(); o.parent = None; o.matrix_world = mw
+        o.name = 'Operator ' + o.name; operators.add(o.name)
+# Skin and work trousers come from textures that are not exported: flat colours.
+FLAT = {'Rex_Skin': (0.72, 0.5, 0.38, 1), 'Rex_Rough': (0.1, 0.12, 0.18, 1), 'Rex_Eyes': (0.05, 0.04, 0.04, 1)}
+for name, col in FLAT.items():
+    m = bpy.data.materials.get(name)
+    if m and m.use_nodes:
+        bsdf = m.node_tree.nodes.get('Principled BSDF')
+        for l in list(bsdf.inputs['Base Color'].links): m.node_tree.links.remove(l)
+        bsdf.inputs['Base Color'].default_value = col
+for o in list(bpy.data.objects):
+    if o.name in operators: continue
     if o.type != 'MESH' or DROP.match(o.name) or any(m.type == 'ARMATURE' for m in o.modifiers):
         bpy.data.objects.remove(o, do_unlink=True)
 # keep only the plant floor: the sunken road area at x > 100 (z -15) hides
@@ -22,8 +43,9 @@ before = 0
 for o in bpy.data.objects:
     n = sum(len(p.vertices) - 2 for p in o.data.polygons); before += n
     if o.data.users > 1: o.data = o.data.copy()
-    if n > MAX_TRIS:
-        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = MAX_TRIS / n
+    cap = HUMAN_TRIS if o.name in operators else MAX_TRIS
+    if n > cap:
+        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = cap / n
 # Perforated fence/grating panels resist decimation: swap them for a
 # translucent box of the same footprint and colour.
 import bmesh

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSim, step, type Sim } from '@/utils/finishingSim';
+import { RETURN_S, createSim, step, stepReturn, type Sim } from '@/utils/finishingSim';
 import {
   ANIM_FPS, JUNBIKI_SEGMENT, QC2_SEGMENT, SEGMENTS, TRUCK_CAPACITY, segmentSeconds, trackAt,
   type Counts,
@@ -107,5 +107,29 @@ describe('finishing simulation', () => {
     expect(maxLoaded).toBe(TRUCK_CAPACITY);
     // one per station + one truckload + a short Junbiki queue
     expect(maxBlocks).toBeLessThan(SEGMENTS.length + TRUCK_CAPACITY + 4);
+  });
+});
+
+describe('stepReturn (station equipment easing back to its start pose)', () => {
+  it('stays put while the same block works the station', () => {
+    const st = { last: 1 as number | null, w: 0 };
+    expect(stepReturn(st, 1, 0.1).release).toBe(false);
+    expect(st.w).toBe(0);
+  });
+
+  it('starts a full-weight return when the block leaves, even if the next one enters at once', () => {
+    const st = { last: 1 as number | null, w: 0 };
+    expect(stepReturn(st, 2, 0).release).toBe(true);
+    expect(st.w).toBe(1);
+    expect(stepReturn({ last: 1, w: 0 }, null, 0).release).toBe(true);
+  });
+
+  it('eases the held pose out over RETURN_S without overshooting', () => {
+    const st = { last: 1 as number | null, w: 0 };
+    stepReturn(st, null, 0);
+    const half = stepReturn(st, null, RETURN_S / 2).weight;
+    expect(half).toBeCloseTo(0.5, 5);
+    expect(stepReturn(st, null, RETURN_S).weight).toBe(0);
+    expect(stepReturn(st, 3, 0.1).weight).toBe(0);
   });
 });

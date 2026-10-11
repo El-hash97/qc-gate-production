@@ -10,6 +10,7 @@ import {
   ANIM_FPS, SEGMENTS, type Counts,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
+import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
 import type { Theme } from '@/hooks/useTheme';
 
@@ -188,9 +189,8 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     let disposed = false;
     // Plays the Blender timeline (operators, hoists, robot arm...).
     let mixer: THREE.AnimationMixer | null = null;
-    // Clips owned by a station segment: they only move while that station
-    // works on a block, scrubbed to the block's own progress.
-    const segActions: THREE.AnimationAction[][] = SEGMENTS.map(() => []);
+    // Clips owned by a station segment move with that station's block.
+    let stations: ReturnType<typeof createStationAnim>[] = [];
     const draco = new DRACOLoader().setDecoderPath('/draco/');
     new GLTFLoader().setDRACOLoader(draco).load(MODEL_URL, (gltf) => {
       if (disposed) return;
@@ -207,16 +207,14 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       if (gltf.animations.length) {
         mixer = new THREE.AnimationMixer(gltf.scene);
         const loop = Math.max(...gltf.animations.map((c) => c.duration));
+        const m = mixer;
+        stations = SEGMENTS.map((seg) => createStationAnim(
+          m,
+          gltf.animations.filter((c) => seg.clips.includes(c.name)),
+          (seg.from - 1) / ANIM_FPS,
+        ));
         for (const clip of gltf.animations) {
-          const k = SEGMENTS.findIndex((seg) => seg.clips.includes(clip.name));
-          if (k >= 0) {
-            const action = mixer.clipAction(clip);
-            action.play();
-            action.paused = true;
-            action.time = (SEGMENTS[k].from - 1) / ANIM_FPS;
-            segActions[k].push(action);
-            continue;
-          }
+          if (SEGMENTS.some((seg) => seg.clips.includes(clip.name))) continue;
           let play = clip;
           const range = clip.name.startsWith('metarig')
             ? activeRange(clip.tracks.map((t) => ({ times: t.times, values: t.values, size: t.getValueSize() })))
@@ -299,11 +297,8 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       last = now;
       if (live.current.running) {
         step(sim, dt, live.current.counts);
-        // a free station keeps its last pose until the next block arrives
-        sim.segments.forEach((seg, k) => {
-          if (seg.busy === null) return;
-          for (const action of segActions[k]) action.time = (SEGMENTS[k].from - 1) / ANIM_FPS + seg.t;
-        });
+        // station clips follow their block, then glide back (stationAnim)
+        sim.segments.forEach((seg, k) => stations[k]?.update(seg.busy, seg.t, dt));
         mixer?.update(dt);
       }
       else if (sim.nextId > 1) sim = createSim();

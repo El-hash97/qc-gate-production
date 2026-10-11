@@ -269,3 +269,23 @@ export function step(sim: Sim, dt: number, counts: Counts, rand: () => number = 
   sim.blocks = sim.blocks.filter((b) => !(b.phase === 'binned' && b.timer <= 0));
   layout(sim);
 }
+
+// How long a station's hoist/operator takes to glide back to its start pose
+// after a block leaves. It runs alongside the next block, never delays it:
+// in the recording the equipment only grabs the block ~1 s into a segment.
+export const RETURN_S = 1.2;
+
+export interface ReturnState {
+  last: number | null;
+  w: number;
+}
+
+// Per frame and station: `release` = the previous block just left (freeze its
+// end pose); `weight` = how much of that frozen pose still shows, eased 1 → 0.
+export function stepReturn(st: ReturnState, busy: number | null, dt: number): { release: boolean; weight: number } {
+  const release = st.last !== null && busy !== st.last;
+  if (release) st.w = 1;
+  st.last = busy;
+  st.w = Math.max(0, st.w - dt / RETURN_S);
+  return { release, weight: st.w * st.w * (3 - 2 * st.w) };
+}

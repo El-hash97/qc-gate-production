@@ -16,6 +16,7 @@ out = sys.argv[-2]; MAX_TRIS = int(sys.argv[-1])
 ANIM_END = 1660  # 69 s at 24 fps
 HUMAN_TRIS = 100000  # per operator body part (decimating skinned meshes tears them)
 DROP = re.compile(r'^(Low Poly Human|outfit_top|Camera|Plane$|Forklif)')
+REPAIR_AREA_LIFT = 9.43  # road z -15.07 -> plant floor z -5.64
 BC_BLOCKS = {'Cube.050', 'Cube.019', 'Cube.562', 'Cube.563', 'Cube.564'}
 
 def ctr(o):
@@ -31,11 +32,14 @@ for o in list(bpy.data.objects):
     # rig-less "Human 2" copies sit unused at the origin
     if o.type != 'MESH' or DROP.match(o.name) or o.name in BC_BLOCKS or o.name.startswith('Human 2'):
         bpy.data.objects.remove(o, do_unlink=True); continue
-    # keep only the plant floor: the sunken road area at x > 100 (z -15) hides
-    # under the web floor and left a wall panel + railing floating in mid-air
     c = ctr(o)
-    if not (-160 < c.x < 100 and -420 < c.y < 30):
-        bpy.data.objects.remove(o, do_unlink=True)
+    if not (-160 < c.x < 200 and -420 < c.y < 30):
+        bpy.data.objects.remove(o, do_unlink=True); continue
+    # The Line Repair area (x > 100) sits on a road 9.43 lower than the plant
+    # floor; raise it to floor level so its fence and benches stand on the
+    # web floor instead of floating.
+    if c.x > 100:
+        o.location.z += REPAIR_AREA_LIFT
 
 skinned = {o for o in bpy.data.objects if o.type == 'MESH' and o.parent in rigs}
 moving = {o for o in bpy.data.objects if o.type == 'MESH' and o not in skinned

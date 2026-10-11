@@ -7,11 +7,11 @@
 // replaying the recorded path; a finished block waits in its station until
 // the next one is free, and Baritori only releases a block when it is empty.
 import {
-  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_SPEED,
-  JUNBIKI_SEGMENT, NG_LINGER_S, QC2_SEGMENT, REPAIR_PALLET, REPAIR_TIME_S, SEGMENTS,
+  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BACK, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_OUT,
+  FORKLIFT_SPEED, JUNBIKI_SEGMENT, NG_LINGER_S, QC2_SEGMENT, REPAIR_STUB, REPAIR_TIME_S, SEGMENTS,
   TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
   pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
-  type Counts, type Outcome, type Quat, type Vec2,
+  type Counts, type Leg, type Outcome, type Quat, type Vec2,
 } from './finishingFlow';
 
 export type Vec3 = [number, number, number];
@@ -35,13 +35,19 @@ export interface Block {
   quat: Quat | null;
 }
 
+export type ForkliftState = 'idle' | 'toRepair' | 'repairing' | 'toGate' | 'unloading';
+
 export interface Sim {
   blocks: Block[];
   nextId: number;
   // which block holds each station segment, and how far in it is
   segments: { busy: number | null; t: number }[];
-  // forkY = height of the fork tips' top face above the floor
-  forklift: { state: 'idle' | 'toRepair' | 'repairing' | 'toGate'; pos: [number, number]; timer: number; load: number[]; forkY: number };
+  // heading: three.js yaw, forks point along it; leg: index into the current
+  // route; forkY: height of the forks' top face above the floor
+  forklift: {
+    state: ForkliftState; pos: [number, number]; heading: number; leg: number;
+    timer: number; load: number[]; forkY: number;
+  };
   truck: { state: 'docked' | 'leaving' | 'returning'; offset: number; load: number };
 }
 
@@ -53,25 +59,30 @@ const HALF = BLOCK / 2;
 // Cargo floor height of the box truck drawn by the renderer.
 export const TRUCK_BED_Y = 1.05;
 
-// The forklift always faces Line Repair: it drives there forks first and
-// reverses back to QC Gate 2, like a real counterbalance truck.
-export const FORKLIFT_HEADING = (() => {
-  const [rx, rz] = stationPos('lineRepair');
-  return Math.atan2(-(rz - FORKLIFT_HOME[1]), rx - FORKLIFT_HOME[0]);
-})();
-// Forks travel low with a load, sit on the floor otherwise; blocks ride on
-// them this far ahead of the forklift's centre.
+// Fork heights: level with the stub conveyor to pick/drop at QC Gate 2, low
+// while driving, level with the repair bench top while repairing.
+export const FORK_STUB_Y = BELT_Y - HALF;
 export const FORK_CARRY_Y = 0.3;
-export const FORK_REST_Y = 0.06;
+export const FORK_BENCH_Y = 0.78;
+const FORK_TARGET: Record<ForkliftState, number> = {
+  idle: FORK_STUB_Y, toRepair: FORK_CARRY_Y, repairing: FORK_BENCH_Y, toGate: FORK_CARRY_Y, unloading: FORK_STUB_Y,
+};
 const FORK_LIFT_SPEED = 0.4;
+// blocks ride this far ahead of the forklift's centre
 const FORK_AHEAD = 1.15;
+const TURN_RATE = 1.6; // rad/s
+// Parked at home it faces the stub end (west).
+const HOME_HEADING = Math.PI;
 
 export function createSim(): Sim {
   return {
     blocks: [],
     nextId: 1,
     segments: SEGMENTS.map(() => ({ busy: null, t: 0 })),
-    forklift: { state: 'idle', pos: [FORKLIFT_HOME[0], FORKLIFT_HOME[1]], timer: 0, load: [], forkY: FORK_REST_Y },
+    forklift: {
+      state: 'idle', pos: [FORKLIFT_HOME[0], FORKLIFT_HOME[1]], heading: HOME_HEADING, leg: 0,
+      timer: 0, load: [], forkY: FORK_STUB_Y,
+    },
     truck: { state: 'docked', offset: 0, load: 0 },
   };
 }
@@ -162,35 +173,56 @@ function stepTruck(sim: Sim, dt: number): void {
   }
 }
 
+// Drives one step along a route of legs, turning toward the direction of
+// travel (backwards on reverse legs). True once the last leg is done.
+function drive(f: Sim['forklift'], legs: readonly Leg[], dt: number): boolean {
+  const leg = legs[f.leg];
+  const dx = leg.to[0] - f.pos[0];
+  const dz = leg.to[1] - f.pos[1];
+  if (dx * dx + dz * dz > 1e-9) {
+    const want = Math.atan2(-dz, dx) + (leg.reverse ? Math.PI : 0);
+    const diff = Math.atan2(Math.sin(want - f.heading), Math.cos(want - f.heading));
+    f.heading += Math.max(-TURN_RATE * dt, Math.min(TURN_RATE * dt, diff));
+  }
+  if (!moveTo(f.pos, leg.to, FORKLIFT_SPEED * dt)) return false;
+  f.leg += 1;
+  if (f.leg < legs.length) return false;
+  f.leg = 0;
+  return true;
+}
+
 function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number): void {
   const f = sim.forklift;
-  const moving = f.state === 'toRepair' || f.state === 'toGate';
-  const forkTarget = moving ? FORK_CARRY_Y : FORK_REST_Y;
+  const target = FORK_TARGET[f.state];
   const lift = FORK_LIFT_SPEED * dt;
-  f.forkY = Math.abs(forkTarget - f.forkY) <= lift ? forkTarget : f.forkY + Math.sign(forkTarget - f.forkY) * lift;
+  f.forkY = Math.abs(target - f.forkY) <= lift ? target : f.forkY + Math.sign(target - f.forkY) * lift;
+  const forksReady = f.forkY === target;
   if (f.state === 'idle') {
+    // forks wait level with the stub end, so loading is a straight slide
     const waiting = sim.blocks.filter((b) => b.phase === 'atPallet').slice(0, FORKLIFT_BATCH);
-    if (waiting.length === 0) return;
+    if (waiting.length === 0 || !forksReady) return;
     for (const b of waiting) b.phase = 'onForklift';
     f.load = waiting.map((b) => b.id);
     f.state = 'toRepair';
   } else if (f.state === 'toRepair') {
-    if (moveTo(f.pos, stationPos('lineRepair'), FORKLIFT_SPEED * dt)) {
+    if (drive(f, FORKLIFT_OUT, dt)) {
       f.state = 'repairing';
       f.timer = REPAIR_TIME_S;
     }
   } else if (f.state === 'repairing') {
-    f.timer -= dt;
+    if (forksReady) f.timer -= dt;
     if (f.timer <= 0) f.state = 'toGate';
-  } else if (moveTo(f.pos, FORKLIFT_HOME, FORKLIFT_SPEED * dt)) {
-    // Back at QC Gate 2: re-inspect every repaired block.
+  } else if (f.state === 'toGate') {
+    if (drive(f, FORKLIFT_BACK, dt)) f.state = 'unloading';
+  } else if (forksReady) {
+    // Back at the stub end: re-inspect every repaired block, roll it to QC Gate 2.
     for (const id of f.load) {
       const b = sim.blocks.find((x) => x.id === id);
       if (!b) continue;
       const o = pickReinspect(counts, rand());
       b.color = o;
-      if (o === 'ng') send(b, 'ng', [FORKLIFT_HOME, ...routePoints('ng')]);
-      else send(b, 'toQc2', [FORKLIFT_HOME, stationPos('qc2')]);
+      if (o === 'ng') send(b, 'ng', [REPAIR_STUB, ...routePoints('ng')]);
+      else send(b, 'toQc2', [REPAIR_STUB, stationPos('qc2')]);
     }
     f.load = [];
     f.state = 'idle';
@@ -217,7 +249,7 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
         if (b.color === 'ok') enter(sim, b, JUNBIKI_SEGMENT);
         else {
           leaveSegment(sim, b);
-          if (b.color === 'repair') send(b, 'toPallet', [stationPos('qc2'), REPAIR_PALLET]);
+          if (b.color === 'repair') send(b, 'toPallet', [stationPos('qc2'), REPAIR_STUB]);
           else send(b, 'ng', routePoints('ng'));
         }
       } else {
@@ -260,14 +292,15 @@ function layout(sim: Sim): void {
   const end = trackAt(SEGMENTS[JUNBIKI_SEGMENT].to).pos;
   for (const b of sim.blocks) {
     if (b.phase === 'atPallet') {
-      b.pos = [REPAIR_PALLET[0], 0.15 + HALF + BLOCK * pallet++, REPAIR_PALLET[1]];
+      // waiting at the end of the stub conveyor (stacked if more than one)
+      b.pos = [REPAIR_STUB[0], BELT_Y + BLOCK * pallet++, REPAIR_STUB[1]];
     } else if (b.phase === 'onForklift') {
       const f = sim.forklift;
       const i = f.load.indexOf(b.id);
       b.pos = [
-        f.pos[0] + FORK_AHEAD * Math.cos(FORKLIFT_HEADING),
+        f.pos[0] + FORK_AHEAD * Math.cos(f.heading),
         f.forkY + HALF + BLOCK * i,
-        f.pos[1] - FORK_AHEAD * Math.sin(FORKLIFT_HEADING),
+        f.pos[1] - FORK_AHEAD * Math.sin(f.heading),
       ];
       b.quat = null;
     } else if (b.phase === 'waitJunbiki') {

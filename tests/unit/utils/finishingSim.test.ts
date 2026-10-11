@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  FORKLIFT_HEADING, FORK_CARRY_Y, FORK_REST_Y, RETURN_S, createSim, step, stepReturn, type Sim,
+  FORK_BENCH_Y, FORK_CARRY_Y, FORK_STUB_Y, RETURN_S, createSim, step, stepReturn, type Sim,
 } from '@/utils/finishingSim';
 import {
-  ANIM_FPS, JUNBIKI_SEGMENT, QC2_SEGMENT, SEGMENTS, TRUCK_CAPACITY, segmentSeconds, trackAt,
-  type Counts,
+  ANIM_FPS, FORKLIFT_HOME, JUNBIKI_SEGMENT, QC2_SEGMENT, REPAIR_DROP, SEGMENTS, TRUCK_CAPACITY,
+  segmentSeconds, trackAt, type Counts,
 } from '@/utils/finishingFlow';
 
 const MAIN_S = SEGMENTS.slice(0, QC2_SEGMENT + 1).reduce((s, seg) => s + segmentSeconds(seg), 0);
@@ -67,7 +67,7 @@ describe('finishing simulation', () => {
     const sim = createSim();
     const forkStates = new Set<string>();
     let first = -1;
-    run(sim, MAIN_S + OK_S + TAKT_S * 3 + 30, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+    run(sim, MAIN_S + OK_S + TAKT_S * 3 + 90, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
       forkStates.add(s.forklift.state);
       if (first < 0 && s.blocks.length) first = s.blocks[0].id;
     });
@@ -86,7 +86,7 @@ describe('finishing simulation', () => {
     const rand = () => draws[Math.min(i++, draws.length - 1)];
     let sawForklift = false;
     let sawBinnedAfter = false;
-    run(sim, MAIN_S + 40, { ok: 0, repair: 1, ng: 1 }, rand, (s) => {
+    run(sim, MAIN_S + 90, { ok: 0, repair: 1, ng: 1 }, rand, (s) => {
       const b = s.blocks.find((x) => x.id === 1);
       if (b?.phase === 'onForklift') sawForklift = true;
       if (sawForklift && b?.phase === 'binned') sawBinnedAfter = true;
@@ -137,26 +137,43 @@ describe('stepReturn (station equipment easing back to its start pose)', () => {
 });
 
 describe('forklift', () => {
-  it('carries repair blocks on raised forks in front of it and lowers them to repair', () => {
+  it('picks repair blocks at conveyor height, carries them ahead of it, repairs at the bench, brings them back', () => {
     const sim = createSim();
-    let carried = false;
-    let lowered = false;
-    run(sim, MAIN_S + 40, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+    const seen = { pickedAtStub: false, carriedAhead: false, benchAtDrop: false, unloadedHome: false, backToQc2: false };
+    run(sim, MAIN_S + 90, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
       const f = s.forklift;
       const onForks = s.blocks.filter((b) => b.phase === 'onForklift');
+      if (f.state === 'toRepair' && onForks.length && !seen.pickedAtStub) {
+        // the first frame it drives off, the forks are still at conveyor height
+        seen.pickedAtStub = Math.abs(f.forkY - FORK_STUB_Y) < 0.05;
+      }
       if (f.state === 'toRepair' && f.forkY === FORK_CARRY_Y && onForks.length) {
-        carried = true;
         for (const b of onForks) {
-          // ahead of the mast along the heading, resting on the forks
-          const ahead = (b.pos[0] - f.pos[0]) * Math.cos(FORKLIFT_HEADING) - (b.pos[2] - f.pos[1]) * Math.sin(FORKLIFT_HEADING);
+          const ahead = (b.pos[0] - f.pos[0]) * Math.cos(f.heading) - (b.pos[2] - f.pos[1]) * Math.sin(f.heading);
           expect(ahead).toBeGreaterThan(0.8);
           expect(b.pos[1]).toBeGreaterThan(f.forkY);
         }
+        seen.carriedAhead = true;
       }
-      if (f.state === 'repairing' && f.forkY === FORK_REST_Y) lowered = true;
+      if (f.state === 'repairing' && f.forkY === FORK_BENCH_Y) {
+        seen.benchAtDrop = Math.hypot(f.pos[0] - REPAIR_DROP[0], f.pos[1] - REPAIR_DROP[1]) < 1e-6;
+      }
+      if (f.state === 'unloading') {
+        seen.unloadedHome = Math.hypot(f.pos[0] - FORKLIFT_HOME[0], f.pos[1] - FORKLIFT_HOME[1]) < 1e-6;
+      }
+      if (s.blocks.some((b) => b.phase === 'toQc2')) seen.backToQc2 = true;
     });
-    expect(carried).toBe(true);
-    expect(lowered).toBe(true);
+    expect(seen).toEqual({ pickedAtStub: true, carriedAhead: true, benchAtDrop: true, unloadedHome: true, backToQc2: true });
+  });
+
+  it('turns to face where it drives (reversing keeps it facing the other way)', () => {
+    const sim = createSim();
+    let headingAtBench: number | null = null;
+    run(sim, MAIN_S + 60, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+      if (s.forklift.state === 'repairing' && headingAtBench === null) headingAtBench = s.forklift.heading;
+    });
+    // last leg drives east (+x) onto the bench: heading 0
+    expect(headingAtBench).not.toBeNull();
+    expect(Math.abs(Math.atan2(Math.sin(headingAtBench!), Math.cos(headingAtBench!)))).toBeLessThan(0.15);
   });
 });
-

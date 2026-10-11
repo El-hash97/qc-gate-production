@@ -6,10 +6,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, STATIONS, TRUCK_DOCK,
   ANIM_FPS, SEGMENTS, type Counts,
 } from '@/utils/finishingFlow';
-import { FORKLIFT_HEADING, TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
+import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
 import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
 import type { Theme } from '@/hooks/useTheme';
@@ -238,9 +238,9 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     scene.add(sun);
 
     const floorMat = new THREE.MeshStandardMaterial();
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 50), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 50), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(-2, -0.02, 19);
+    floor.position.set(1, -0.02, 19); // reaches the Line Repair area at x ≈ 18
     scene.add(floor);
 
     // The plant layout exported from the user's Blender file.
@@ -301,9 +301,6 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       scene.add(label);
     }
 
-    const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.15, 1.4), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
-    pallet.position.set(REPAIR_PALLET[0], 0.08, REPAIR_PALLET[1]);
-    scene.add(pallet);
 
     // OK sits by Junbiki (where the truck loads), Repair by Line Repair, NG by the red box.
     const badges = (
@@ -317,7 +314,7 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     });
 
     const forklift = makeForklift();
-    forklift.group.rotation.y = FORKLIFT_HEADING;
+    forklift.group.rotation.y = Math.PI; // parked facing the stub end
     forklift.group.position.set(FORKLIFT_HOME[0], 0, FORKLIFT_HOME[1]);
     scene.add(forklift.group);
     const truck = makeTruck();
@@ -393,9 +390,10 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       // roll the tyres by the distance covered (sign: forward along the heading)
       const fx = sim.forklift.pos[0] - forklift.group.position.x;
       const fz = sim.forklift.pos[1] - forklift.group.position.z;
-      const along = fx * Math.cos(FORKLIFT_HEADING) - fz * Math.sin(FORKLIFT_HEADING);
+      const along = fx * Math.cos(sim.forklift.heading) - fz * Math.sin(sim.forklift.heading);
       forklift.wheels.forEach((w, i) => { w.rotation.y -= along / (i < 2 ? WHEEL_R.front : WHEEL_R.rear); });
       forklift.group.position.set(sim.forklift.pos[0], 0, sim.forklift.pos[1]);
+      forklift.group.rotation.y = sim.forklift.heading;
       forklift.carriage.position.y = sim.forklift.forkY;
       truck.position.x = TRUCK_DOCK[0] + sim.truck.offset;
 

@@ -49,8 +49,9 @@ export const STATIONS: readonly Station[] = [
   { id: 'qc2', label: 'QC Gate 2', pos: b(6.5, -263), labelY: 2.6 },
   { id: 'spray', label: 'Spray Booth', pos: b(-5, -295), labelY: 3.8 },
   { id: 'junbiki', label: 'Junbiki', pos: b(-89, -295), labelY: 3.2 },
-  { id: 'ngBox', label: 'Box Merah (NG)', pos: b(44, -262), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
-  { id: 'lineRepair', label: 'Line Repair', pos: b(27, -242), labelY: 2.2 },
+  { id: 'ngBox', label: 'Box Merah (NG)', pos: b(24, -283), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
+  // repair benches in the fenced area across the factory road
+  { id: 'lineRepair', label: 'Line Repair', pos: b(164, -391), labelY: 2.6 },
 ];
 
 // Station segments of the Blender timeline (24 fps). A block entering a
@@ -103,15 +104,36 @@ export function trackAt(frame: number): { pos: [number, number, number]; quat: Q
 }
 
 const PATHS = {
-  ng: [[6.5, -263], [44, -262]],
+  ng: [[6.5, -263], [24, -283]],
 } as const;
 
 export const ROUTES = {
   ng: PATHS.ng.map(([x, y]) => b(x, y)),
 };
 
-export const REPAIR_PALLET: Vec2 = b(15, -271);
-export const FORKLIFT_HOME: Vec2 = b(15, -281);
+// Repair blocks are pushed from QC Gate 2 along the stub conveyor (as in the
+// recording) and wait at its end for the forklift, which parks facing it.
+export const REPAIR_STUB: Vec2 = b(22, -263);
+export const FORKLIFT_HOME: Vec2 = b(35, -263);
+// Where the forklift stops with its forks over the repair bench.
+export const REPAIR_DROP: Vec2 = b(150, -391);
+// Forklift legs; `reverse` = backing up (it keeps facing the other way).
+export interface Leg {
+  to: Vec2;
+  reverse?: boolean;
+}
+export const FORKLIFT_OUT: readonly Leg[] = [
+  { to: b(46, -263), reverse: true },
+  { to: b(72, -300) },
+  { to: b(138, -391) },
+  { to: REPAIR_DROP },
+];
+export const FORKLIFT_BACK: readonly Leg[] = [
+  { to: b(136, -391), reverse: true },
+  { to: b(72, -300) },
+  { to: b(48, -263) },
+  { to: FORKLIFT_HOME },
+];
 export const TRUCK_DOCK: Vec2 = b(-85, -348);
 
 // BC block as modelled in the Blender file: 47.5 x 37.1 x 33.6 cm (L x W x H).

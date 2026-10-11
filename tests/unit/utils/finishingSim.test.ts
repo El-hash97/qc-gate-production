@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { RETURN_S, createSim, step, stepReturn, type Sim } from '@/utils/finishingSim';
+import {
+  FORKLIFT_HEADING, FORK_CARRY_Y, FORK_REST_Y, RETURN_S, createSim, step, stepReturn, type Sim,
+} from '@/utils/finishingSim';
 import {
   ANIM_FPS, JUNBIKI_SEGMENT, QC2_SEGMENT, SEGMENTS, TRUCK_CAPACITY, segmentSeconds, trackAt,
   type Counts,
@@ -133,3 +135,28 @@ describe('stepReturn (station equipment easing back to its start pose)', () => {
     expect(stepReturn(st, 3, 0.1).weight).toBe(0);
   });
 });
+
+describe('forklift', () => {
+  it('carries repair blocks on raised forks in front of it and lowers them to repair', () => {
+    const sim = createSim();
+    let carried = false;
+    let lowered = false;
+    run(sim, MAIN_S + 40, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+      const f = s.forklift;
+      const onForks = s.blocks.filter((b) => b.phase === 'onForklift');
+      if (f.state === 'toRepair' && f.forkY === FORK_CARRY_Y && onForks.length) {
+        carried = true;
+        for (const b of onForks) {
+          // ahead of the mast along the heading, resting on the forks
+          const ahead = (b.pos[0] - f.pos[0]) * Math.cos(FORKLIFT_HEADING) - (b.pos[2] - f.pos[1]) * Math.sin(FORKLIFT_HEADING);
+          expect(ahead).toBeGreaterThan(0.8);
+          expect(b.pos[1]).toBeGreaterThan(f.forkY);
+        }
+      }
+      if (f.state === 'repairing' && f.forkY === FORK_REST_Y) lowered = true;
+    });
+    expect(carried).toBe(true);
+    expect(lowered).toBe(true);
+  });
+});
+

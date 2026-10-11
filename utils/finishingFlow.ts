@@ -49,7 +49,7 @@ export const STATIONS: readonly Station[] = [
   { id: 'qc2', label: 'QC Gate 2', pos: b(6.5, -263), labelY: 2.6 },
   { id: 'spray', label: 'Spray Booth', pos: b(-5, -295), labelY: 3.8 },
   { id: 'junbiki', label: 'Junbiki', pos: b(-89, -295), labelY: 3.2 },
-  { id: 'ngBox', label: 'Box Merah (NG)', pos: b(36, -262), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
+  { id: 'ngBox', label: 'Box Merah (NG)', pos: b(44, -262), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
   { id: 'lineRepair', label: 'Line Repair', pos: b(27, -242), labelY: 2.2 },
 ];
 
@@ -103,15 +103,15 @@ export function trackAt(frame: number): { pos: [number, number, number]; quat: Q
 }
 
 const PATHS = {
-  ng: [[6.5, -263], [36, -262]],
+  ng: [[6.5, -263], [44, -262]],
 } as const;
 
 export const ROUTES = {
   ng: PATHS.ng.map(([x, y]) => b(x, y)),
 };
 
-export const REPAIR_PALLET: Vec2 = b(22, -268);
-export const FORKLIFT_HOME: Vec2 = b(22, -273);
+export const REPAIR_PALLET: Vec2 = b(15, -271);
+export const FORKLIFT_HOME: Vec2 = b(15, -281);
 export const TRUCK_DOCK: Vec2 = b(-85, -348);
 
 // BC block as modelled in the Blender file: 47.5 x 37.1 x 33.6 cm (L x W x H).

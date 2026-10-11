@@ -6,10 +6,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  BLOCK_SIZE, MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
   ANIM_FPS, SEGMENTS, type Counts,
 } from '@/utils/finishingFlow';
-import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
+import { FORKLIFT_HEADING, TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
 import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
 import type { Theme } from '@/hooks/useTheme';
@@ -73,14 +73,72 @@ function makeLabel(text: string): THREE.Sprite {
   return sprite;
 }
 
-function makeForklift(): THREE.Group {
+// Counterbalance forklift, forks pointing +x. Local origin = centre of the
+// wheelbase at ground level. `carriage` slides up the mast (its y = fork top
+// height); `wheels` spin as it drives.
+const WHEEL_R = { front: 0.32, rear: 0.25 };
+function makeForklift(): { group: THREE.Group; carriage: THREE.Group; wheels: THREE.Mesh[] } {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1, 2), new THREE.MeshStandardMaterial({ color: 0xf59e0b }));
-  body.position.y = 0.7;
-  const mast = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.4, 0.15), new THREE.MeshStandardMaterial({ color: 0x374151 }));
-  mast.position.set(0, 1.2, -1.05);
-  g.add(body, mast);
-  return g;
+  const mat = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
+    new THREE.MeshStandardMaterial({ color, ...extra });
+  const box = (parent: THREE.Object3D, size: [number, number, number], pos: [number, number, number], m: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), m);
+    mesh.position.set(...pos);
+    parent.add(mesh);
+    return mesh;
+  };
+  const paint = mat(0xf97316); // forklift orange
+  const steel = mat(0x374151, { metalness: 0.5, roughness: 0.5 });
+  const black = mat(0x111827);
+
+  // chassis, hood over the engine, heavy rear counterweight
+  box(g, [1.7, 0.45, 1.05], [-0.15, 0.55, 0], paint);
+  box(g, [0.7, 0.3, 0.95], [-0.45, 0.92, 0], paint);
+  box(g, [0.38, 0.75, 1.1], [-0.9, 0.72, 0], steel);
+  // seat and steering wheel
+  box(g, [0.35, 0.08, 0.45], [-0.35, 1.11, 0], black);
+  box(g, [0.06, 0.45, 0.45], [-0.55, 1.33, 0], black);
+  const column = box(g, [0.05, 0.4, 0.05], [0.05, 1.05, 0], black);
+  column.rotation.z = -0.35;
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.02, 8, 20), black);
+  wheel.position.set(0.0, 1.25, 0);
+  wheel.rotation.set(Math.PI / 2, 0.6, 0);
+  g.add(wheel);
+  // overhead guard: four posts and a slatted roof
+  for (const [x, z] of [[-0.75, 0.47], [-0.75, -0.47], [0.3, 0.47], [0.3, -0.47]]) box(g, [0.05, 1.3, 0.05], [x, 1.42, z], steel);
+  box(g, [1.12, 0.05, 1.0], [-0.22, 2.08, 0], steel);
+  for (const z of [-0.25, 0, 0.25]) box(g, [1.05, 0.04, 0.06], [-0.22, 2.1, z], steel);
+  // amber beacon
+  box(g, [0.12, 0.1, 0.12], [-0.6, 2.17, 0], mat(0xfbbf24, { emissive: 0xf59e0b, emissiveIntensity: 0.8 }));
+  // mast: two uprights tied by cross members
+  for (const z of [0.32, -0.32]) box(g, [0.1, 2.3, 0.08], [0.62, 1.2, z], steel);
+  for (const y of [0.35, 1.3, 2.3]) box(g, [0.08, 0.08, 0.72], [0.62, y, 0], steel);
+
+  // carriage with load backrest and two forks; y = fork top height
+  const carriage = new THREE.Group();
+  carriage.position.set(0.7, 0.06, 0);
+  box(carriage, [0.06, 0.45, 0.9], [0, 0.2, 0], steel);
+  for (const z of [-0.3, -0.1, 0.1, 0.3]) box(carriage, [0.04, 0.55, 0.04], [0, 0.65, z], steel);
+  box(carriage, [0.04, 0.04, 0.9], [0, 0.92, 0], steel);
+  for (const z of [0.22, -0.22]) box(carriage, [1.0, 0.05, 0.12], [0.5, -0.025, z], steel);
+  g.add(carriage);
+
+  // tyres with grey hubs: big drive wheels under the mast, small steer wheels at the back
+  const wheels: THREE.Mesh[] = [];
+  const hubMat = mat(0x9ca3af);
+  for (const [x, z, r] of [
+    [0.4, 0.45, WHEEL_R.front], [0.4, -0.45, WHEEL_R.front],
+    [-0.75, 0.42, WHEEL_R.rear], [-0.75, -0.42, WHEEL_R.rear],
+  ] as const) {
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.22, 20), black);
+    tyre.rotation.x = Math.PI / 2;
+    tyre.position.set(x, r, z);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.5, 0.24, 6), hubMat);
+    tyre.add(hub);
+    g.add(tyre);
+    wheels.push(tyre);
+  }
+  return { group: g, carriage, wheels };
 }
 
 // Box truck, cab facing -x, open rear doors facing +x. Local origin = centre of
@@ -259,7 +317,9 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
     });
 
     const forklift = makeForklift();
-    scene.add(forklift);
+    forklift.group.rotation.y = FORKLIFT_HEADING;
+    forklift.group.position.set(FORKLIFT_HOME[0], 0, FORKLIFT_HOME[1]);
+    scene.add(forklift.group);
     const truck = makeTruck();
     truck.position.set(TRUCK_DOCK[0], 0, TRUCK_DOCK[1]);
     scene.add(truck);
@@ -330,7 +390,13 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
           meshes.delete(id);
         }
       }
-      forklift.position.set(sim.forklift.pos[0], 0, sim.forklift.pos[1]);
+      // roll the tyres by the distance covered (sign: forward along the heading)
+      const fx = sim.forklift.pos[0] - forklift.group.position.x;
+      const fz = sim.forklift.pos[1] - forklift.group.position.z;
+      const along = fx * Math.cos(FORKLIFT_HEADING) - fz * Math.sin(FORKLIFT_HEADING);
+      forklift.wheels.forEach((w, i) => { w.rotation.y -= along / (i < 2 ? WHEEL_R.front : WHEEL_R.rear); });
+      forklift.group.position.set(sim.forklift.pos[0], 0, sim.forklift.pos[1]);
+      forklift.carriage.position.y = sim.forklift.forkY;
       truck.position.x = TRUCK_DOCK[0] + sim.truck.offset;
 
       const c = live.current.counts;

@@ -40,7 +40,8 @@ export interface Sim {
   nextId: number;
   // which block holds each station segment, and how far in it is
   segments: { busy: number | null; t: number }[];
-  forklift: { state: 'idle' | 'toRepair' | 'repairing' | 'toGate'; pos: [number, number]; timer: number; load: number[] };
+  // forkY = height of the fork tips' top face above the floor
+  forklift: { state: 'idle' | 'toRepair' | 'repairing' | 'toGate'; pos: [number, number]; timer: number; load: number[]; forkY: number };
   truck: { state: 'docked' | 'leaving' | 'returning'; offset: number; load: number };
 }
 
@@ -52,12 +53,25 @@ const HALF = BLOCK / 2;
 // Cargo floor height of the box truck drawn by the renderer.
 export const TRUCK_BED_Y = 1.05;
 
+// The forklift always faces Line Repair: it drives there forks first and
+// reverses back to QC Gate 2, like a real counterbalance truck.
+export const FORKLIFT_HEADING = (() => {
+  const [rx, rz] = stationPos('lineRepair');
+  return Math.atan2(-(rz - FORKLIFT_HOME[1]), rx - FORKLIFT_HOME[0]);
+})();
+// Forks travel low with a load, sit on the floor otherwise; blocks ride on
+// them this far ahead of the forklift's centre.
+export const FORK_CARRY_Y = 0.3;
+export const FORK_REST_Y = 0.06;
+const FORK_LIFT_SPEED = 0.4;
+const FORK_AHEAD = 1.15;
+
 export function createSim(): Sim {
   return {
     blocks: [],
     nextId: 1,
     segments: SEGMENTS.map(() => ({ busy: null, t: 0 })),
-    forklift: { state: 'idle', pos: [FORKLIFT_HOME[0], FORKLIFT_HOME[1]], timer: 0, load: [] },
+    forklift: { state: 'idle', pos: [FORKLIFT_HOME[0], FORKLIFT_HOME[1]], timer: 0, load: [], forkY: FORK_REST_Y },
     truck: { state: 'docked', offset: 0, load: 0 },
   };
 }
@@ -150,6 +164,10 @@ function stepTruck(sim: Sim, dt: number): void {
 
 function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number): void {
   const f = sim.forklift;
+  const moving = f.state === 'toRepair' || f.state === 'toGate';
+  const forkTarget = moving ? FORK_CARRY_Y : FORK_REST_Y;
+  const lift = FORK_LIFT_SPEED * dt;
+  f.forkY = Math.abs(forkTarget - f.forkY) <= lift ? forkTarget : f.forkY + Math.sign(forkTarget - f.forkY) * lift;
   if (f.state === 'idle') {
     const waiting = sim.blocks.filter((b) => b.phase === 'atPallet').slice(0, FORKLIFT_BATCH);
     if (waiting.length === 0) return;
@@ -244,8 +262,14 @@ function layout(sim: Sim): void {
     if (b.phase === 'atPallet') {
       b.pos = [REPAIR_PALLET[0], 0.15 + HALF + BLOCK * pallet++, REPAIR_PALLET[1]];
     } else if (b.phase === 'onForklift') {
-      const i = sim.forklift.load.indexOf(b.id);
-      b.pos = [sim.forklift.pos[0], 0.5 + HALF + BLOCK * i, sim.forklift.pos[1] - 1.3];
+      const f = sim.forklift;
+      const i = f.load.indexOf(b.id);
+      b.pos = [
+        f.pos[0] + FORK_AHEAD * Math.cos(FORKLIFT_HEADING),
+        f.forkY + HALF + BLOCK * i,
+        f.pos[1] - FORK_AHEAD * Math.sin(FORKLIFT_HEADING),
+      ];
+      b.quat = null;
     } else if (b.phase === 'waitJunbiki') {
       b.pos = [end[0], end[1], end[2] - 0.6 * queue++];
     } else if (b.phase === 'loaded') {

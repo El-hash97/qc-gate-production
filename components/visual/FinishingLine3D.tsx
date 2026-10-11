@@ -10,6 +10,7 @@ import {
   type Counts,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
+import { activeRange } from '@/utils/animRange';
 import type { Theme } from '@/hooks/useTheme';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
@@ -197,15 +198,26 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
         if (obj instanceof THREE.SkinnedMesh) obj.frustumCulled = false;
       });
       scene.add(gltf.scene);
-      // One clip per moving object, all on the same Blender timeline: give
-      // them the full loop length so they stay in sync when they repeat.
+      // One clip per moving object on the Blender timeline. Operators (rigs)
+      // loop their own motion back-to-back instead of holding the pose until
+      // the whole timeline ends; machines keep the shared loop length.
       if (gltf.animations.length) {
         mixer = new THREE.AnimationMixer(gltf.scene);
         mixer.timeScale = OPERATOR_ANIM_SPEED;
         const loop = Math.max(...gltf.animations.map((c) => c.duration));
         for (const clip of gltf.animations) {
-          clip.duration = loop;
-          mixer.clipAction(clip).play();
+          let play = clip;
+          const range = clip.name.startsWith('metarig')
+            ? activeRange(clip.tracks.map((t) => ({ times: t.times, values: t.values, size: t.getValueSize() })))
+            : null;
+          if (range) {
+            const [from, to] = range;
+            const tracks = clip.tracks.map((t) => t.clone().trim(from, to).shift(-from));
+            play = new THREE.AnimationClip(clip.name, to - from, tracks);
+          } else {
+            clip.duration = loop;
+          }
+          mixer.clipAction(play).play();
         }
       }
     });

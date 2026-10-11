@@ -83,8 +83,11 @@ export const TRUCK_DOCK: Vec2 = b(-85, -348);
 export const BLOCK_SIZE = [0.475, 0.336, 0.371] as const;
 
 // Tuning knobs (seconds, floor units per second).
-export const SPAWN_INTERVAL_S = 2;
-export const BLOCK_SPEED = 4;
+// Blocks crawl at real conveyor pace so several stations work in parallel;
+// the Blender operator animation plays faster than recorded to match.
+export const SPAWN_INTERVAL_S = 3;
+export const BLOCK_SPEED = 1.2;
+export const OPERATOR_ANIM_SPEED = 2;
 export const FORKLIFT_SPEED = 2;
 export const REPAIR_TIME_S = 4;
 export const NG_LINGER_S = 3;

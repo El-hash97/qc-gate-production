@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  BLOCK_SIZE, MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, MODEL_LIFT, MODEL_SCALE, OPERATOR_ANIM_SPEED, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
   type Counts,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
@@ -201,6 +201,7 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       // them the full loop length so they stay in sync when they repeat.
       if (gltf.animations.length) {
         mixer = new THREE.AnimationMixer(gltf.scene);
+        mixer.timeScale = OPERATOR_ANIM_SPEED;
         const loop = Math.max(...gltf.animations.map((c) => c.duration));
         for (const clip of gltf.animations) {
           clip.duration = loop;

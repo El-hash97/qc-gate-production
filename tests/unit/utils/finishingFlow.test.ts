@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  STATIONS, stationPos, routePoints, isRunning, pickOutcome, pickReinspect,
+  JUNBIKI_SEGMENT, QC2_SEGMENT, SEGMENTS, STATIONS, isRunning, pickOutcome, pickReinspect,
+  routePoints, stationPos, trackAt,
 } from '@/utils/finishingFlow';
 
 describe('finishing line layout', () => {
@@ -9,23 +10,27 @@ describe('finishing line layout', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('passes every station in process order and splits at QC Gate 2', () => {
-    const main = routePoints('main');
-    expect(main.at(-1)).toEqual(stationPos('qc2'));
-    // each station lies on the route, in this order
-    const order = ['hsb05', 'hsb06', 'grinding', 'hanten', 'final', 'qc1', 'qc2'] as const;
-    const nearest = (id: (typeof order)[number]) => {
-      const [sx, sz] = stationPos(id);
-      let best = 0;
-      main.forEach(([x, z], i) => {
-        if (Math.hypot(x - sx, z - sz) < Math.hypot(main[best][0] - sx, main[best][1] - sz)) best = i;
-      });
-      expect(Math.hypot(main[best][0] - sx, main[best][1] - sz)).toBeLessThan(1.2);
-      return best;
-    };
-    const idx = order.map(nearest);
-    expect(idx).toEqual([...idx].sort((p, q) => p - q));
-    expect(routePoints('ok')[0]).toEqual(stationPos('qc2'));
+  it('chains the main station segments back to back up to QC Gate 2', () => {
+    for (let k = 0; k < QC2_SEGMENT; k++) expect(SEGMENTS[k].to).toBe(SEGMENTS[k + 1].from);
+    expect(SEGMENTS[JUNBIKI_SEGMENT].from).toBeGreaterThan(SEGMENTS[QC2_SEGMENT].to);
+  });
+
+  it('records the block at QC Gate 2 when the line segment ends', () => {
+    const { pos } = trackAt(SEGMENTS[QC2_SEGMENT].to);
+    const [qx, qz] = stationPos('qc2');
+    expect(Math.hypot(pos[0] - qx, pos[2] - qz)).toBeLessThan(0.5);
+  });
+
+  it('interpolates between samples, clamps past the end, and keeps unit rotations', () => {
+    const a = trackAt(399).pos; // samples sit on odd frames
+    const mid = trackAt(400).pos;
+    const c = trackAt(401).pos;
+    expect(mid[2]).toBeCloseTo((a[2] + c[2]) / 2, 5);
+    expect(trackAt(99999)).toEqual(trackAt(1660));
+    expect(Math.hypot(...trackAt(733).quat)).toBeCloseTo(1, 5);
+  });
+
+  it('routes NG from QC Gate 2 to the red box', () => {
     expect(routePoints('ng')).toEqual([stationPos('qc2'), stationPos('ngBox')]);
   });
 });

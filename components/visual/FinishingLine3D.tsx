@@ -6,8 +6,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  BLOCK_SIZE, MODEL_LIFT, MODEL_SCALE, OPERATOR_ANIM_SPEED, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
-  type Counts,
+  BLOCK_SIZE, MODEL_LIFT, MODEL_SCALE, MODEL_URL, REPAIR_PALLET, STATIONS, TRUCK_DOCK,
+  ANIM_FPS, SEGMENTS, type Counts,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
 import { activeRange } from '@/utils/animRange';
@@ -186,8 +186,11 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
 
     // The plant layout exported from the user's Blender file.
     let disposed = false;
-    // Plays the Blender timeline (operators, hoists, robot arm...) in a loop.
+    // Plays the Blender timeline (operators, hoists, robot arm...).
     let mixer: THREE.AnimationMixer | null = null;
+    // Clips owned by a station segment: they only move while that station
+    // works on a block, scrubbed to the block's own progress.
+    const segActions: THREE.AnimationAction[][] = SEGMENTS.map(() => []);
     const draco = new DRACOLoader().setDecoderPath('/draco/');
     new GLTFLoader().setDRACOLoader(draco).load(MODEL_URL, (gltf) => {
       if (disposed) return;
@@ -198,14 +201,22 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
         if (obj instanceof THREE.SkinnedMesh) obj.frustumCulled = false;
       });
       scene.add(gltf.scene);
-      // One clip per moving object on the Blender timeline. Operators (rigs)
-      // loop their own motion back-to-back instead of holding the pose until
-      // the whole timeline ends; machines keep the shared loop length.
+      // One clip per moving object on the Blender timeline. Station clips are
+      // driven by the simulation; the remaining operators (rigs) loop their own
+      // motion back-to-back, other machines keep the shared loop length.
       if (gltf.animations.length) {
         mixer = new THREE.AnimationMixer(gltf.scene);
-        mixer.timeScale = OPERATOR_ANIM_SPEED;
         const loop = Math.max(...gltf.animations.map((c) => c.duration));
         for (const clip of gltf.animations) {
+          const k = SEGMENTS.findIndex((seg) => seg.clips.includes(clip.name));
+          if (k >= 0) {
+            const action = mixer.clipAction(clip);
+            action.play();
+            action.paused = true;
+            action.time = (SEGMENTS[k].from - 1) / ANIM_FPS;
+            segActions[k].push(action);
+            continue;
+          }
           let play = clip;
           const range = clip.name.startsWith('metarig')
             ? activeRange(clip.tracks.map((t) => ({ times: t.times, values: t.values, size: t.getValueSize() })))
@@ -288,6 +299,11 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       last = now;
       if (live.current.running) {
         step(sim, dt, live.current.counts);
+        // a free station keeps its last pose until the next block arrives
+        sim.segments.forEach((seg, k) => {
+          if (seg.busy === null) return;
+          for (const action of segActions[k]) action.time = (SEGMENTS[k].from - 1) / ANIM_FPS + seg.t;
+        });
         mixer?.update(dt);
       }
       else if (sim.nextId > 1) sim = createSim();
@@ -302,10 +318,15 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
           scene.add(m);
         }
         m.material = blockMats[b.color];
-        // face the direction of travel; parked blocks keep their last heading
-        const dx = b.pos[0] - m.position.x;
-        const dz = b.pos[2] - m.position.z;
-        if (dx * dx + dz * dz > 1e-6) m.rotation.y = Math.atan2(-dz, dx);
+        if (b.quat) {
+          // riding a recorded station segment: exact Blender rotation
+          m.quaternion.set(...b.quat);
+        } else {
+          // face the direction of travel; parked blocks keep their last heading
+          const dx = b.pos[0] - m.position.x;
+          const dz = b.pos[2] - m.position.z;
+          if (dx * dx + dz * dz > 1e-6) m.rotation.set(0, Math.atan2(-dz, dx), 0);
+        }
         m.position.set(b.pos[0], b.pos[1], b.pos[2]);
       }
       for (const [id, m] of meshes) {

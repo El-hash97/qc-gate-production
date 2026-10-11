@@ -1,19 +1,24 @@
 // Framework-free simulation of the finishing line. step() mutates the sim
-// and leaves every block's world position in `pos`; the Three.js renderer
+// and leaves every block's world position in `pos` (and, while it rides a
+// recorded station segment, its rotation in `quat`); the Three.js renderer
 // only mirrors it. Called only while production is running.
+//
+// Stations are the SEGMENTS of the Blender timeline: one block per station,
+// replaying the recorded path; a finished block waits in its station until
+// the next one is free, and Baritori only releases a block when it is empty.
 import {
-  BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_SPEED, NG_LINGER_S,
-  REPAIR_PALLET, REPAIR_TIME_S, SPAWN_INTERVAL_S, TRUCK_AWAY_OFFSET,
-  TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
-  pickOutcome, pickReinspect, routePoints, stationPos,
-  type Counts, type Outcome, type Vec2,
+  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_SPEED,
+  JUNBIKI_SEGMENT, NG_LINGER_S, QC2_SEGMENT, REPAIR_PALLET, REPAIR_TIME_S, SEGMENTS,
+  TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
+  pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
+  type Counts, type Outcome, type Quat, type Vec2,
 } from './finishingFlow';
 
 export type Vec3 = [number, number, number];
 export type BlockColor = 'raw' | Outcome;
 export type Phase =
-  | 'main' | 'ok' | 'ng' | 'toPallet' | 'atPallet'
-  | 'onForklift' | 'waitJunbiki' | 'loaded' | 'binned';
+  | 'seg' | 'ng' | 'toPallet' | 'atPallet' | 'onForklift' | 'toQc2' | 'waitOk'
+  | 'waitJunbiki' | 'loaded' | 'binned';
 
 export interface Block {
   id: number;
@@ -24,12 +29,17 @@ export interface Block {
   timer: number;
   slot: number;
   pos: Vec3;
+  // station segment index and seconds into it (phase 'seg')
+  seg: number;
+  t: number;
+  quat: Quat | null;
 }
 
 export interface Sim {
   blocks: Block[];
   nextId: number;
-  spawnTimer: number;
+  // which block holds each station segment, and how far in it is
+  segments: { busy: number | null; t: number }[];
   forklift: { state: 'idle' | 'toRepair' | 'repairing' | 'toGate'; pos: [number, number]; timer: number; load: number[] };
   truck: { state: 'docked' | 'leaving' | 'returning'; offset: number; load: number };
 }
@@ -46,7 +56,7 @@ export function createSim(): Sim {
   return {
     blocks: [],
     nextId: 1,
-    spawnTimer: 0,
+    segments: SEGMENTS.map(() => ({ busy: null, t: 0 })),
     forklift: { state: 'idle', pos: [FORKLIFT_HOME[0], FORKLIFT_HOME[1]], timer: 0, load: [] },
     truck: { state: 'docked', offset: 0, load: 0 },
   };
@@ -86,6 +96,22 @@ function send(b: Block, phase: Phase, path: Vec2[]): void {
   b.phase = phase;
   b.path = path;
   b.dist = 0;
+  b.quat = null;
+}
+
+// Takes segment k if it is free; the block's previous segment is released.
+function enter(sim: Sim, b: Block, k: number): boolean {
+  if (sim.segments[k].busy !== null) return false;
+  if (b.phase === 'seg') sim.segments[b.seg].busy = null;
+  sim.segments[k] = { busy: b.id, t: 0 };
+  b.phase = 'seg';
+  b.seg = k;
+  b.t = 0;
+  return true;
+}
+
+function leaveSegment(sim: Sim, b: Block): void {
+  if (b.phase === 'seg') sim.segments[b.seg].busy = null;
 }
 
 function travel(b: Block, dt: number): boolean {
@@ -96,11 +122,13 @@ function travel(b: Block, dt: number): boolean {
 }
 
 function spawn(sim: Sim): void {
-  const path = routePoints('main');
-  sim.blocks.push({
-    id: sim.nextId++, color: 'raw', phase: 'main', path, dist: 0, timer: 0, slot: 0,
-    pos: [path[0][0], BELT_Y, path[0][1]],
-  });
+  if (sim.segments[0].busy !== null) return;
+  const b: Block = {
+    id: sim.nextId++, color: 'raw', phase: 'waitOk', path: [], dist: 0, timer: 0, slot: 0,
+    pos: trackAt(SEGMENTS[0].from).pos, seg: 0, t: 0, quat: null,
+  };
+  sim.blocks.push(b);
+  enter(sim, b, 0);
 }
 
 function stepTruck(sim: Sim, dt: number): void {
@@ -143,7 +171,8 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number):
       if (!b) continue;
       const o = pickReinspect(counts, rand());
       b.color = o;
-      send(b, o, [FORKLIFT_HOME, ...routePoints(o)]);
+      if (o === 'ng') send(b, 'ng', [FORKLIFT_HOME, ...routePoints('ng')]);
+      else send(b, 'toQc2', [FORKLIFT_HOME, stationPos('qc2')]);
     }
     f.load = [];
     f.state = 'idle';
@@ -152,16 +181,37 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number):
 
 function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => number): void {
   switch (b.phase) {
-    case 'main':
-      if (travel(b, dt)) {
-        const o = pickOutcome(counts, rand());
-        b.color = o;
-        if (o === 'repair') send(b, 'toPallet', [stationPos('qc2'), REPAIR_PALLET]);
-        else send(b, o, routePoints(o));
+    case 'seg': {
+      const seg = SEGMENTS[b.seg];
+      b.t = Math.min(b.t + dt, segmentSeconds(seg));
+      sim.segments[b.seg].t = b.t;
+      const at = trackAt(seg.from + b.t * ANIM_FPS);
+      b.pos = at.pos;
+      b.quat = at.quat;
+      if (b.t < segmentSeconds(seg)) break;
+      if (b.seg === JUNBIKI_SEGMENT) {
+        leaveSegment(sim, b);
+        b.phase = 'waitJunbiki';
+        b.quat = null;
+      } else if (b.seg === QC2_SEGMENT) {
+        // QC Gate 2: decide once, then wait here until the next leg is free
+        if (b.color === 'raw') b.color = pickOutcome(counts, rand());
+        if (b.color === 'ok') enter(sim, b, JUNBIKI_SEGMENT);
+        else {
+          leaveSegment(sim, b);
+          if (b.color === 'repair') send(b, 'toPallet', [stationPos('qc2'), REPAIR_PALLET]);
+          else send(b, 'ng', routePoints('ng'));
+        }
+      } else {
+        enter(sim, b, b.seg + 1);
       }
       break;
-    case 'ok':
-      if (travel(b, dt)) b.phase = 'waitJunbiki';
+    }
+    case 'toQc2':
+      if (travel(b, dt)) b.phase = 'waitOk';
+      break;
+    case 'waitOk':
+      enter(sim, b, JUNBIKI_SEGMENT);
       break;
     case 'ng':
       if (travel(b, dt)) {
@@ -189,7 +239,7 @@ function layout(sim: Sim): void {
   let pallet = 0;
   let queue = 0;
   const [ngX, ngZ] = stationPos('ngBox');
-  const [jx, jz] = routePoints('ok').at(-1)!;
+  const end = trackAt(SEGMENTS[JUNBIKI_SEGMENT].to).pos;
   for (const b of sim.blocks) {
     if (b.phase === 'atPallet') {
       b.pos = [REPAIR_PALLET[0], 0.15 + HALF + BLOCK * pallet++, REPAIR_PALLET[1]];
@@ -197,7 +247,7 @@ function layout(sim: Sim): void {
       const i = sim.forklift.load.indexOf(b.id);
       b.pos = [sim.forklift.pos[0], 0.5 + HALF + BLOCK * i, sim.forklift.pos[1] - 1.3];
     } else if (b.phase === 'waitJunbiki') {
-      b.pos = [jx + 0.6 * queue++, BELT_Y, jz];
+      b.pos = [end[0], end[1], end[2] - 0.6 * queue++];
     } else if (b.phase === 'loaded') {
       b.pos = [
         // inside the cargo box: 5 along the bed x 2 across
@@ -212,11 +262,7 @@ function layout(sim: Sim): void {
 }
 
 export function step(sim: Sim, dt: number, counts: Counts, rand: () => number = Math.random): void {
-  sim.spawnTimer += dt;
-  while (sim.spawnTimer >= SPAWN_INTERVAL_S) {
-    sim.spawnTimer -= SPAWN_INTERVAL_S;
-    spawn(sim);
-  }
+  spawn(sim);
   stepTruck(sim, dt);
   stepForklift(sim, dt, counts, rand);
   for (const b of sim.blocks) stepBlock(sim, b, dt, counts, rand);

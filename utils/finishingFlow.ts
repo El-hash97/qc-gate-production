@@ -1,3 +1,5 @@
+import TRACK from './finishingTrack.json';
+
 // Layout of the BC finishing line for /visualisasi, plus the pure outcome
 // pickers. The 3D layout itself is the GLB exported from the user's Blender
 // file (scripts/export-finishing-glb.py); stations below are the waypoints
@@ -51,27 +53,60 @@ export const STATIONS: readonly Station[] = [
   { id: 'lineRepair', label: 'Line Repair', pos: b(27, -242), labelY: 2.2 },
 ];
 
-// Waypoints per route, Blender coordinates, in the order the block visits them.
+// Station segments of the Blender timeline (24 fps). A block entering a
+// segment replays the recorded block path over [from, to] while the clips
+// listed (operator rigs, hoists, grippers) replay the same frames, so the block
+// always rides on whatever carries it. One block per segment at a time.
+export interface Segment {
+  id: string;
+  from: number;
+  to: number;
+  clips: readonly string[];
+}
+
+export const ANIM_FPS = 24;
+
+export const SEGMENTS: readonly Segment[] = [
+  { id: 'baritori', from: 1, to: 301, clips: ['metarig.001', 'Cylinder.007', 'Cylinder.035'] },
+  { id: 'hsb05', from: 301, to: 551, clips: ['Hoist HSB', 'metarig.003', 'Cylinder.117'] },
+  { id: 'hsb06', from: 551, to: 676, clips: ['Hoist HSB.002', 'metarig.015', 'Cylinder.104'] },
+  { id: 'grinding', from: 676, to: 801, clips: ['Cylinder.099', 'metarig.005'] },
+  // Hanten → Final → QC Gate 1 → QC Gate 2, where the outcome is decided
+  { id: 'line', from: 801, to: 976, clips: ['Cube.097'] },
+  // OK only: Spray Booth → round the corner → hoist into the Junbiki rack
+  { id: 'toJunbiki', from: 1351, to: 1660, clips: ['motorreductor.002', 'motorreductor.025'] },
+];
+export const QC2_SEGMENT = 4;
+export const JUNBIKI_SEGMENT = 5;
+
+export function segmentSeconds(s: Segment): number {
+  return (s.to - s.from) / ANIM_FPS;
+}
+
+export type Quat = [number, number, number, number];
+
+// Recorded block centre + rotation, already in scene coordinates
+// (scripts/export-finishing-track.py).
+export function trackAt(frame: number): { pos: [number, number, number]; quat: Quat } {
+  const { start, step, frames } = TRACK;
+  const x = Math.min(Math.max((frame - start) / step, 0), frames.length - 1);
+  const i = Math.min(Math.floor(x), frames.length - 2);
+  const t = x - i;
+  const a = frames[i];
+  const c = frames[i + 1];
+  const lerp = (k: number) => a[k] + (c[k] - a[k]) * t;
+  // nlerp, taking the short way round
+  const sign = a[3] * c[3] + a[4] * c[4] + a[5] * c[5] + a[6] * c[6] < 0 ? -1 : 1;
+  const q = [3, 4, 5, 6].map((k) => a[k] + (sign * c[k] - a[k]) * t);
+  const n = Math.hypot(...q) || 1;
+  return { pos: [lerp(0), lerp(1), lerp(2)], quat: [q[0] / n, q[1] / n, q[2] / n, q[3] / n] };
+}
+
 const PATHS = {
-  // Baritori → HSB05 (via hoist) → HSB06 → across to Grinding → back to the
-  // main conveyor → Hanten → Final → QC Gate 1 → QC Gate 2.
-  main: [
-    [23.4, -28.6], [10.1, -13.8], [0.2, -13.8], [-0.7, -16.9], [-0.7, -50.8], [7, -62.4],
-    [18.2, -70.5], [27.2, -73.5], [12.4, -73.1], [2.5, -82.4], [-3.8, -100], [20.1, -121.5],
-    [14.9, -133.1], [9.2, -128.5], [9.6, -116.4], [-3.7, -123.3], [-31.2, -118.7],
-    [-9.8, -138.7], [6.5, -145.1], [6.5, -175], [6.5, -202], [6.5, -232], [6.5, -263],
-  ],
-  // QC Gate 2 → Spray Booth → round the corner → hoist into the Junbiki rack lane.
-  ok: [
-    [6.5, -263], [7, -292], [-41.1, -303.4], [-69.9, -302.6], [-71.9, -274.3], [-72.7, -262.5],
-    [-89.3, -262.5], [-89.3, -323],
-  ],
   ng: [[6.5, -263], [36, -262]],
 } as const;
 
 export const ROUTES = {
-  main: PATHS.main.map(([x, y]) => b(x, y)),
-  ok: PATHS.ok.map(([x, y]) => b(x, y)),
   ng: PATHS.ng.map(([x, y]) => b(x, y)),
 };
 
@@ -82,12 +117,9 @@ export const TRUCK_DOCK: Vec2 = b(-85, -348);
 // BC block as modelled in the Blender file: 47.5 x 37.1 x 33.6 cm (L x W x H).
 export const BLOCK_SIZE = [0.475, 0.336, 0.371] as const;
 
-// Tuning knobs (seconds, floor units per second).
-// Blocks crawl at real conveyor pace so several stations work in parallel;
-// operators play at the speed recorded in the Blender animation.
-export const SPAWN_INTERVAL_S = 3;
+// Tuning knobs (seconds, floor units per second). Station tempo comes from
+// SEGMENTS; BLOCK_SPEED only covers the off-record moves (NG drop, repair return).
 export const BLOCK_SPEED = 1.2;
-export const OPERATOR_ANIM_SPEED = 1;
 export const FORKLIFT_SPEED = 2;
 export const REPAIR_TIME_S = 4;
 export const NG_LINGER_S = 3;

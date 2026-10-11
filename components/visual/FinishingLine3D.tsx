@@ -185,12 +185,28 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
 
     // The plant layout exported from the user's Blender file.
     let disposed = false;
+    // Plays the Blender timeline (operators, hoists, robot arm...) in a loop.
+    let mixer: THREE.AnimationMixer | null = null;
     const draco = new DRACOLoader().setDecoderPath('/draco/');
     new GLTFLoader().setDRACOLoader(draco).load(MODEL_URL, (gltf) => {
       if (disposed) return;
       gltf.scene.scale.setScalar(MODEL_SCALE);
       gltf.scene.position.y = MODEL_LIFT;
+      // skinned operators move outside their bind-pose bounds
+      gltf.scene.traverse((obj) => {
+        if (obj instanceof THREE.SkinnedMesh) obj.frustumCulled = false;
+      });
       scene.add(gltf.scene);
+      // One clip per moving object, all on the same Blender timeline: give
+      // them the full loop length so they stay in sync when they repeat.
+      if (gltf.animations.length) {
+        mixer = new THREE.AnimationMixer(gltf.scene);
+        const loop = Math.max(...gltf.animations.map((c) => c.duration));
+        for (const clip of gltf.animations) {
+          clip.duration = loop;
+          mixer.clipAction(clip).play();
+        }
+      }
     });
 
     for (const s of STATIONS) {
@@ -257,7 +273,10 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       raf = requestAnimationFrame(frame);
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
-      if (live.current.running) step(sim, dt, live.current.counts);
+      if (live.current.running) {
+        step(sim, dt, live.current.counts);
+        mixer?.update(dt);
+      }
       else if (sim.nextId > 1) sim = createSim();
 
       const seen = new Set<number>();
@@ -299,6 +318,7 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
 
     return () => {
       disposed = true;
+      mixer?.stopAllAction();
       draco.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect();

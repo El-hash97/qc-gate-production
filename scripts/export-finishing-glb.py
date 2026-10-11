@@ -1,24 +1,47 @@
-# Lightweight GLB of the finishing-line layout for /visualisasi.
+# Lightweight, animated GLB of the finishing line for /visualisasi.
 # Never saves the .blend. Usage (Blender 5.x):
-#   blender -b "animasi/line finishing before improvement.blend" #     --python scripts/export-finishing-glb.py -- public/models/finishing-line.glb 600
-# Last arg = max triangles per object (decimate cap). Cameras, the huge ground
-# plane and the forklift (animated in the web scene) are dropped; the 14 rigged
-# operators are frozen in their frame-1 pose.
-import bpy, sys, json, re
+#   blender -b "animasi/line finishing before improvement.blend" \
+#     --python scripts/export-finishing-glb.py -- public/models/finishing-line.glb 600
+# Last arg = max triangles per object (decimate cap).
+#
+# Static layout is decimated and joined into one mesh. Moving parts (the 14
+# rigged operators, hoists, robot arm, shutters...) stay separate and carry
+# the Blender timeline as one "Scene" clip, frames 1..ANIM_END (the last 10 s
+# of the reference video are left out). The BC block relay objects are dropped:
+# the web simulation draws its own blocks on the same paths.
+import bpy, sys, json, re, bmesh
 from mathutils import Vector
+
 out = sys.argv[-2]; MAX_TRIS = int(sys.argv[-1])
-DROP = re.compile(r'^(Human 2|Low Poly Human|metarig|outfit_top|Camera|Plane$|Forklif)')
-HUMAN_TRIS = 2000
-# Operators: bake the rig pose into plain meshes before the rigs are deleted.
-# Rig-less "Human 2" copies sit unused at the origin and stay dropped.
-dg = bpy.context.evaluated_depsgraph_get()
-operators = set()
+ANIM_END = 1660  # 69 s at 24 fps
+HUMAN_TRIS = 100000  # per operator body part (decimating skinned meshes tears them)
+DROP = re.compile(r'^(Low Poly Human|outfit_top|Camera|Plane$|Forklif)')
+BC_BLOCKS = {'Cube.050', 'Cube.019', 'Cube.562', 'Cube.563', 'Cube.564'}
+
+def ctr(o):
+    pts = [o.matrix_world @ Vector(c) for c in o.bound_box]; return sum(pts, Vector()) / 8
+
+def tris(me):
+    return sum(len(p.vertices) - 2 for p in me.polygons)
+
+rigs = {o for o in bpy.data.objects if o.type == 'ARMATURE'}
 for o in list(bpy.data.objects):
-    if o.type == 'MESH' and o.name.startswith('Human 2') and any(m.type == 'ARMATURE' and m.object for m in o.modifiers):
-        mw = o.matrix_world.copy()
-        o.data = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
-        o.modifiers.clear(); o.parent = None; o.matrix_world = mw
-        o.name = 'Operator ' + o.name; operators.add(o.name)
+    if o in rigs or (o.type == 'MESH' and o.parent in rigs):
+        continue
+    # rig-less "Human 2" copies sit unused at the origin
+    if o.type != 'MESH' or DROP.match(o.name) or o.name in BC_BLOCKS or o.name.startswith('Human 2'):
+        bpy.data.objects.remove(o, do_unlink=True); continue
+    # keep only the plant floor: the sunken road area at x > 100 (z -15) hides
+    # under the web floor and left a wall panel + railing floating in mid-air
+    c = ctr(o)
+    if not (-160 < c.x < 100 and -420 < c.y < 30):
+        bpy.data.objects.remove(o, do_unlink=True)
+
+skinned = {o for o in bpy.data.objects if o.type == 'MESH' and o.parent in rigs}
+moving = {o for o in bpy.data.objects if o.type == 'MESH' and o not in skinned
+          and ((o.animation_data and o.animation_data.action) or o.constraints)}
+static = [o for o in bpy.data.objects if o.type == 'MESH' and o not in skinned and o not in moving]
+
 # Skin and work trousers come from textures that are not exported: flat colours.
 FLAT = {'Rex_Skin': (0.72, 0.5, 0.38, 1), 'Rex_Rough': (0.1, 0.12, 0.18, 1), 'Rex_Eyes': (0.05, 0.04, 0.04, 1)}
 for name, col in FLAT.items():
@@ -27,33 +50,29 @@ for name, col in FLAT.items():
         bsdf = m.node_tree.nodes.get('Principled BSDF')
         for l in list(bsdf.inputs['Base Color'].links): m.node_tree.links.remove(l)
         bsdf.inputs['Base Color'].default_value = col
-for o in list(bpy.data.objects):
-    if o.name in operators: continue
-    if o.type != 'MESH' or DROP.match(o.name) or any(m.type == 'ARMATURE' for m in o.modifiers):
-        bpy.data.objects.remove(o, do_unlink=True)
-# keep only the plant floor: the sunken road area at x > 100 (z -15) hides
-# under the web floor and left a wall panel + railing floating in mid-air
-def ctr(o):
-    pts=[o.matrix_world @ Vector(c) for c in o.bound_box]; return sum(pts, Vector())/8
-for o in list(bpy.data.objects):
-    c = ctr(o)
-    if not (-160 < c.x < 100 and -420 < c.y < 30): bpy.data.objects.remove(o, do_unlink=True)
-for o in bpy.data.objects: o.animation_data_clear()
-before = 0
-for o in bpy.data.objects:
-    n = sum(len(p.vertices) - 2 for p in o.data.polygons); before += n
+
+before = sum(tris(o.data) for o in bpy.data.objects if o.type == 'MESH')
+# Operators: decimate first in the stack so the rig still deforms the result
+# (the exporter applies every modifier except the armature).
+for o in skinned:
+    n = tris(o.data)
+    if n > HUMAN_TRIS:
+        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = HUMAN_TRIS / n
+        o.modifiers.move(len(o.modifiers) - 1, 0)
+plain = static + list(moving)
+for o in plain:
     if o.data.users > 1: o.data = o.data.copy()
-    cap = HUMAN_TRIS if o.name in operators else MAX_TRIS
-    if n > cap:
-        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = cap / n
+    n = tris(o.data)
+    if n > MAX_TRIS:
+        m = o.modifiers.new('dec', 'DECIMATE'); m.ratio = MAX_TRIS / n
+
 # Perforated fence/grating panels resist decimation: swap them for a
 # translucent box of the same footprint and colour.
-import bmesh
 dg = bpy.context.evaluated_depsgraph_get()
 fence_mats = {}
 boxed = 0
-for o in list(bpy.data.objects):
-    e = o.evaluated_get(dg); me = e.to_mesh(); n = sum(len(p.vertices) - 2 for p in me.polygons); e.to_mesh_clear()
+for o in plain:
+    e = o.evaluated_get(dg); me = e.to_mesh(); n = tris(me); e.to_mesh_clear()
     if n <= 15000: continue
     bb = [Vector(c) for c in o.bound_box]
     mn = Vector([min(v[i] for v in bb) for i in range(3)]); mx = Vector([max(v[i] for v in bb) for i in range(3)])
@@ -70,25 +89,35 @@ for o in list(bpy.data.objects):
         if src and src.use_nodes and src.node_tree.nodes.get('Principled BSDF'):
             col = src.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value
         bsdf.inputs['Base Color'].default_value = col; bsdf.inputs['Alpha'].default_value = 0.35
-        m.surface_render_method = 'BLENDED' if hasattr(m, 'surface_render_method') else m.surface_render_method
         fence_mats[key] = m
     new.materials.append(fence_mats[key])
     o.modifiers.clear(); o.data = new; boxed += 1
-print('BOXED', boxed)
+
+# Apply decimate etc. on everything that is not skinned (objects and their
+# animation survive the conversion), then join only the static layout.
+bpy.context.scene.frame_set(1)
 bpy.ops.object.select_all(action='DESELECT')
-for o in bpy.data.objects: o.select_set(True)
-bpy.context.view_layer.objects.active = bpy.data.objects[0]
-bpy.ops.object.convert(target='MESH')  # applies decimate/bevel/hook
-# join everything; glTF exporter splits by material into primitives
-bpy.ops.object.select_all(action='SELECT')
-bpy.context.view_layer.objects.active = bpy.data.objects[0]
+for o in plain: o.select_set(True)
+bpy.context.view_layer.objects.active = plain[0]
+bpy.ops.object.convert(target='MESH')
+bpy.ops.object.select_all(action='DESELECT')
+for o in static: o.select_set(True)
+bpy.context.view_layer.objects.active = static[0]
 bpy.ops.object.join()
-o = bpy.context.view_layer.objects.active
+layout = bpy.context.view_layer.objects.active
+layout.name = 'Layout'
 bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.remove_doubles(threshold=0.001); bpy.ops.object.mode_set(mode='OBJECT')
-after = sum(len(p.vertices) - 2 for p in o.data.polygons)
+
+sc = bpy.context.scene
+sc.frame_start, sc.frame_end = 1, ANIM_END
+after = sum(tris(o.data) for o in bpy.data.objects if o.type == 'MESH')
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=False,
-    export_apply=True, export_animations=False, export_cameras=False, export_lights=False,
+    export_apply=True, export_cameras=False, export_lights=False,
+    export_animations=True, export_animation_mode='SCENE', export_frame_range=True,
+    export_force_sampling=True, export_frame_step=4, export_optimize_animation_size=True,
+    export_optimize_animation_keep_anim_armature=False,
+    export_skins=True, export_def_bones=True,
     export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=10,
     export_image_format='NONE', export_normals=True, export_texcoords=False)
-print('JSON>>' + json.dumps({'tris_before': before, 'tris_after': after, 'materials': len(o.data.materials),
-  'bbox': [list(o.matrix_world @ Vector(c)) for c in (o.bound_box[0], o.bound_box[6])]}))
+print('JSON>>' + json.dumps({'tris_before': before, 'tris_after': after, 'boxed': boxed,
+  'moving': sorted(o.name for o in moving), 'operators': len(rigs)}))

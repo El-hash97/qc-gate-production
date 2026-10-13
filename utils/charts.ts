@@ -236,3 +236,16 @@ export function lotDefectData(logs: EntryLog[]): LotDefectData {
     }));
   return { types, maxLot, series };
 }
+
+// --- Over Dimensi Pareto: pcs per Die Mould, for one entry kind (NG or Repair) ---
+// Only entries carrying Over Dimensi detail count; label is "Die N" so it reads
+// on the shared ParetoChart axis.
+export function overDimensiByDie(logs: EntryLog[], kind: EntryLog['kind']): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const log of logs) {
+    if (log.kind !== kind || !log.overDimensi) continue;
+    const key = `Die ${log.overDimensi.dieMould}`;
+    out[key] = (out[key] ?? 0) + log.qty;
+  }
+  return out;
+}

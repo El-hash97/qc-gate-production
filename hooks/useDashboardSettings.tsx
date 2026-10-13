@@ -19,6 +19,7 @@ export const PANELS = [
   { id: 'heatmap', label: 'Flask/Cavity × Defect' },
   { id: 'lotDefect', label: 'Lot × Defect' },
   { id: 'entryLog', label: 'Lot/Flask Log' },
+  { id: 'overDimensi', label: 'Pareto Over Dimensi per Die' },
 ] as const;
 export type PanelId = (typeof PANELS)[number]['id'];
 

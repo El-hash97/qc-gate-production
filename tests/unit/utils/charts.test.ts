@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   hourlySeries, hourlyOeeSeries, pareto, flaskTypeMatrix, cavityTypeMatrix, expandCavities, lotDefectData, padLabels,
+  overDimensiByDie,
 } from '@/utils/charts';
 import type { EntryLog } from '@/lib/types';
 
@@ -141,5 +142,24 @@ describe('lotDefectData', () => {
       { x: 'Dross', y: 65, flask: '4', qty: 1 },
     ]);
     expect(series[1].points).toEqual([{ x: 'Dross', y: 12, flask: '1-6', qty: 1 }]);
+  });
+});
+
+describe('overDimensiByDie', () => {
+  const od = (dieMould: 1 | 2 | 3) => ({ dieMould, crankCaseNo: '1', slubWjNo: '1', position: '1' });
+  const logs: EntryLog[] = [
+    { kind: 'defect', group: 'bc', line: 1, type: 'Over Dimensi', qty: 2, lot: 'L1', flask: '1', overDimensi: od(3) },
+    { kind: 'defect', group: 'bc', line: 2, type: 'Over Dimensi', qty: 1, lot: 'L2', flask: '2', overDimensi: od(3) },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Over Dimensi', qty: 1, lot: 'L3', flask: '3', overDimensi: od(1) },
+    { kind: 'repair', group: 'bc', line: 1, type: 'Over Dimensi', qty: 5, lot: 'L4', flask: '4', overDimensi: od(2) },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole', qty: 9, lot: 'L5', flask: '5' },
+  ];
+
+  it('sums qty per Die Mould for NG entries only, ignoring non-Over-Dimensi logs', () => {
+    expect(overDimensiByDie(logs, 'defect')).toEqual({ 'Die 3': 3, 'Die 1': 1 });
+  });
+
+  it('counts Repair entries separately', () => {
+    expect(overDimensiByDie(logs, 'repair')).toEqual({ 'Die 2': 5 });
   });
 });

@@ -2,7 +2,8 @@ import type { EntryLog } from '@/lib/types';
 import { PRODUCT_LINE_LABELS } from '@/lib/types';
 import styles from './DefectRepairSummary.module.css';
 
-export function EntryLogList({ title, logs = [] }: { title: string; logs?: EntryLog[] }) {
+// onEdit (login only) adds a ✎ button per row to correct a mistyped entry.
+export function EntryLogList({ title, logs = [], onEdit }: { title: string; logs?: EntryLog[]; onEdit?: (log: EntryLog) => void }) {
   return (
     <div>
       <div className={styles.title}>{title}</div>
@@ -22,7 +23,20 @@ export function EntryLogList({ title, logs = [] }: { title: string; logs?: Entry
                 {log.die ? ` · Die ${log.die}` : ''}
                 {od ? ` · Die Mould ${od.dieMould}${od.coreCombo ? ` · Core ${od.coreCombo}` : ''} · F/R ${od.position} · CC ${od.crankCaseNo} · Slub/Wj ${od.slubWjNo}` : ''}
               </span>
-              <span className={styles.count}>{log.qty}</span>
+              <span className={styles.rowEnd}>
+                <span className={styles.count}>{log.qty}</span>
+                {onEdit && (
+                  <button
+                    type="button"
+                    className={styles.editButton}
+                    aria-label={`Edit ${log.type} Lot ${log.lot} / ${slotLabel} ${log.flask}`}
+                    title="Edit entri"
+                    onClick={() => onEdit(log)}
+                  >
+                    ✎
+                  </button>
+                )}
+              </span>
             </div>
           );
         })

@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { ProductionDashboardView, REPORT_LABEL, type DashboardView } from '@/components/production/ProductionDashboardView';
 import { DefectPhotoModal } from '@/components/production/DefectPhotoModal';
+import { EntryLogEditModal } from '@/components/production/EntryLogEditModal';
+import { editEntryLog, type EntryLogEdit } from '@/utils/entryLogEdit';
 import { useDefectPhotoFlags } from '@/hooks/useDefectPhotos';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
 import { useAuth } from '@/hooks/useAuth';
-import type { HourWindow, ProductionState } from '@/lib/types';
+import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
 const EMPTY_STATE: ProductionState = {
@@ -58,6 +60,20 @@ export default function DashboardPage() {
     updateState({ ...state, pinnedHour: state.pinnedHour === hour ? '' : hour });
   }
 
+  // Index into the shift's full entryLogs (the dashboard shows a per-view
+  // filtered copy holding the same objects). New entries only ever append, so
+  // the index stays valid while the edit form is open.
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  function handleEditLog(log: EntryLog) {
+    const index = current.entryLogs.indexOf(log);
+    if (index >= 0) setEditIndex(index);
+  }
+  function handleSaveEdit(edit: EntryLogEdit) {
+    if (!state || editIndex === null) return;
+    updateState({ ...state, ...editEntryLog(state, editIndex, edit) });
+    setEditIndex(null);
+  }
+
   return (
     <main className={styles.page}>
       <ProductionDashboardView
@@ -67,11 +83,22 @@ export default function DashboardPage() {
         now={new Date(minuteTick)}
         onHourlyWindowChange={authed ? handleHourlyWindow : undefined}
         onPinHour={authed ? handlePinHour : undefined}
+        onEditLog={authed ? handleEditLog : undefined}
         hasPhoto={hasPhoto}
         onPhotoBarClick={(chartType, defectType) => setPhotoModal({ chartType, defectType })}
         connectionStatus={isError ? 'offline' : isFetching ? 'syncing' : 'online'}
         exportMode="download" downloadPdfUrl={`/api/dashboard/pdf?view=${view}`}
       />
+
+      {authed && editIndex !== null && (
+        <EntryLogEditModal
+          key={editIndex}
+          logs={current.entryLogs}
+          index={editIndex}
+          onSave={handleSaveEdit}
+          onClose={() => setEditIndex(null)}
+        />
+      )}
 
       {photoGroup && photoModal && (
         <DefectPhotoModal

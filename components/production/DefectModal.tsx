@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
-import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
+import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail, fromOverDimensiDetail } from './OverDimensiFields';
 import { FlaskNumberFields } from './FlaskNumberFields';
 import { CavityFields } from './CavityFields';
 import { needsOverDimensiDetail } from '@/utils/constants';
 import type { OverDimensiDetail } from '@/lib/types';
+import type { EntryLogEdit } from '@/utils/entryLogEdit';
 import styles from './EntryModal.module.css';
 
 interface DefectModalProps {
@@ -22,11 +23,16 @@ interface DefectModalProps {
   takenFlasks?: (lot: string) => readonly string[];
   // Camshaft only: pick the cavity via TR KAI + No. Die toggles instead of typing.
   cavityPicker?: boolean;
+  // Editing a logged entry: prefill every field from it and use this title.
+  initial?: EntryLogEdit;
+  title?: string;
 }
 
-export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker }: DefectModalProps) {
-  const [defectType, setDefectType] = useState<string>(types[0]);
-  const [customType, setCustomType] = useState('');
+export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker, initial, title = 'Input Defect (NG)' }: DefectModalProps) {
+  // A logged type missing from the list was typed via 'Other'.
+  const initialKnown = !initial || types.includes(initial.type);
+  const [defectType, setDefectType] = useState<string>(initial ? (initialKnown ? initial.type : OTHER_TYPE) : types[0]);
+  const [customType, setCustomType] = useState(initialKnown ? '' : initial!.type);
   const [isSearching, setIsSearching] = useState(false);
   const lotRef = useRef<HTMLInputElement>(null);
   // Products have different defect lists — when the target product changes
@@ -47,10 +53,12 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   // empty while the user is clearing/retyping it — a live `parseInt(...) ||
   // 1` fallback would snap an emptied field straight back to "1" and turn
   // every keystroke into an append rather than a replace.
-  const [qtyInput, setQtyInput] = useState('1');
-  const [lot, setLot] = useState('');
-  const [flask, setFlask] = useState('');
-  const [overDimensi, setOverDimensi] = useState(initialOverDimensiState);
+  const [qtyInput, setQtyInput] = useState(String(initial?.qty ?? 1));
+  const [lot, setLot] = useState(initial?.lot ?? '');
+  const [flask, setFlask] = useState(initial?.flask ?? '');
+  const [overDimensi, setOverDimensi] = useState(
+    initial?.overDimensi ? fromOverDimensiDetail(initial.overDimensi) : initialOverDimensiState,
+  );
   const taken = takenFlasks ? takenFlasks(lot) : [];
 
   // A flask picked before the lot was typed may already be logged under that
@@ -80,7 +88,7 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Input Defect (NG)" wide>
+    <Modal isOpen={isOpen} onClose={onClose} title={title} wide>
       <TypeSelect
         label="Jenis Defect"
         types={types}

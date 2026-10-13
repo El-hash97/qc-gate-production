@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { vi } from 'vitest';
 import { EntryLogList } from '@/components/production/EntryLogList';
 import type { EntryLog } from '@/lib/types';
 
@@ -48,5 +49,22 @@ describe('EntryLogList', () => {
   it('shows the empty state when there are no logs', () => {
     render(<EntryLogList title="Lot / Flask Log" logs={[]} />);
     expect(screen.getByText('Belum ada data')).toBeInTheDocument();
+  });
+
+  it('shows no edit button unless onEdit is given (logged out)', () => {
+    const logs: EntryLog[] = [{ kind: 'defect', line: 1, group: 'bc', type: 'Gomi Cope', qty: 2, lot: 'L1', flask: '1' }];
+    render(<EntryLogList title="Lot / Flask Log" logs={logs} />);
+    expect(screen.queryByRole('button', { name: /^Edit/ })).not.toBeInTheDocument();
+  });
+
+  it('hands the clicked entry to onEdit', () => {
+    const logs: EntryLog[] = [
+      { kind: 'defect', line: 1, group: 'bc', type: 'Gomi Cope', qty: 2, lot: 'L1', flask: '1' },
+      { kind: 'repair', line: 2, group: 'bc', type: 'Dakon', qty: 1, lot: 'L2', flask: '3' },
+    ];
+    const onEdit = vi.fn();
+    render(<EntryLogList title="Lot / Flask Log" logs={logs} onEdit={onEdit} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Dakon Lot L2 / Flask 3' }));
+    expect(onEdit).toHaveBeenCalledWith(logs[1]);
   });
 });

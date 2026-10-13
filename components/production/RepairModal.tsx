@@ -5,11 +5,12 @@ import { Modal } from '@/components/ui/Modal';
 import { DieNumberFields } from './DieNumberFields';
 import type { DieNumber } from './DieNumberFields';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
-import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail } from './OverDimensiFields';
+import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail, fromOverDimensiDetail } from './OverDimensiFields';
 import { FlaskNumberFields } from './FlaskNumberFields';
 import { CavityFields } from './CavityFields';
 import { needsDieNumber, needsOverDimensiDetail } from '@/utils/constants';
 import type { OverDimensiDetail } from '@/lib/types';
+import type { EntryLogEdit } from '@/utils/entryLogEdit';
 import styles from './EntryModal.module.css';
 
 interface RepairModalProps {
@@ -24,11 +25,16 @@ interface RepairModalProps {
   takenFlasks?: (lot: string) => readonly string[];
   // Camshaft only: pick the cavity via TR KAI + No. Die toggles instead of typing.
   cavityPicker?: boolean;
+  // Editing a logged entry: prefill every field from it and use this title.
+  initial?: EntryLogEdit;
+  title?: string;
 }
 
-export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker }: RepairModalProps) {
-  const [repairType, setRepairType] = useState<string>(types[0]);
-  const [customType, setCustomType] = useState('');
+export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker, initial, title = 'Input Repair' }: RepairModalProps) {
+  // A logged type missing from the list was typed via 'Other'.
+  const initialKnown = !initial || types.includes(initial.type);
+  const [repairType, setRepairType] = useState<string>(initial ? (initialKnown ? initial.type : OTHER_TYPE) : types[0]);
+  const [customType, setCustomType] = useState(initialKnown ? '' : initial!.type);
   const [isSearching, setIsSearching] = useState(false);
   const lotRef = useRef<HTMLInputElement>(null);
   // 'Other' is never in `types` but is a valid choice, so exempt it from the
@@ -42,15 +48,17 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     if (needsDieNumber(repairType)) return;
     if (repairType !== OTHER_TYPE) lotRef.current?.focus();
   }, [repairType, isOpen, isSearching, customType]);
-  const [qtyInput, setQtyInput] = useState('1');
-  const [lot, setLot] = useState('');
-  const [flask, setFlask] = useState('');
+  const [qtyInput, setQtyInput] = useState(String(initial?.qty ?? 1));
+  const [lot, setLot] = useState(initial?.lot ?? '');
+  const [flask, setFlask] = useState(initial?.flask ?? '');
   // Which die (mould) the piece came from — only meaningful for Mejashi Bore
   // repairs. Deliberately NOT reset after a save (mirrors repairType, which
   // also carries over) so logging several consecutive Mejashi Bore repairs
   // from the same die doesn't force re-picking it each time.
-  const [dieNumber, setDieNumber] = useState<DieNumber | null>(null);
-  const [overDimensi, setOverDimensi] = useState(initialOverDimensiState);
+  const [dieNumber, setDieNumber] = useState<DieNumber | null>(initial?.die ?? null);
+  const [overDimensi, setOverDimensi] = useState(
+    initial?.overDimensi ? fromOverDimensiDetail(initial.overDimensi) : initialOverDimensiState,
+  );
   const taken = takenFlasks ? takenFlasks(lot) : [];
 
   // A flask picked before the lot was typed may already be logged under that
@@ -96,7 +104,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Input Repair" wide>
+    <Modal isOpen={isOpen} onClose={onClose} title={title} wide>
       <TypeSelect
         label="Jenis Repair"
         types={types}

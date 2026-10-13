@@ -23,8 +23,10 @@ interface Props {
  * FlaskNumberFields).
  */
 export function CavityFields({ label, value, onChange }: Props) {
-  const [tr, setTr] = useState<1 | 2>(1);
-  const [die, setDie] = useState<1 | 2>(1);
+  // Start from an existing "T-N" value (editing a log entry): TR = T, Die 2 for cavities 5-8.
+  const [initTr, initCavity] = value.split('-').map(Number);
+  const [tr, setTr] = useState<1 | 2>(initTr === 2 ? 2 : 1);
+  const [die, setDie] = useState<1 | 2>(initCavity > 4 ? 2 : 1);
 
   // Changing TR/Die changes the option set, so a pick from the old set is stale.
   function pick(nextTr: 1 | 2, nextDie: 1 | 2) {

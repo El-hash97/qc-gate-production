@@ -40,3 +40,26 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+
+.rowEnd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.editButton {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.editButton:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}

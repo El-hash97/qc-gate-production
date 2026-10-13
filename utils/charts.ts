@@ -249,3 +249,23 @@ export function overDimensiByDie(logs: EntryLog[], kind: EntryLog['kind']): Reco
   }
   return out;
 }
+
+// Tooltip detail for the Over Dimensi Pareto: per "Die N" label, the
+// CC · Slub/Wj · F/R combinations logged under it, most pcs first.
+export function overDimensiCombos(logs: EntryLog[], kind: EntryLog['kind']): Record<string, string[]> {
+  const byDie: Record<string, Record<string, number>> = {};
+  for (const log of logs) {
+    const od = log.overDimensi;
+    if (log.kind !== kind || !od) continue;
+    const combos = (byDie[`Die ${od.dieMould}`] ??= {});
+    const combo = `CC ${od.crankCaseNo} · Slub/Wj ${od.slubWjNo} · F/R ${od.position}`;
+    combos[combo] = (combos[combo] ?? 0) + log.qty;
+  }
+  const out: Record<string, string[]> = {};
+  for (const [die, combos] of Object.entries(byDie)) {
+    out[die] = Object.entries(combos)
+      .sort((a, b) => b[1] - a[1])
+      .map(([combo, qty]) => `${combo}: ${qty} pcs`);
+  }
+  return out;
+}

@@ -17,13 +17,15 @@ interface ParetoChartProps {
   // hasPhoto is checked per defect label; onBarClick receives the defect name.
   hasPhoto?: (defectType: string) => boolean;
   onBarClick?: (defectType: string) => void;
+  // Extra tooltip lines under a real bar (e.g. Over Dimensi combinations per die).
+  tooltipDetail?: (label: string) => string[];
 }
 
 // Vertical Pareto bar chart: one bar per defect/repair type, tallest (most
 // frequent) on the left. Bar height is that type's share of the total (y axis
 // in %); the raw pcs count sits above each bar. Sparse data is padded with
 // faint grey skeleton bars so 1-2 types don't render as giant blocks.
-export function ParetoChart({ data, hasPhoto, onBarClick }: ParetoChartProps) {
+export function ParetoChart({ data, hasPhoto, onBarClick, tooltipDetail }: ParetoChartProps) {
   const { labels, counts } = pareto(data);
   const ct = useChartTheme();
 
@@ -77,6 +79,10 @@ export function ParetoChart({ data, hasPhoto, onBarClick }: ParetoChartProps) {
           tooltip: {
             callbacks: {
               label: (c) => (c.dataIndex < real ? `${counts[c.dataIndex]} pcs (${pct[c.dataIndex]}%)` : ''),
+              afterBody: (items) => {
+                const idx = items[0]?.dataIndex;
+                return idx != null && idx < real && tooltipDetail ? tooltipDetail(labels[idx]) : [];
+              },
             },
           },
           datalabels: {

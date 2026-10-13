@@ -30,7 +30,7 @@ import {
   hourlyOee, avMinutesByHour, peMinutesByHour, lineStopsByHour, shiftOee,
 } from '@/utils/oee';
 import { hoursForShiftTime } from '@/utils/shiftHours';
-import { overDimensiByDie } from '@/utils/charts';
+import { overDimensiByDie, overDimensiCombos } from '@/utils/charts';
 import type { OeeBreakdown } from '@/utils/oee';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
@@ -565,7 +565,10 @@ export function ProductionDashboardView({
               </div>
             </div>
             <div className={styles.panelBody}>
-              <ParetoChart data={overDimensiByDie(entryLogs, overDimensiKind)} />
+              <ParetoChart
+                data={overDimensiByDie(entryLogs, overDimensiKind)}
+                tooltipDetail={(die) => overDimensiCombos(entryLogs, overDimensiKind)[die] ?? []}
+              />
             </div>
           </section>
         )}

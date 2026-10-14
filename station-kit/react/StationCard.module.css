@@ -1,8 +1,8 @@
-/* Display serif for the station description (personal-use licence, see
-   public/fonts/milesdane-LICENSE.txt). */
+/* Serif for the station description: Open Serif Book by Steve Matteson
+   (no licence file shipped with the font). */
 @font-face {
-  font-family: 'Milesdane';
-  src: url('/fonts/milesdane.otf') format('opentype');
+  font-family: 'Open Serif';
+  src: url('/fonts/open-serif-book.ttf') format('truetype');
   font-display: swap;
 }
 
@@ -130,7 +130,7 @@
 
 .para {
   margin: 0;
-  font-family: 'Milesdane', Georgia, serif;
+  font-family: 'Open Serif', Georgia, serif;
   font-size: 17px;
   line-height: 1.5;
   color: var(--text-secondary, #59616f);

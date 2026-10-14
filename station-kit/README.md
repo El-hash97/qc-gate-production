@@ -15,7 +15,7 @@ station-kit/
   machine/build.mjs               menempelkan kit → satu file HTML mandiri
   machine/tools/shot.mjs          screenshot review (butuh Playwright)
   react/StationCard.tsx (+ .css)  komponen card: gambar | deskripsi, tombol Play 3D
-  fonts/                          Milesdane + perjanjian lisensinya
+  fonts/                          Open Serif Book (Steve Matteson)
 ```
 
 Contoh lengkap yang sudah jadi: **HSB05** (`figure/stations/hsb05.mjs`,
@@ -109,5 +109,5 @@ tetap rapi tanpa token tema.
 ## Lisensi
 
 - `figure/iso-kit.mjs` dan `machine/lab-kit.js`: MIT (lihat `LICENSE-*`).
-- Font Milesdane: **hanya untuk penggunaan pribadi**. Pemakaian komersial
-  atau promosi butuh lisensi dari pembuatnya (`fonts/milesdane-LICENSE.txt`).
+- Font Open Serif Book (Steve Matteson): zip tidak menyertakan file lisensi; cek izin
+  pemakaian ke pembuatnya sebelum dipakai di luar internal.

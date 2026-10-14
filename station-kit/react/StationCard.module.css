@@ -1,8 +1,8 @@
 /* Display serif for the station description (personal-use licence, see
-   public/fonts/relationship-of-melodrame-LICENSE.txt). */
+   public/fonts/milesdane-LICENSE.txt). */
 @font-face {
-  font-family: 'Relationship of Melodrame';
-  src: url('/fonts/relationship-of-melodrame.ttf') format('truetype');
+  font-family: 'Milesdane';
+  src: url('/fonts/milesdane.otf') format('opentype');
   font-display: swap;
 }
 
@@ -130,7 +130,7 @@
 
 .para {
   margin: 0;
-  font-family: 'Relationship of Melodrame', Georgia, serif;
+  font-family: 'Milesdane', Georgia, serif;
   font-size: 17px;
   line-height: 1.5;
   color: var(--text-secondary, #59616f);

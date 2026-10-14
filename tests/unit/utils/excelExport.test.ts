@@ -26,7 +26,7 @@ const state: ProductionState = {
 
 const DATE = new Date(Date.UTC(2026, 7, 5));
 
-type TableModel = { name: string; ref?: string; tableRef?: string; rows: unknown[][]; columns: { name: string }[] };
+type TableModel = { name: string; ref?: string; tableRef?: string; rows: unknown[][]; columns: { name: string; filterButton?: boolean }[] };
 
 function model(workbook: ExcelJS.Workbook, name: string): TableModel {
   const table = workbook.getWorksheet(SHEET_NAME)!.getTable(name);
@@ -45,35 +45,26 @@ describe('buildShiftWorkbook', () => {
     const names = ws.getTables().map((t) => (t as unknown as { table: TableModel }).table.name);
     expect(names).toEqual([
       'Ringkasan',
-      'Produksi_BC1TR', 'DefectRepair_BC1TR', 'EntryLog_BC1TR',
-      'Produksi_BC2TR', 'DefectRepair_BC2TR', 'EntryLog_BC2TR',
-      'Produksi_Camshaft', 'DefectRepair_Camshaft', 'EntryLog_Camshaft',
-      'Produksi_Crankshaft', 'DefectRepair_Crankshaft', 'EntryLog_Crankshaft',
+      'Produksi_BC1TR', 'EntryLog_BC1TR',
+      'Produksi_BC2TR', 'EntryLog_BC2TR',
+      'Produksi_Camshaft', 'EntryLog_Camshaft',
+      'Produksi_Crankshaft', 'EntryLog_Crankshaft',
       'LineStop',
     ]);
   });
 
   it('summarises per target group with real numbers and fractional percentages', () => {
     const rows = model(buildShiftWorkbook(state), 'Ringkasan').rows;
-    expect(rows[0]).toEqual([DATE, 'Shift Red', 'BC 1TR + BC 2TR', 200, 180, 9, 5, 194, 180 / 194, 9 / 194, 5 / 194, 194 / 200]);
-    expect(rows.map((r) => r[2])).toEqual(['BC 1TR + BC 2TR', 'Camshaft', 'Crankshaft']);
+    expect(rows[0]).toEqual([DATE, 'Shift Red', 'Day', 'BC 1TR + BC 2TR', 200, 180, 9, 5, 194, 180 / 194, 9 / 194, 5 / 194, 194 / 200]);
+    expect(rows.map((r) => r[3])).toEqual(['BC 1TR + BC 2TR', 'Camshaft', 'Crankshaft']);
   });
 
   it('gives every Produksi table the same columns so Power BI can append them', () => {
     const workbook = buildShiftWorkbook(state);
     const bc1 = model(workbook, 'Produksi_BC1TR');
     expect(model(workbook, 'Produksi_Crankshaft').columns.map((c) => c.name)).toEqual(bc1.columns.map((c) => c.name));
-    expect(bc1.rows[0].slice(2, 8)).toEqual(['BC 1TR', null, 100, 5, 3, 108]);
-    expect(model(workbook, 'Produksi_Camshaft').rows[0][3]).toBe(60);
-  });
-
-  it('tallies NG first then Repair per line from the entry logs, biggest first', () => {
-    const rows = model(buildShiftWorkbook(state), 'DefectRepair_BC1TR').rows;
-    expect(rows.map((r) => r.slice(3))).toEqual([
-      ['NG', 'Gas Hole Cope', 5],
-      ['NG', 'Dross', 1],
-      ['Repair', 'Mejashi Bore 1', 5],
-    ]);
+    expect(bc1.rows[0].slice(3, 9)).toEqual(['BC 1TR', null, 100, 5, 3, 108]);
+    expect(model(workbook, 'Produksi_Camshaft').rows[0][4]).toBe(60);
   });
 
   it('lists each entry with die and Over Dimensi detail in its own columns', () => {
@@ -89,9 +80,12 @@ describe('buildShiftWorkbook', () => {
     expect(rows[0].slice(0, 4)).toEqual([DATE, 'Shift Red', 'Crankshaft', null]);
   });
 
-  it('writes line stops with category and duration in minutes', () => {
+  it('writes line stops with its hour bucket, category code and duration in minutes', () => {
     const rows = model(buildShiftWorkbook(state), 'LineStop').rows;
-    expect(rows[0]).toEqual([DATE, 'Shift Red', '07:10', '07:40', 'AV (Availability)', 30, 'Ganti tooling', 'Stok tool']);
+    expect(rows[0]).toEqual([
+      DATE, 'Shift Red', 'Day', 'Budi', 'SURYO HADI WIHARJO',
+      '07:00', '07:10', '07:40', 'AV', 'Availability', 30, 'Ganti tooling', 'Stok tool',
+    ]);
   });
 
   it('fills each product table header with that product colour', () => {
@@ -103,11 +97,25 @@ describe('buildShiftWorkbook', () => {
     expect(fill.fgColor?.argb).toBe('FF3B82F6');
   });
 
+  it('makes every table 13 columns wide with no filter arrows and centred header + body', () => {
+    const workbook = buildShiftWorkbook(state);
+    const ws = workbook.getWorksheet(SHEET_NAME)!;
+    for (const t of ws.getTables()) {
+      const m = (t as unknown as { table: TableModel }).table;
+      expect(m.columns).toHaveLength(13);
+      expect(m.columns.every((c) => !c.filterButton)).toBe(true);
+    }
+    const t = model(workbook, 'EntryLog_BC1TR');
+    const top = Number((t.tableRef ?? t.ref)!.match(/\d+/)![0]);
+    expect(ws.getRow(top).getCell(5).alignment?.horizontal).toBe('center');
+    expect(ws.getRow(top + 1).getCell(5).alignment?.horizontal).toBe('center');
+  });
+
   it('round-trips through a real .xlsx file with its tables intact', async () => {
     const buffer = await buildShiftWorkbook(state).xlsx.writeBuffer();
     const loaded = new ExcelJS.Workbook();
     await loaded.xlsx.load(buffer as ArrayBuffer);
-    expect(loaded.getWorksheet(SHEET_NAME)!.getTables()).toHaveLength(14);
+    expect(loaded.getWorksheet(SHEET_NAME)!.getTables()).toHaveLength(10);
   });
 });
 

@@ -1,3 +1,11 @@
+/* Display serif for the station description (personal-use licence, see
+   public/fonts/relationship-of-melodrame-LICENSE.txt). */
+@font-face {
+  font-family: 'Relationship of Melodrame';
+  src: url('/fonts/relationship-of-melodrame.ttf') format('truetype');
+  font-display: swap;
+}
+
 .backdrop {
   position: absolute;
   inset: 0;
@@ -122,8 +130,9 @@
 
 .para {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
+  font-family: 'Relationship of Melodrame', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 

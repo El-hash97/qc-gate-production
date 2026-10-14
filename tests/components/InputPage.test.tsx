@@ -167,6 +167,17 @@ describe('InputPage', () => {
     expect(screen.queryByRole('button', { name: 'Cavity 1-5' })).not.toBeInTheDocument();
   });
 
+  it('logs the Camshaft No. Die picked with the cavity', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[2]);
+    await userEvent.click(screen.getByRole('button', { name: '2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cavity 1-6' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    const saved = updateStateMock.mock.calls[0][0];
+    expect(saved.entryLogs.at(-1)).toMatchObject({ line: 3, flask: '1-6', die: 2 });
+  });
+
   it('shows no pinned-hour banner by default (real-time input)', () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
     expect(screen.queryByText(/input diarahkan ke jam/i)).not.toBeInTheDocument();

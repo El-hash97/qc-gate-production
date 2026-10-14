@@ -43,6 +43,17 @@ describe('editEntryLog', () => {
     expect(patch.repairData).toEqual({ Gomi: 1 });
   });
 
+  it('re-derives the Camshaft die when the cavity is edited', () => {
+    const cam = {
+      ...base,
+      entryLogs: [{ kind: 'defect', group: 'shaft', line: 3, type: 'Dross', qty: 1, lot: 'L1', flask: '1-2', die: 1 }],
+      defectDataShaft: { Dross: 1 },
+      ng3: 1,
+    } as unknown as ProductionState;
+    const patch = editEntryLog(cam, 0, { type: 'Dross', qty: 1, lot: 'L1', flask: '2-7' });
+    expect(patch.entryLogs![0]).toMatchObject({ flask: '2-7', die: 2 });
+  });
+
   it('returns no change for a missing index', () => {
     expect(editEntryLog(base, 9, { type: 'Crack', qty: 1, lot: 'L', flask: '1' })).toEqual({});
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { EntryLog } from '@/lib/types';
-import { takenFlasks } from '@/utils/flask';
+import { entryDie, takenFlasks } from '@/utils/flask';
 
 const log = (over: Partial<EntryLog>): EntryLog => ({
   kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 1, lot: 'L1', flask: '2', ...over,
@@ -33,5 +33,24 @@ describe('takenFlasks', () => {
 
   it('lists each flask once', () => {
     expect(takenFlasks([log({ flask: '2' }), log({ flask: '2' })], 'L1', 1)).toEqual(['2']);
+  });
+});
+
+describe('entryDie', () => {
+  it('derives the Camshaft die from the cavity: 1-4 is Die 1, 5-8 is Die 2', () => {
+    expect(entryDie(3, '1-3')).toBe(1);
+    expect(entryDie(3, '2-4')).toBe(1);
+    expect(entryDie(3, '1-5')).toBe(2);
+    expect(entryDie(3, '2-8')).toBe(2);
+  });
+
+  it('gives no die for a Camshaft value that is not a picked cavity', () => {
+    expect(entryDie(3, '')).toBeUndefined();
+    expect(entryDie(3, '1-6,1-7')).toBeUndefined();
+  });
+
+  it('passes the given die through for other products', () => {
+    expect(entryDie(1, '3', 2)).toBe(2);
+    expect(entryDie(4, '1,5')).toBeUndefined();
   });
 });

@@ -1,5 +1,6 @@
 import type { EntryLog, OverDimensiDetail, ProductionState } from '@/lib/types';
 import { lineGroup } from '@/lib/types';
+import { entryDie } from '@/utils/flask';
 
 export interface EntryLogEdit {
   type: string;
@@ -30,13 +31,14 @@ export function editEntryLog(state: ProductionState, index: number, edit: EntryL
   data[edit.type] = (data[edit.type] ?? 0) + edit.qty;
 
   const { die: _die, overDimensi: _od, ...base } = old;
+  const die = entryDie(line, edit.flask, edit.die);
   const next: EntryLog = {
     ...base,
     type: edit.type,
     qty: edit.qty,
     lot: edit.lot,
     flask: edit.flask,
-    ...(edit.die ? { die: edit.die } : {}),
+    ...(die ? { die } : {}),
     ...(edit.overDimensi ? { overDimensi: edit.overDimensi } : {}),
   };
   const entryLogs = state.entryLogs.map((log, i) => (i === index ? next : log));

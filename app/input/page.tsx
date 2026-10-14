@@ -17,7 +17,7 @@ import {
 import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
-import { takenFlasks } from '@/utils/flask';
+import { entryDie, takenFlasks } from '@/utils/flask';
 import {
   SHIFTS, SHIFT_TIMES, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
@@ -200,10 +200,14 @@ export default function InputPage() {
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'defectDataShaft' : 'defectData';
     const currentData = current[dataKey] ?? {};
+    const die = entryDie(line, flask);
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [defectType]: (currentData[defectType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'defect', group, line, type: defectType, qty, lot, flask, ...(overDimensi ? { overDimensi } : {}) }],
+      entryLogs: [
+        ...current.entryLogs,
+        { kind: 'defect', group, line, type: defectType, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) },
+      ],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${defectType} ditambahkan`, 'error');
     setDefectTarget(null);
@@ -214,6 +218,7 @@ export default function InputPage() {
   ) {
     if (!repairTarget) return;
     const line = lineForTarget(repairTarget);
+    const logDie = entryDie(line, flask, die);
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'repairDataShaft' : 'repairData';
     const currentData = current[dataKey] ?? {};
@@ -222,7 +227,7 @@ export default function InputPage() {
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
       entryLogs: [
         ...current.entryLogs,
-        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) },
+        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(logDie ? { die: logDie } : {}), ...(overDimensi ? { overDimensi } : {}) },
       ],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');

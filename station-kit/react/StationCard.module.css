@@ -67,7 +67,9 @@
   border-color: var(--text-secondary, #59616f);
 }
 
+/* grows with the description column; the figure stays vertically centred in it */
 .figure {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;

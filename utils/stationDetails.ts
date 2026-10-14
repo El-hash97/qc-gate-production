@@ -7,6 +7,8 @@ export interface StationDetail {
   title: string;
   subtitle: string;
   image: { light: string; dark: string };
+  // interactive 3D machine (Machine skill page in public/stations), opened by Play
+  play?: string;
   description: string[];
   specs: { label: string; value: string }[];
 }
@@ -16,6 +18,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'HSB05',
     subtitle: 'Hanger Shot Blast',
     image: { light: '/stations/hsb05-light.svg', dark: '/stations/hsb05-dark.svg' },
+    play: '/stations/hsb05-3d.html',
     description: [
       'The monorail hoist picks the cast block off the roller conveyor on a C-hook hanger and carries it into the octagonal blast chamber.',
       'Inside, turbine wheels throw steel shot at the turning block to strip sand, scale and burrs from every face, while the dust collector draws the spent media out through the roof duct.',

@@ -23,6 +23,42 @@
   box-shadow: var(--shadow-popup);
 }
 
+.media {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* playing: the 3D machine takes the full width, the description moves below */
+.card[data-playing] {
+  grid-template-columns: 1fr;
+  width: min(1180px, 100%);
+}
+
+.machine {
+  display: block;
+  width: 100%;
+  height: min(62vh, 640px);
+  border: 0;
+}
+
+.play {
+  align-self: center;
+  padding: 8px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.play:hover {
+  border-color: var(--text-secondary);
+}
+
 .figure {
   display: flex;
   align-items: center;

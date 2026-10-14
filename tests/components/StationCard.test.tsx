@@ -32,4 +32,18 @@ describe('StationCard', () => {
   it('has no card for stations without a detail yet', () => {
     expect(stationDetail('hanten')).toBeNull();
   });
+
+  it('plays the interactive 3D machine under the figure and goes back to the picture', () => {
+    render(<StationCard detail={hsb05} theme="light" onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/HSB05 3D/)).toHaveAttribute('src', '/stations/hsb05-3d.html');
+    expect(screen.queryByRole('img')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /gambar/i }));
+    expect(screen.getByRole('img')).toBeInTheDocument();
+  });
+
+  it('has no play button for a station without a 3D machine', () => {
+    render(<StationCard detail={{ ...hsb05, play: undefined }} theme="light" onClose={() => {}} />);
+    expect(screen.queryByRole('button', { name: /play/i })).toBeNull();
+  });
 });

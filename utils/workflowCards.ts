@@ -1,0 +1,61 @@
+import { SEGMENTS, segmentSeconds, type Counts, type StationId } from './finishingFlow';
+
+// One workflow board per process, standing on the empty floor beside the line
+// in flow order. Placeholder copy for review.
+export interface WorkflowCard {
+  id: StationId;
+  title: string;
+  desc: string;
+  next: string;
+  // station segment with its own Blender timing (cycle time + live status)
+  segment?: number;
+}
+
+export const WORKFLOW_CARDS: readonly WorkflowCard[] = [
+  { id: 'baritori', title: 'Baritori', segment: 0, next: 'HSB05',
+    desc: 'Burrs and flash left by casting are removed by hand before the block is hung for blasting.' },
+  { id: 'hsb05', title: 'HSB05', segment: 1, next: 'HSB06',
+    desc: 'Hanger shot blast: steel shot strips sand and scale from every face of the turning block.' },
+  { id: 'hsb06', title: 'HSB06', segment: 2, next: 'Grinding',
+    desc: 'Second blast pass cleans the pockets and core holes the first machine could not reach.' },
+  { id: 'grinding', title: 'Grinding', segment: 3, next: 'Hanten MC',
+    desc: 'Gate and riser stubs are ground flush so the block sits true on the machining fixtures.' },
+  { id: 'hanten', title: 'Hanten MC', next: 'Final Proses',
+    desc: 'The block is turned over on the conveyor so the deck face comes up for finishing.' },
+  { id: 'final', title: 'Final Proses', next: 'QC Gate 1',
+    desc: 'Last touch-up of edges and passages, then compressed air blows out any loose shot.' },
+  { id: 'qc1', title: 'QC Gate 1', next: 'QC Gate 2',
+    desc: 'Visual check of the outside faces against the limit samples for cracks and porosity.' },
+  { id: 'qc2', title: 'QC Gate 2', next: 'Spray / Repair / NG',
+    desc: 'Final judgement: OK goes on to Spray Booth, Repair to Line Repair, NG to the red box.' },
+  { id: 'spray', title: 'Spray Booth', next: 'Junbiki',
+    desc: 'Rust-preventive oil is sprayed over the OK block before it leaves the line.' },
+  { id: 'junbiki', title: 'Junbiki', next: 'Truck',
+    desc: 'OK blocks are staged in the rack in delivery order and loaded onto the truck.' },
+  { id: 'lineRepair', title: 'Line Repair', next: 'QC Gate 2',
+    desc: 'Repair blocks arrive by forklift, are reworked on the bench and return to QC Gate 2.' },
+];
+
+// The data rows printed under a card's description.
+export function cardRows(
+  card: WorkflowCard,
+  counts: Counts,
+  running: boolean,
+  busy: readonly boolean[],
+): [string, string][] {
+  const rows: [string, string][] = [];
+  if (card.segment !== undefined) {
+    rows.push(['Cycle time', `${segmentSeconds(SEGMENTS[card.segment]).toFixed(1)} s`]);
+    rows.push(['Status', !running ? 'Stopped' : busy[card.segment] ? 'Processing' : 'Waiting']);
+  }
+  const total = counts.ok + counts.repair + counts.ng;
+  const pct = (n: number) => (total ? `${((n / total) * 100).toFixed(1)}%` : '0.0%');
+  if (card.id === 'qc2') {
+    rows.push(['Checked', `${total}`]);
+    rows.push(['OK / Repair / NG', `${counts.ok} / ${counts.repair} / ${counts.ng}`]);
+  }
+  if (card.id === 'junbiki') rows.push(['OK', `${counts.ok} (${pct(counts.ok)})`]);
+  if (card.id === 'lineRepair') rows.push(['Repair', `${counts.repair} (${pct(counts.repair)})`]);
+  rows.push(['Next', card.next]);
+  return rows;
+}

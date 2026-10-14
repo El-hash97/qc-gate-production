@@ -13,6 +13,8 @@ import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishing
 import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
 import { stationDetail } from '@/utils/stationDetails';
+import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
+import { createWorkflowBoards } from './workflowBoards';
 import type { Theme } from '@/hooks/useTheme';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
@@ -309,6 +311,10 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     scene.add(floor);
     const room = makeRoom();
     scene.add(room.group);
+    // workflow boards on the empty floor east of the line, Baritori end to Line Repair
+    const boards = createWorkflowBoards(WORKFLOW_CARDS, 15.5, -3, 3.1);
+    scene.add(boards.group);
+    let boardTheme: Theme = 'dark';
 
     // The plant layout exported from the user's Blender file.
     let disposed = false;
@@ -436,6 +442,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       floorMat.color.set(FLOOR[t]);
       room.wall.color.set(WALL[t]);
       room.plinth.color.set(PLINTH[t]);
+      boardTheme = t;
     };
 
     const resize = () => {
@@ -509,6 +516,8 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
         const pct = total ? ((c[key] / total) * 100).toFixed(1) : '0.0';
         badge.set(`${label} ${c[key]} · ${pct}%`);
       }
+      const busy = sim.segments.map((seg) => seg.busy !== null);
+      boards.draw((card) => cardRows(card, c, live.current.running, busy), boardTheme);
 
       controls.update();
       controls.target.x = THREE.MathUtils.clamp(controls.target.x, roomMin.x, roomMax.x);

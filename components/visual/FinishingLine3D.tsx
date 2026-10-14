@@ -7,11 +7,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
   BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, STATIONS, TRUCK_DOCK,
-  ANIM_FPS, SEGMENTS, type Counts,
+  ANIM_FPS, SEGMENTS, type Counts, type StationId,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
 import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
+import { stationDetail } from '@/utils/stationDetails';
 import type { Theme } from '@/hooks/useTheme';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
@@ -24,6 +25,8 @@ interface Props {
   counts: Counts;
   running: boolean;
   theme: Theme;
+  // called when a station's name tag that has a detail card is clicked
+  onSelectStation?: (id: StationId) => void;
 }
 
 // Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
@@ -197,8 +200,10 @@ function makeTruck(): THREE.Group {
   return g;
 }
 
-export default function FinishingLine3D({ counts, running, theme }: Props) {
+export default function FinishingLine3D({ counts, running, theme, onSelectStation }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
+  const select = useRef(onSelectStation);
+  select.current = onSelectStation;
   // Read by the render loop, so a 3 s poll updates these without rebuilding the scene.
   const live = useRef({ counts, running });
   live.current = { counts, running };
@@ -289,6 +294,7 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       }
     });
 
+    const tags: THREE.Sprite[] = [];
     for (const s of STATIONS) {
       if (s.prop) {
         const [w, h, d] = s.prop.size;
@@ -296,10 +302,40 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
         mesh.position.set(s.pos[0], h / 2, s.pos[1]);
         scene.add(mesh);
       }
-      const label = makeLabel(s.label);
+      // a tag with a detail card gets a chevron and answers clicks
+      const clickable = stationDetail(s.id) !== null;
+      const label = makeLabel(clickable ? `${s.label} ›` : s.label);
       label.position.set(s.pos[0], s.labelY, s.pos[1]);
+      if (clickable) {
+        label.userData.stationId = s.id;
+        tags.push(label);
+      }
       scene.add(label);
     }
+
+    // Click a tag to open its card; a drag that orbits the camera is not a click.
+    const ray = new THREE.Raycaster();
+    const tagAt = (event: PointerEvent) => {
+      const box = renderer.domElement.getBoundingClientRect();
+      ray.setFromCamera(
+        new THREE.Vector2(((event.clientX - box.left) / box.width) * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1),
+        camera,
+      );
+      return ray.intersectObjects(tags, false)[0]?.object.userData.stationId as StationId | undefined;
+    };
+    let downAt: [number, number] | null = null;
+    const onDown = (event: PointerEvent) => { downAt = [event.clientX, event.clientY]; };
+    const onUp = (event: PointerEvent) => {
+      if (!downAt || Math.hypot(event.clientX - downAt[0], event.clientY - downAt[1]) > 5) return;
+      const id = tagAt(event);
+      if (id) select.current?.(id);
+    };
+    const onMove = (event: PointerEvent) => {
+      renderer.domElement.style.cursor = tagAt(event) ? 'pointer' : '';
+    };
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointerup', onUp);
+    renderer.domElement.addEventListener('pointermove', onMove);
 
 
     // OK sits by Junbiki (where the truck loads), Repair by Line Repair, NG by the red box.
@@ -414,6 +450,9 @@ export default function FinishingLine3D({ counts, running, theme }: Props) {
       mixer?.stopAllAction();
       draco.dispose();
       cancelAnimationFrame(raf);
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('pointermove', onMove);
       ro.disconnect();
       controls.dispose();
       for (const m of meshes.values()) scene.remove(m);

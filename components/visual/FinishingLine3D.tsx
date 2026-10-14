@@ -20,6 +20,62 @@ const BLOCK_COLORS: Record<BlockColor, number> = {
 };
 const SCENE_BG: Record<Theme, number> = { dark: 0x0f1117, light: 0xf3f4f6 };
 const FLOOR: Record<Theme, number> = { dark: 0x2e3346, light: 0xc9ccd3 };
+const WALL: Record<Theme, number> = { dark: 0x4b5270, light: 0xe5e7eb };
+const PLINTH: Record<Theme, number> = { dark: 0x262a38, light: 0x9ca3af };
+
+// The building around the layout (metres, scene axes). The floor fills it; the
+// camera stays inside it. The truck gate is in the west wall, in line with the dock.
+const ROOM = { x0: -19, x1: 21, z0: -6, z1: 44, h: 12, t: 0.3 };
+const GATE = { z: TRUCK_DOCK[1], w: 4.4, h: 4.6 };
+
+// Four walls with a concrete plinth, and a truck gate (steel frame, rolled-up
+// shutter) cut into the west wall.
+function makeRoom() {
+  const g = new THREE.Group();
+  const wall = new THREE.MeshStandardMaterial({ roughness: 0.9 });
+  const plinth = new THREE.MeshStandardMaterial({ roughness: 1 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 });
+  const shutter = new THREE.MeshStandardMaterial({ color: 0x6b7280, metalness: 0.5, roughness: 0.5 });
+  const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number, m: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m);
+    mesh.position.set(x, y, z);
+    g.add(mesh);
+  };
+  const { x0, x1, z0, z1, h, t } = ROOM;
+  const PH = 1.2; // plinth height
+  // a wall run along x (at z) or along z (at x) from a to b: plinth below, panel above;
+  // `from` lifts the run off the floor (the lintel over the gate)
+  const runX = (z: number, a: number, b: number) => {
+    box(b - a, PH, t + 0.06, (a + b) / 2, PH / 2, z, plinth);
+    box(b - a, h - PH, t, (a + b) / 2, PH + (h - PH) / 2, z, wall);
+  };
+  const runZ = (x: number, a: number, b: number, from = 0) => {
+    if (from < PH) box(t + 0.06, PH - from, b - a, x, from + (PH - from) / 2, (a + b) / 2, plinth);
+    const y = Math.max(PH, from);
+    box(t, h - y, b - a, x, y + (h - y) / 2, (a + b) / 2, wall);
+  };
+  runX(z0, x0 - t / 2, x1 + t / 2);
+  runX(z1, x0 - t / 2, x1 + t / 2);
+  runZ(x1, z0, z1);
+  const g0 = GATE.z - GATE.w / 2;
+  const g1 = GATE.z + GATE.w / 2;
+  runZ(x0, z0, g0);
+  runZ(x0, g1, z1);
+  runZ(x0, g0, g1, GATE.h);
+  // gate frame: two posts and a header, proud of the wall on both faces
+  for (const z of [g0 - 0.1, g1 + 0.1]) box(t + 0.2, GATE.h, 0.2, x0, GATE.h / 2, z, steel);
+  box(t + 0.2, 0.2, GATE.w + 0.4, x0, GATE.h + 0.1, GATE.z, steel);
+  // rolled-up shutter drum on the inside face, above the header
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, GATE.w + 0.2, 20), shutter);
+  drum.rotation.x = Math.PI / 2;
+  drum.position.set(x0 + t / 2 + 0.4, GATE.h + 0.55, GATE.z);
+  g.add(drum);
+  // yellow-black hazard stripes on the floor across the gateway
+  for (let i = 0; i < 6; i++) {
+    box(0.6, 0.01, GATE.w / 6, x0 + 0.5, 0.005, g0 + (i + 0.5) * (GATE.w / 6), i % 2 ? plinth : steel);
+  }
+  return { group: g, wall, plinth };
+}
 
 interface Props {
   counts: Counts;
@@ -227,8 +283,9 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
-    // Looks down the line from the Baritori end, like the reference video.
-    camera.position.set(-22, 20, 2);
+    // Looks down the line from the Baritori end, like the reference video,
+    // from high in the building's corner.
+    camera.position.set(-17, ROOM.h - 0.5, 2);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(-1, 0, 17);
     controls.enableDamping = true;
@@ -236,6 +293,9 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     controls.minDistance = 6;
     controls.maxDistance = 40;
     controls.update();
+    // The camera (and what it orbits) never leaves the building.
+    const roomMin = new THREE.Vector3(ROOM.x0 + 0.6, 1, ROOM.z0 + 0.6);
+    const roomMax = new THREE.Vector3(ROOM.x1 - 0.6, ROOM.h - 0.5, ROOM.z1 - 0.6);
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
     const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -243,10 +303,12 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     scene.add(sun);
 
     const floorMat = new THREE.MeshStandardMaterial();
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 50), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.x1 - ROOM.x0, ROOM.z1 - ROOM.z0), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(1, -0.02, 19); // reaches the Line Repair area at x ≈ 18
+    floor.position.set((ROOM.x0 + ROOM.x1) / 2, -0.02, (ROOM.z0 + ROOM.z1) / 2);
     scene.add(floor);
+    const room = makeRoom();
+    scene.add(room.group);
 
     // The plant layout exported from the user's Blender file.
     let disposed = false;
@@ -353,19 +415,27 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     forklift.group.rotation.y = Math.PI; // parked facing the stub end
     forklift.group.position.set(FORKLIFT_HOME[0], 0, FORKLIFT_HOME[1]);
     scene.add(forklift.group);
+    // Past the gate the truck (and its load) is outside: cut away at the west wall.
+    renderer.localClippingEnabled = true;
+    const outside = [new THREE.Plane(new THREE.Vector3(1, 0, 0), -ROOM.x0)];
     const truck = makeTruck();
     truck.position.set(TRUCK_DOCK[0], 0, TRUCK_DOCK[1]);
+    truck.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) (obj.material as THREE.Material).clippingPlanes = outside;
+    });
     scene.add(truck);
 
     const blockGeo = new THREE.BoxGeometry(...BLOCK_SIZE);
     const blockMats = Object.fromEntries(
-      Object.entries(BLOCK_COLORS).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c })]),
+      Object.entries(BLOCK_COLORS).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, clippingPlanes: outside })]),
     ) as Record<BlockColor, THREE.MeshStandardMaterial>;
     const meshes = new Map<number, THREE.Mesh>();
 
     applyTheme.current = (t) => {
       scene.background = new THREE.Color(SCENE_BG[t]);
       floorMat.color.set(FLOOR[t]);
+      room.wall.color.set(WALL[t]);
+      room.plinth.color.set(PLINTH[t]);
     };
 
     const resize = () => {
@@ -441,6 +511,9 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       }
 
       controls.update();
+      controls.target.x = THREE.MathUtils.clamp(controls.target.x, roomMin.x, roomMax.x);
+      controls.target.z = THREE.MathUtils.clamp(controls.target.z, roomMin.z, roomMax.z);
+      camera.position.clamp(roomMin, roomMax);
       renderer.render(scene, camera);
     };
     raf = requestAnimationFrame(frame);

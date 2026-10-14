@@ -85,6 +85,7 @@ function titleBar(ws: ExcelJS.Worksheet, text: string, hex: string): void {
 // query never breaks.
 function addTable(
   ws: ExcelJS.Worksheet, name: string, hex: string, columns: Column[], rows: Cell[][], blankRow: Cell[],
+  rowFill?: (rowIndex: number) => string,
 ): void {
   const top = ws.lastRow ? ws.lastRow.number + 1 : 1;
   const data = rows.length > 0 ? rows : [blankRow];
@@ -105,12 +106,20 @@ function addTable(
       const cell = ws.getRow(top + r).getCell(i + 1);
       cell.alignment = CENTER;
       if (c.numFmt) cell.numFmt = c.numFmt;
+      if (rowFill && rows.length > 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(rowFill(r - 1)) } };
+      }
     }
   });
   ws.addRow([]);
 }
 
-// Label merged over A:F, value over G:M, both centred on a light band.
+// A compact "Label | Value" block in the middle of the A:M width: label merged
+// over F:H (right-aligned), value over I:J (left-aligned), so the pair meets
+// at the sheet's centre line. Light band with a thin outside border.
+const META_LABEL: [number, number] = [6, 8];
+const META_VALUE: [number, number] = [9, 10];
+
 function addMeta(ws: ExcelJS.Worksheet, state: ProductionState): void {
   const meta: [string, Cell][] = [
     ['Tanggal', dateCell(state.date) ?? '—'],
@@ -121,20 +130,28 @@ function addMeta(ws: ExcelJS.Worksheet, state: ProductionState): void {
     ['Operator', state.operator || '—'],
     ['PIC', picName(state) ?? '—'],
   ];
-  for (const [label, value] of meta) {
+  const [labelFrom, labelTo] = META_LABEL;
+  const [valueFrom, valueTo] = META_VALUE;
+  meta.forEach(([label, value], i) => {
     const row = ws.addRow([]);
-    row.getCell(1).value = label;
-    row.getCell(7).value = value;
-    ws.mergeCells(row.number, 1, row.number, 6);
-    ws.mergeCells(row.number, 7, row.number, WIDTH);
-    for (const col of [1, 7]) {
+    row.height = 18;
+    row.getCell(labelFrom).value = label;
+    row.getCell(valueFrom).value = value;
+    ws.mergeCells(row.number, labelFrom, row.number, labelTo);
+    ws.mergeCells(row.number, valueFrom, row.number, valueTo);
+    // Styles go on each merged range's master cell (ExcelJS shares it across the range).
+    const edge = { style: 'thin' as const, color: { argb: argb(TOYOTA_RED) } };
+    const rowEdges = { ...(i === 0 ? { top: edge } : {}), ...(i === meta.length - 1 ? { bottom: edge } : {}) };
+    for (const [col, side] of [[labelFrom, { left: edge }], [valueFrom, { right: edge }]] as const) {
       const cell = row.getCell(col);
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(META_BG) } };
-      cell.alignment = CENTER;
+      cell.border = { ...rowEdges, ...side };
     }
-    row.getCell(1).font = { bold: true };
-    if (value instanceof Date) row.getCell(7).numFmt = DATE;
-  }
+    row.getCell(labelFrom).alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+    row.getCell(labelFrom).font = { bold: true };
+    row.getCell(valueFrom).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    if (value instanceof Date) row.getCell(valueFrom).numFmt = DATE;
+  });
   ws.addRow([]);
 }
 
@@ -179,17 +196,42 @@ function kindLabel(kind: EntryLog['kind']): string {
   return kind === 'defect' ? 'NG' : 'Repair';
 }
 
+// Light tint of each product's identity colour, for Entry Log row backgrounds.
+const PRODUCT_TINT: Record<ProductLine, string> = { 1: 'FEE2E2', 2: 'DBEAFE', 3: 'FEF9C3', 4: 'DCFCE7' };
+
+// Product first, then NG before Repair; input order kept within each group.
+// Legacy logs without a line are BC 1TR.
+function sortedLogs(logs: EntryLog[]): EntryLog[] {
+  return logs
+    .map((log, i) => ({ log, i }))
+    .sort((a, b) => (a.log.line ?? 1) - (b.log.line ?? 1)
+      || (a.log.kind === b.log.kind ? 0 : a.log.kind === 'defect' ? -1 : 1)
+      || a.i - b.i)
+    .map(({ log }) => log);
+}
+
+function entryRow(state: ProductionState, log: EntryLog): Cell[] {
+  const od = log.overDimensi;
+  return [
+    dateCell(state.date), state.shift, PRODUCT_LINE_LABELS[log.line ?? 1], kindLabel(log.kind), log.type, log.qty,
+    log.lot, log.flask, log.die ?? null, od?.dieMould ?? null,
+    od?.crankCaseNo ?? null, od?.slubWjNo ?? null, od?.position ?? null,
+  ];
+}
+
 function entryRows(state: ProductionState, line: ProductLine): Cell[][] {
-  return state.entryLogs
-    .filter((log) => log.line === line)
-    .map((log) => {
-      const od = log.overDimensi;
-      return [
-        dateCell(state.date), state.shift, PRODUCT_LINE_LABELS[line], kindLabel(log.kind), log.type, log.qty,
-        log.lot, log.flask, log.die ?? null, od?.dieMould ?? null,
-        od?.crankCaseNo ?? null, od?.slubWjNo ?? null, od?.position ?? null,
-      ];
-    });
+  return sortedLogs(state.entryLogs.filter((log) => (log.line ?? 1) === line)).map((log) => entryRow(state, log));
+}
+
+// Every product's entries in one table, rows tinted by product. Same rows as
+// the per-product EntryLog_* tables — use one or the other in Power BI, never
+// append both or NG/Repair counts double.
+function allEntriesTable(ws: ExcelJS.Worksheet, state: ProductionState): void {
+  const logs = sortedLogs(state.entryLogs);
+  titleBar(ws, 'Entry Log — Semua Produk', TOYOTA_RED);
+  addTable(ws, 'EntryLog_Semua', TOYOTA_RED, ENTRY_COLUMNS, logs.map((log) => entryRow(state, log)),
+    [dateCell(state.date), state.shift, ...Array(WIDTH - 2).fill(null)],
+    (i) => PRODUCT_TINT[logs[i].line ?? 1]);
 }
 
 function productBlock(ws: ExcelJS.Worksheet, state: ProductionState, line: ProductLine): void {
@@ -201,7 +243,7 @@ function productBlock(ws: ExcelJS.Worksheet, state: ProductionState, line: Produ
   titleBar(ws, label, color);
   addTable(ws, `Produksi_${key}`, color, SUMMARY_COLUMNS, [countsRow(state, label, line, target)], []);
   addTable(ws, `EntryLog_${key}`, color, ENTRY_COLUMNS, entryRows(state, line),
-    [dateCell(state.date), state.shift, label, ...Array(WIDTH - 3).fill(null)]);
+    [dateCell(state.date), state.shift, label, ...Array(WIDTH - 3).fill(null)], () => PRODUCT_TINT[line]);
 }
 
 const CATEGORY_LABEL: Record<string, string> = { AV: 'Availability', PE: 'Performance', RQ: 'Quality' };
@@ -240,6 +282,7 @@ export function buildShiftWorkbook(state: ProductionState): ExcelJS.Workbook {
   addMeta(ws, state);
   summaryTable(ws, state);
   for (const line of LINES) productBlock(ws, state, line);
+  allEntriesTable(ws, state);
   lineStopTable(ws, state);
 
   ws.columns = [12, 12, 13, 16, 24, 10, 12, 14, 10, 15, 15, 26, 26].map((width) => ({ width }));

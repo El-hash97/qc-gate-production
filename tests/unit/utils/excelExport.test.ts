@@ -49,6 +49,7 @@ describe('buildShiftWorkbook', () => {
       'Produksi_BC2TR', 'EntryLog_BC2TR',
       'Produksi_Camshaft', 'EntryLog_Camshaft',
       'Produksi_Crankshaft', 'EntryLog_Crankshaft',
+      'EntryLog_Semua',
       'LineStop',
     ]);
   });
@@ -111,11 +112,49 @@ describe('buildShiftWorkbook', () => {
     expect(ws.getRow(top + 1).getCell(5).alignment?.horizontal).toBe('center');
   });
 
+  it('lists every entry in EntryLog_Semua by product, NG before Repair, rows tinted per product', () => {
+    const mixed: ProductionState = {
+      ...state,
+      entryLogs: [
+        { kind: 'repair', group: 'shaft', line: 3, type: 'Bari', qty: 1, lot: 'C1', flask: '1-2' },
+        { kind: 'repair', group: 'bc', line: 2, type: 'Gomi', qty: 1, lot: 'B1', flask: '1' },
+        { kind: 'defect', group: 'bc', line: 2, type: 'Dross', qty: 2, lot: 'B2', flask: '2' },
+        { kind: 'defect', group: 'bc', line: 1, type: 'Crack', qty: 1, lot: 'A1', flask: '3' },
+      ],
+    };
+    const workbook = buildShiftWorkbook(mixed);
+    const t = model(workbook, 'EntryLog_Semua');
+    expect(t.rows.map((r) => [r[2], r[3], r[4]])).toEqual([
+      ['BC 1TR', 'NG', 'Crack'],
+      ['BC 2TR', 'NG', 'Dross'],
+      ['BC 2TR', 'Repair', 'Gomi'],
+      ['Camshaft', 'Repair', 'Bari'],
+    ]);
+    const ws = workbook.getWorksheet(SHEET_NAME)!;
+    const top = Number((t.tableRef ?? t.ref)!.match(/\d+/)![0]);
+    const tint = (r: number) => (ws.getRow(top + r).getCell(1).fill as ExcelJS.FillPattern).fgColor?.argb;
+    expect([tint(1), tint(2), tint(4)]).toEqual(['FFFEE2E2', 'FFDBEAFE', 'FFFEF9C3']);
+  });
+
+  it('keeps the shift info as a compact centred label | value block with an outside border', () => {
+    const ws = buildShiftWorkbook(state).getWorksheet(SHEET_NAME)!;
+    let first = 0;
+    ws.eachRow((row, n) => { if (!first && row.getCell(6).value === 'Tanggal') first = n; });
+    expect(first).toBeGreaterThan(0);
+    const row = ws.getRow(first);
+    expect(row.getCell(9).value).toEqual(DATE);
+    expect(row.getCell(6).alignment?.horizontal).toBe('right');
+    expect(row.getCell(9).alignment?.horizontal).toBe('left');
+    expect(row.getCell(6).border?.top).toBeDefined();
+    expect(row.getCell(6).border?.left).toBeDefined();
+    expect(row.getCell(9).border?.right).toBeDefined();
+  });
+
   it('round-trips through a real .xlsx file with its tables intact', async () => {
     const buffer = await buildShiftWorkbook(state).xlsx.writeBuffer();
     const loaded = new ExcelJS.Workbook();
     await loaded.xlsx.load(buffer as ArrayBuffer);
-    expect(loaded.getWorksheet(SHEET_NAME)!.getTables()).toHaveLength(10);
+    expect(loaded.getWorksheet(SHEET_NAME)!.getTables()).toHaveLength(11);
   });
 });
 

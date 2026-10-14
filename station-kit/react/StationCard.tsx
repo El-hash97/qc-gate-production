@@ -1,9 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Theme } from '@/hooks/useTheme';
-import type { StationDetail } from '@/utils/stationDetails';
 import styles from './StationCard.module.css';
+
+// Self-contained so the folder can be copied to another site: React + CSS modules only.
+export type Theme = 'light' | 'dark';
+
+export interface StationDetail {
+  title: string;
+  subtitle: string;
+  // isometric figure per theme (station-kit/figure)
+  image: { light: string; dark: string };
+  // interactive 3D machine page (station-kit/machine), opened by Play
+  play?: string;
+  description: string[];
+  specs: { label: string; value: string }[];
+}
 
 interface Props {
   detail: StationDetail;
@@ -11,8 +23,8 @@ interface Props {
   onClose: () => void;
 }
 
-// Detail card opened by clicking a station's name tag in the 3D view:
-// the station's isometric figure beside its process description.
+// Detail card for one station: its isometric figure (or, after Play, its 3D machine)
+// beside the process description. Renders as an overlay filling its positioned parent.
 export function StationCard({ detail, theme, onClose }: Props) {
   const [playing, setPlaying] = useState(false);
   useEffect(() => {

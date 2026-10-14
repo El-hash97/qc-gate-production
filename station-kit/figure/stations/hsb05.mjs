@@ -2,14 +2,14 @@
 // detail card in /visualisasi. Shapes follow the Blender layout: an octagonal
 // blast cabinet with a round lid, a door between two posts, a monorail hoist
 // carrying a BC block on a hanger, and the roller conveyor feeding it.
-//   node scripts/stations/hsb05.mjs   →   public/stations/hsb05-{light,dark}.svg
-import { writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import * as k from "./iso-kit.mjs";
+//   node station-kit/figure/stations/hsb05.mjs [outDir]   →   <outDir>/hsb05-{light,dark}.svg
+//   (outDir defaults to public/stations, relative to where you run it)
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import * as k from "../iso-kit.mjs";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const OUT = join(HERE, "../../public/stations");
+const OUT = resolve(process.argv[2] ?? "public/stations");
+mkdirSync(OUT, { recursive: true });
 const WIDTH = 600;
 const HEIGHT = 420;
 
@@ -331,5 +331,5 @@ const LABEL =
 for (const theme of ["light", "dark"]) {
   const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });
   writeFileSync(join(OUT, `hsb05-${theme}.svg`), svg);
-  console.log(`wrote public/stations/hsb05-${theme}.svg (${(svg.length / 1024).toFixed(0)} KB)`);
+  console.log(`wrote ${join(OUT, `hsb05-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
 }

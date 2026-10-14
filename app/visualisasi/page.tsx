@@ -7,7 +7,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import { isRunning, type Counts, type StationId } from '@/utils/finishingFlow';
 import { stationDetail } from '@/utils/stationDetails';
-import { StationCard } from '@/components/visual/StationCard';
+import { StationCard } from '@/station-kit/react/StationCard';
 import styles from './page.module.css';
 
 const FinishingLine3D = dynamic(() => import('@/components/visual/FinishingLine3D'), {

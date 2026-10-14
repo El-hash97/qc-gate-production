@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { StationCard } from '@/components/visual/StationCard';
+import { StationCard } from '@/station-kit/react/StationCard';
 import { stationDetail } from '@/utils/stationDetails';
 
 describe('StationCard', () => {

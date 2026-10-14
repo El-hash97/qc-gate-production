@@ -1,18 +1,12 @@
 import type { StationId } from './finishingFlow';
+import type { StationDetail } from '@/station-kit/react/StationCard';
+
+export type { StationDetail };
 
 // Detail card content per station: an isometric figure (built by
-// scripts/stations/<id>.mjs, one SVG per theme) and a short description.
+// station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
+// (station-kit/machine/stations/<id>-3d.html) and a short description.
 // Placeholder copy for review; only HSB05 has a card so far.
-export interface StationDetail {
-  title: string;
-  subtitle: string;
-  image: { light: string; dark: string };
-  // interactive 3D machine (Machine skill page in public/stations), opened by Play
-  play?: string;
-  description: string[];
-  specs: { label: string; value: string }[];
-}
-
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   hsb05: {
     title: 'HSB05',

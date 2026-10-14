@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
+  background: color-mix(in srgb, var(--bg-primary, #f3f4f6) 55%, transparent);
 }
 
 .card {
@@ -25,10 +25,10 @@
   max-height: 100%;
   overflow: auto;
   padding: 18px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-popup);
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e3e6ec);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-popup, 0 25px 50px -12px rgba(0,0,0,0.35));
 }
 
 .media {
@@ -54,26 +54,26 @@
 .play {
   align-self: center;
   padding: 8px 18px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, #e3e6ec);
   border-radius: 999px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary, #1b1e28);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .play:hover {
-  border-color: var(--text-secondary);
+  border-color: var(--text-secondary, #59616f);
 }
 
 .figure {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px);
+  background: var(--bg-primary, #f3f4f6);
+  border: 1px solid var(--border-color, #e3e6ec);
   overflow: hidden;
 }
 
@@ -100,13 +100,13 @@
 .title {
   font-size: 22px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--text-primary, #1b1e28);
 }
 
 .subtitle {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #59616f);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -115,17 +115,17 @@
   flex: none;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  border: 1px solid var(--border-color, #e3e6ec);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #59616f);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
 }
 
 .close:hover {
-  color: var(--text-primary);
+  color: var(--text-primary, #1b1e28);
 }
 
 .para {
@@ -133,7 +133,7 @@
   font-family: 'Relationship of Melodrame', Georgia, serif;
   font-size: 17px;
   line-height: 1.5;
-  color: var(--text-secondary);
+  color: var(--text-secondary, #59616f);
 }
 
 .specs {
@@ -145,15 +145,15 @@
 
 .spec {
   padding: 8px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
+  border: 1px solid var(--border-color, #e3e6ec);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-secondary, #f3f4f6);
 }
 
 .spec dt {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-muted, #98a0ad);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -162,7 +162,7 @@
   margin: 2px 0 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-primary, #1b1e28);
 }
 
 @media (max-width: 760px) {

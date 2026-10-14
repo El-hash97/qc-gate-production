@@ -114,11 +114,12 @@ function addTable(
   ws.addRow([]);
 }
 
-// A compact "Label | Value" block in the middle of the A:M width: label merged
-// over F:H (right-aligned), value over I:J (left-aligned), so the pair meets
-// at the sheet's centre line. Light band with a thin outside border.
-const META_LABEL: [number, number] = [6, 8];
-const META_VALUE: [number, number] = [9, 10];
+// Shift info straight under the title, spanning A:M like the tables: label
+// merged over A:G (right-aligned), value over H:M (left-aligned), so each pair
+// meets near the sheet's centre line. Title + info share one outside border.
+const META_LABEL: [number, number] = [1, 7];
+const META_VALUE: [number, number] = [8, WIDTH];
+const BOX_EDGE = { style: 'thin' as const, color: { argb: argb(TOYOTA_RED) } };
 
 function addMeta(ws: ExcelJS.Worksheet, state: ProductionState): void {
   const meta: [string, Cell][] = [
@@ -140,9 +141,8 @@ function addMeta(ws: ExcelJS.Worksheet, state: ProductionState): void {
     ws.mergeCells(row.number, labelFrom, row.number, labelTo);
     ws.mergeCells(row.number, valueFrom, row.number, valueTo);
     // Styles go on each merged range's master cell (ExcelJS shares it across the range).
-    const edge = { style: 'thin' as const, color: { argb: argb(TOYOTA_RED) } };
-    const rowEdges = { ...(i === 0 ? { top: edge } : {}), ...(i === meta.length - 1 ? { bottom: edge } : {}) };
-    for (const [col, side] of [[labelFrom, { left: edge }], [valueFrom, { right: edge }]] as const) {
+    const rowEdges = i === meta.length - 1 ? { bottom: BOX_EDGE } : {};
+    for (const [col, side] of [[labelFrom, { left: BOX_EDGE }], [valueFrom, { right: BOX_EDGE }]] as const) {
       const cell = row.getCell(col);
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(META_BG) } };
       cell.border = { ...rowEdges, ...side };
@@ -278,14 +278,14 @@ export function buildShiftWorkbook(state: ProductionState): ExcelJS.Workbook {
   titleBar(ws, 'Laporan Shift — QC Gate Production', TOYOTA_RED);
   ws.getRow(1).getCell(1).font = { bold: true, size: 16, color: { argb: argb(WHITE) } };
   ws.getRow(1).height = 28;
-  ws.addRow([]);
+  ws.getRow(1).getCell(1).border = { top: BOX_EDGE, left: BOX_EDGE, right: BOX_EDGE };
   addMeta(ws, state);
   summaryTable(ws, state);
   for (const line of LINES) productBlock(ws, state, line);
   allEntriesTable(ws, state);
   lineStopTable(ws, state);
 
-  ws.columns = [12, 12, 13, 16, 24, 10, 12, 14, 10, 15, 15, 26, 26].map((width) => ({ width }));
+  ws.columns = [12, 12, 13, 16, 24, 10, 14, 14, 10, 15, 15, 26, 26].map((width) => ({ width }));
   return workbook;
 }
 

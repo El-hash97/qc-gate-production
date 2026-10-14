@@ -136,18 +136,26 @@ describe('buildShiftWorkbook', () => {
     expect([tint(1), tint(2), tint(4)]).toEqual(['FFFEE2E2', 'FFDBEAFE', 'FFFEF9C3']);
   });
 
-  it('keeps the shift info as a compact centred label | value block with an outside border', () => {
+  it('puts the shift info straight under the title, both inside one A:M outside border', () => {
     const ws = buildShiftWorkbook(state).getWorksheet(SHEET_NAME)!;
-    let first = 0;
-    ws.eachRow((row, n) => { if (!first && row.getCell(6).value === 'Tanggal') first = n; });
-    expect(first).toBeGreaterThan(0);
-    const row = ws.getRow(first);
-    expect(row.getCell(9).value).toEqual(DATE);
-    expect(row.getCell(6).alignment?.horizontal).toBe('right');
-    expect(row.getCell(9).alignment?.horizontal).toBe('left');
-    expect(row.getCell(6).border?.top).toBeDefined();
-    expect(row.getCell(6).border?.left).toBeDefined();
-    expect(row.getCell(9).border?.right).toBeDefined();
+    const title = ws.getRow(1).getCell(1);
+    expect(title.border?.top).toBeDefined();
+    expect(title.border?.left).toBeDefined();
+    expect(title.border?.right).toBeDefined();
+
+    // Row 2 = Tanggal (no gap), label A:G right-aligned meeting value H:M left-aligned.
+    const first = ws.getRow(2);
+    expect(first.getCell(1).value).toBe('Tanggal');
+    expect(first.getCell(8).value).toEqual(DATE);
+    expect(first.getCell(1).alignment?.horizontal).toBe('right');
+    expect(first.getCell(8).alignment?.horizontal).toBe('left');
+    expect(first.getCell(1).border?.left).toBeDefined();
+    expect(first.getCell(8).border?.right).toBeDefined();
+
+    const last = ws.getRow(6); // Tanggal, Shift, Jam Shift, Operator, PIC
+    expect(last.getCell(1).value).toBe('PIC');
+    expect(last.getCell(1).border?.bottom).toBeDefined();
+    expect(last.getCell(8).border?.bottom).toBeDefined();
   });
 
   it('round-trips through a real .xlsx file with its tables intact', async () => {

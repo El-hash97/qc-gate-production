@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hanten MC Block Turnover · Machine Skill</title>
+<meta name="description" content="Station Hanten MC of the BC finishing line: the block rolls into a cage of two rings, is clamped and turned over 180° by a geared motor, and rolls out deck up. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "Hanten MC: the block turnover of the BC finishing line, moving the way it does in the Blender layout"
+// Hanten (反転) turns the block over on the line so the deck face comes up for the finishing and the QC gates.
+// Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): housing 1.3 along the line, 2.1
+// across and 1.8 high, straddling a roller line with tops at 0.47; a turnover cage of two rings 0.76 across
+// tied by four bars, riding on support rollers; infeed conveyor under a yellow mesh guard, outfeed conveyor
+// towards Final; gear motors under the conveyors; BC block 0.475 x 0.336 x 0.371, 36 kg.
+// Parts: housing (back wall, end walls with tunnels, roof, front skirt, window, control box), cage (two
+// rings with sprocket teeth, four tie bars, platform rails, clamp bar, two clamp cylinders), four support
+// rollers on pedestals, drive motor and gearbox with a chain, two conveyors (rails, legs, rollers, gear
+// motors), mesh guard, the block.
+// Physics: cage and block turn about the line axis: I dw/dt = T_drive - m g e sin(theta) - c w, with the
+// drive a geared motor (T = T_motor i eta, speed limited to n_motor / i) following a stop-at-180° profile,
+// and the block's centre of mass e = 60 mm below the axis when it comes in deck down. A holding brake keeps
+// it at 180°, where that weight sits above the axis and wants to tip it on round.
+// Hero: turnover angle, °. Input: gear ratio. Break: the brake slips at 180° and the block tips on round.
+
+const lab = new Lab({
+  prompt: 'Hanten MC: the block turnover of the BC line, moving the way it does in the Blender layout',
+  no: 8, title: 'Hanten MC', sub: 'block turnover',
+  size: 5.4,
+  view: { az: 24, el: 16, dist: 1.25, target: [0, 0.8, 0.4], fov: 30 },
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0, 0.75, 0], reach: 0.6 },
+  pills: ['three.js', 'Rotor dynamics', 'Turnover'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const ROLL_Y = 0.47                            // roller tops
+const BLOCK = [0.475, 0.336, 0.371]
+const E = 0.06                                 // block centre below the cage axis, deck down
+const AXIS_Y = ROLL_Y + BLOCK[1] / 2 + E       // cage axis height (axis along x, the line)
+const RING_R = 0.38, RING_T = 0.04
+const HX = 0.65, HZ = 1.05, HH = 1.8           // housing half length (along the line), half width, height
+const IN = [-2.6, -0.62], OUT = [0.62, 2.6]    // conveyor ends
+const CW = 0.3                                 // half width of the roller bed
+
+// ------------------------------------------------------------------ materials
+const beige = MAT.paint({ color: [0.78, 0.72, 0.6], roughness: 0.45, clearcoat: 0.25 })
+const beigeDark = MAT.paint({ color: [0.62, 0.57, 0.47], roughness: 0.5, clearcoat: 0.2 })
+const yellow = MAT.paint({ color: [0.86, 0.72, 0.1], roughness: 0.36, clearcoat: 0.5 })
+const blue = MAT.paint({ color: [0.08, 0.16, 0.55], roughness: 0.35, clearcoat: 0.5 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const blockMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.58 })
+
+// ------------------------------------------------------------------ housing
+lab.mesh(GEO.rbox(2 * HX, HH, 0.06, 0.01), beige, { name: 'Back wall', pos: [0, HH / 2, -HZ], explode: [0, 0, -0.8], xray: 'shell' })
+for (const s of [-1, 1]) {
+  // end walls with the tunnel the line runs through
+  const jw = HZ - CW - 0.08
+  for (const t of [-1, 1]) lab.mesh(GEO.rbox(0.06, HH, jw, 0.01), beige, { name: 'End wall', pos: [s * HX, HH / 2, t * (CW + 0.08 + jw / 2)], explode: [s * 0.6, 0, 0], xray: 'shell', count: 1 })
+  lab.mesh(GEO.rbox(0.06, HH - 1.0, 2 * (CW + 0.08), 0.01), beige, { name: 'Tunnel header', pos: [s * HX, 1.0 + (HH - 1.0) / 2, 0], explode: [s * 0.6, 0, 0], xray: 'shell', count: 1 })
+  lab.mesh(GEO.rbox(0.1, HH, 0.1, 0.01), beigeDark, { name: 'Corner post', pos: [s * HX, HH / 2, HZ], explode: [s * 0.6, 0, 0.6], count: 1 })
+}
+lab.mesh(GEO.rbox(2 * HX + 0.1, 0.08, 2 * HZ + 0.1, 0.01), beigeDark, { name: 'Roof', pos: [0, HH + 0.04, 0], explode: [0, 0.8, 0], xray: 'shell' })
+lab.mesh(GEO.rbox(2 * HX, 0.5, 0.06, 0.01), beige, { name: 'Front skirt', pos: [0, 0.25, HZ], explode: [0, 0, 0.8], xray: 'shell' })
+lab.mesh(GEO.rbox(2 * HX, 0.3, 0.06, 0.01), beige, { name: 'Front header', pos: [0, HH - 0.15, HZ], explode: [0, 0, 0.8], xray: 'shell' })
+lab.mesh(GEO.rbox(2 * HX - 0.1, HH - 0.8, 0.012, 0.003), MAT.glass(), { name: 'Window', pos: [0, 0.5 + (HH - 0.8) / 2, HZ + 0.01], explode: [0, 0, 1.0] })
+lab.mesh(GEO.rbox(0.36, 0.26, 0.2, 0.02), beigeDark, { name: 'Control box', pos: [0.3, HH + 0.21, -0.6], explode: [0, 1.0, 0] })
+const lamps = [[0.1, 1, 0.3], [1, 0.8, 0.1], [1, 0.15, 0.1]].map((c, i) => {
+  const m = MAT.glow({ emissive: c, emissiveIntensity: 0.2 })
+  lab.mesh(GEO.disc(0.025, 0.02), m, { name: 'Lamp', pos: [0.2 + i * 0.1, HH + 0.24, -0.49], rot: [Math.PI / 2, 0, 0], explode: [0, 1.0, 0], count: 1 })
+  return m
+})
+
+// ------------------------------------------------------------------ the solver's state and input (the labels below read them)
+const S = { theta: 0, w: 0, T: 0, rpm: 0, slipped: false }
+const gear = lab.slider({ id: 'gear', label: 'Gear ratio', min: 30, max: 120, value: 60, unit: '', ends: ['30 : 1', '120 : 1'] })
+
+// ------------------------------------------------------------------ cage base, support rollers, drive
+lab.mesh(GEO.rbox(0.7, 0.08, 0.8, 0.01), steelDark, { name: 'Cage base', pos: [0, 0.04, 0], explode: [0, -0.3, 0] })
+const ROLL_R = 0.07
+const sup = []
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+  const a = (35 * Math.PI) / 180
+  const d = RING_R + RING_T + ROLL_R
+  const y = AXIS_Y - Math.cos(a) * d, z = sz * Math.sin(a) * d
+  lab.mesh(GEO.rbox(0.08, y - 0.08, 0.1, 0.01), steelDark, { name: 'Roller pedestal', pos: [sx * 0.2, (y + 0.08) / 2, z], explode: [0, -0.3, sz * 0.3], count: 1 })
+  sup.push(lab.mesh(GEO.disc(ROLL_R, 0.06), MAT.steel({ roughness: 0.25 }), { name: 'Support roller', pos: [sx * 0.2, y, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.3, sz * 0.3], count: 1 }))
+}
+lab.mesh(GEO.disc(0.12, 0.3), blue, { name: 'Drive motor', pos: [0.45, 0.22, -0.55], rot: [0, 0, Math.PI / 2], explode: [0.4, -0.2, -0.4], label: 'Drive', at: [0, 0.16, 0], value: () => `i = ${fmt(gear.value)} · ${fmt(S.T)} N·m` })
+lab.mesh(GEO.rbox(0.2, 0.22, 0.2, 0.02), steelDark, { name: 'Gearbox', pos: [0.22, 0.22, -0.55], explode: [0.4, -0.2, -0.4] })
+lab.mesh(GEO.pipe([[0.22, 0.3, -0.48], [0.22, AXIS_Y - RING_R - RING_T - 0.02, -0.12]], 0.012), steelDark, { name: 'Drive chain', explode: [0.3, -0.1, -0.3] })
+
+// ------------------------------------------------------------------ the turnover cage (turns about x)
+const cage = new THREE.Group(); cage.position.set(0, AXIS_Y, 0)
+const ringGeo = GEO.tube(RING_R + RING_T, RING_R, 0.05)
+for (const x of [-0.2, 0.2]) {
+  const r = new THREE.Mesh(ringGeo, MAT.steel({ roughness: 0.35 })); r.rotation.z = Math.PI / 2; r.position.x = x; cage.add(r)
+  const teeth = new THREE.Mesh(GEO.ring(GEO.rbox(0.025, 0.02, 0.03, 0.004).translate(0, RING_R + RING_T + 0.008, 0), 48, 'x'), steelDark); teeth.position.x = x; cage.add(teeth)
+}
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + (i * Math.PI) / 2
+  const bar = new THREE.Mesh(GEO.disc(0.018, 0.44), steel); bar.rotation.z = Math.PI / 2
+  bar.position.set(0, Math.cos(a) * (RING_R - 0.02), Math.sin(a) * (RING_R - 0.02)); cage.add(bar)
+}
+// platform rails under the block and the clamp bar over it (cage frame: the block centre sits at y = -E)
+for (const z of [-0.12, 0.12]) { const rail = new THREE.Mesh(GEO.rbox(0.44, 0.03, 0.04, 0.006), steelDark); rail.position.set(0, -E - BLOCK[1] / 2 - 0.015, z); cage.add(rail) }
+const clampBar = new THREE.Mesh(GEO.rbox(0.44, 0.03, 0.08, 0.006), steelDark); cage.add(clampBar)
+const cyls = [-0.12, 0.12].map((x) => { const c = new THREE.Mesh(GEO.disc(0.03, 0.12), steel); c.position.set(x, 0, 0); cage.add(c); return c })
+lab.add(cage, { name: 'Turnover cage', explode: [0, 0.5, 0.4], count: 14, label: 'Turnover cage', at: [0.2, RING_R + 0.1, 0], value: () => `${fmt(S.rpm, 1)} rpm` })
+
+// ------------------------------------------------------------------ conveyors and the mesh guard
+const rollers = []
+for (const [x0, x1] of [IN, OUT]) {
+  for (const s of [-1, 1]) {
+    lab.mesh(GEO.rbox(x1 - x0, 0.09, 0.04, 0.006), steelDark, { name: 'Conveyor rail', pos: [(x0 + x1) / 2, ROLL_Y - 0.035, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+    for (const x of [x0 + 0.1, x1 - 0.1]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [x, (ROLL_Y - 0.08) / 2, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+  }
+  for (let x = x0 + 0.05; x < x1 - 0.03; x += 0.07) rollers.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [x, ROLL_Y - 0.023, 0], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 }))
+  lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [x0 + 0.5, 0.2, CW + 0.18], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0.3], count: 1, label: x0 > 0 ? 'To Final' : undefined, at: [0.3, 0.3, 0] })
+}
+const MX = [-2.3, -0.9], MY = 1.05
+for (const x of MX) for (const s of [-1, 1]) lab.mesh(GEO.rbox(0.03, MY - ROLL_Y, 0.03, 0.004), yellow, { name: 'Guard post', pos: [x, (MY + ROLL_Y) / 2, s * (CW + 0.06)], explode: [-0.3, 0.3, 0], count: 1 })
+for (const s of [-1, 1]) lab.mesh(GEO.rbox(MX[1] - MX[0], 0.03, 0.03, 0.004), yellow, { name: 'Guard rail', pos: [(MX[0] + MX[1]) / 2, MY, s * (CW + 0.06)], explode: [-0.3, 0.3, 0], count: 1 })
+const meshMat = MAT.paint({ color: [0.86, 0.72, 0.1], transparent: true, opacity: 0.35, roughness: 0.6 })
+lab.mesh(GEO.rbox(MX[1] - MX[0], 0.004, 2 * (CW + 0.06), 0.001), meshMat, { name: 'Mesh top', pos: [(MX[0] + MX[1]) / 2, MY, 0], explode: [-0.3, 0.3, 0] })
+for (const s of [-1, 1]) lab.mesh(GEO.rbox(MX[1] - MX[0], MY - ROLL_Y - 0.05, 0.004, 0.001), meshMat, { name: 'Mesh side', pos: [(MX[0] + MX[1]) / 2, (MY + ROLL_Y) / 2 + 0.025, s * (CW + 0.06)], explode: [-0.3, 0.3, 0], count: 1 })
+
+// ------------------------------------------------------------------ the block: built about its centre, deck (bores) on +y
+const block = new THREE.Group()
+block.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat))
+for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); block.add(b) }
+const pan = new THREE.Mesh(GEO.tube(0.17, 0.15, 0.01), steelDark); pan.scale.set(1.3, 1, 1); pan.position.y = -BLOCK[1] / 2 - 0.004; block.add(pan)
+lab.add(block, { name: 'BC block', explode: [0, 0.6, 0.6], count: 6, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => (Math.cos(block.rotation.x) < 0 ? 'deck up' : 'deck down') })
+
+// ------------------------------------------------------------------ the solver: cage and block about the line axis
+const M_BLOCK = 36, G = 9.81
+const I_CAGE = 2 * 38 * (RING_R + RING_T / 2) ** 2 + 4 * 3 * RING_R ** 2  // two rings and four bars
+const I_BLOCK = (M_BLOCK * (BLOCK[1] ** 2 + BLOCK[2] ** 2)) / 12 + M_BLOCK * E * E
+const I = I_CAGE + I_BLOCK
+const T_MOTOR = 5.0, N_MOTOR = 1450, ETA = 0.9  // 0.75 kW four-pole motor
+const C_DAMP = 6                                 // bearing and seal drag, N·m s
+const weight = (th) => -M_BLOCK * G * E * Math.sin(th) // the block's weight about the axis (centre at -E when th = 0)
+lab.hero({ label: 'Turnover angle', unit: '°', max: 180, digits: 0 })
+
+function integrate(torque, dt) {
+  const n = 8, h = dt / n
+  for (let k = 0; k < n; k++) { S.w += ((torque + weight(S.theta) - C_DAMP * S.w) / I) * h; S.theta += S.w * h }
+}
+// drive the cage to `target`: a speed controller limited by the motor's torque and speed through the gearbox
+function driveTo(target, dt) {
+  const i = gear.value
+  const tMax = T_MOTOR * i * ETA, wMax = ((N_MOTOR / i) * 2 * Math.PI) / 60
+  const aBrake = (0.6 * tMax) / I
+  const left = target - S.theta
+  const wWant = Math.sign(left) * Math.min(wMax, Math.sqrt(2 * aBrake * Math.abs(left)))
+  S.T = clamp((wWant - S.w) * I * 25 - weight(S.theta) + C_DAMP * S.w, -tMax, tMax)
+  integrate(S.T, dt)
+}
+
+// one cycle, shaped like the Blender animation
+const CYCLE = [['roll in', 1.6], ['clamp', 0.6], ['turn', 0], ['hold', 0.8], ['unclamp', 0.6], ['roll out', 1.6], ['return', 0], ['next', 0.8]]
+const SAY = { 'roll in': 'rolling in deck down', clamp: 'clamping', turn: 'turning over', hold: 'brake on', unclamp: 'unclamping', 'roll out': 'rolling out', return: 'cage back to the start', next: 'next block' }
+let step = 0, pt = 0, outTheta = 0
+const next = () => { step = (step + 1) % CYCLE.length; pt = 0 }
+
+lab.onTick((dt) => {
+  pt += dt
+  const [name, dur] = CYCLE[step]
+  const u = dur ? clamp(pt / dur) : 0
+  const e = smoothstep(0, 1, u)
+
+  // the cage: driven to 180°, held by the brake, driven back empty; a slipping brake lets the weight tip it on round
+  if (name === 'turn') {
+    driveTo(Math.PI, dt)
+    if (Math.abs(S.theta - Math.PI) < 0.004 && Math.abs(S.w) < 0.03) { S.theta = Math.PI; S.w = 0; next() }
+  } else if (name === 'hold' || name === 'unclamp') {
+    if (lab.broken) { S.T = 0; integrate(0, dt); S.slipped = true } else { S.w = 0; S.T = -weight(S.theta) }
+    if (u >= 1) { outTheta = S.theta; next() }
+  } else if (name === 'return') {
+    const goal = Math.round(S.theta / (2 * Math.PI)) * 2 * Math.PI
+    driveTo(goal, dt)
+    if (Math.abs(S.theta - goal) < 0.004 && Math.abs(S.w) < 0.03) { S.theta = 0; S.w = 0; next() }
+  } else {
+    if (name === 'roll out' && lab.broken) integrate(0, dt) // the empty cage may still be swinging
+    S.T = 0
+    if (u >= 1) { if (name === 'next') S.slipped = false; next() }
+  }
+  S.rpm = (Math.abs(S.w) * 60) / (2 * Math.PI)
+  cage.rotation.x = S.theta
+  sup.forEach((r) => { r.rotation.x -= ((S.w * (RING_R + RING_T)) / ROLL_R) * dt })
+
+  // clamp bar comes down on the block for the turn; the cylinders follow it
+  const clampDown = name === 'clamp' ? e : name === 'unclamp' ? 1 - e : ['turn', 'hold'].includes(name) ? 1 : 0
+  const barY = -E + BLOCK[1] / 2 + 0.015 + (1 - clampDown) * 0.1
+  clampBar.position.y = barY
+  cyls.forEach((c) => { c.position.y = barY + 0.075 })
+
+  // the block: rolls in along the infeed, turns with the cage, rolls out the way the turn left it
+  let bx = 0, alpha = 1, th = 0
+  if (name === 'roll in') { bx = lerp(-2.0, 0, e); alpha = smoothstep(0, 0.25, u) }
+  else if (name === 'roll out') { bx = lerp(0, 2.0, e); alpha = 1 - smoothstep(0.75, 1, u); th = Math.cos(outTheta) < 0 ? Math.PI : 0 }
+  else if (name === 'return' || name === 'next') { bx = 2.0; alpha = 0 }
+  else th = S.theta
+  if (name === 'roll in' || name === 'roll out') rollers.forEach((r) => { r.rotation.y += dt * 9 })
+  // its centre is (0, -E) in the cage frame, so it swings round the axis with the cage
+  lab.place(block, bx, AXIS_Y - E * Math.cos(th), -E * Math.sin(th))
+  block.rotation.x = th
+  // transparent only while fading, so the solid block sorts properly behind the window glass
+  const fading = alpha < 0.999
+  if (blockMat.transparent !== fading) { blockMat.transparent = fading; blockMat.needsUpdate = true }
+  blockMat.opacity = alpha
+
+  lamps[0].emissiveIntensity = name === 'roll in' || name === 'roll out' ? 3 : 0.2
+  lamps[1].emissiveIntensity = name === 'turn' || name === 'return' ? 3 : 0.2
+  lamps[2].emissiveIntensity = S.slipped ? 3 : 0.2
+  const deg = (((S.theta * 180) / Math.PI) % 360 + 360) % 360
+  lab.setHero(deg > 180 ? 360 - deg : deg, {
+    state: S.slipped ? `brake slipped · cage at ${fmt(deg)}°, block ${Math.cos(S.theta) < 0 ? 'deck up' : 'back deck down'}` : SAY[name],
+    sub: `i = ${fmt(gear.value)} · ${fmt(S.T)} N·m on the cage · ${fmt(S.rpm, 1)} rpm · weight torque ${fmt(Math.abs(weight(S.theta)))} N·m`,
+    bad: S.slipped,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'Brake slips', run() {}, reset() { S.slipped = false } })
+lab.how(
+  'The block rolls into the cage deck down, a clamp bar comes down on it and a geared motor turns the cage 180° about the line axis, so the deck faces up for finishing and the QC gates. The cage speeds up as far as the motor and gearbox allow and slows to stop at 180°: the motor torque times the ratio fights the inertia of the rings and the block and the torque of the block\'s weight, whose centre sits 60 mm off the axis. A higher ratio gives more torque but a lower top speed. At 180° that weight is above the axis, so the holding brake has to keep it there: if the brake slips, the cage tips on round and the block ends up deck down again.',
+  [
+    'I dw/dt = T - m g e sin(theta) - c w',
+    'T <= T_motor i eta       T_motor = 5 N·m, eta = 0.9',
+    'w <= 2 pi n_motor / (60 i)   n_motor = 1,450 rpm',
+    'I = 2 m_ring r^2 + m_block (h^2 + w^2) / 12 + m_block e^2',
+    'm_block = 36 kg, e = 60 mm, c = 6 N·m s',
+  ],
+)
+lab.autoFilm({ runBeat: 'It turns the block over.', runSub: 'Deck down in, deck up out.', breakBeat: 'The brake slips.', breakSub: 'The weight above the axis tips the cage on round.', sliderTo: 0.3 })
+// jump to a phase for review shots: __hanten.go('turn')
+window.__hanten = {
+  go(name) {
+    step = CYCLE.findIndex((c) => c[0] === name); pt = 0
+    S.w = 0; S.theta = ['hold', 'unclamp', 'roll out'].includes(name) ? Math.PI : 0; outTheta = S.theta
+  },
+}
+lab.start()
+</script>
+</body>
+</html>

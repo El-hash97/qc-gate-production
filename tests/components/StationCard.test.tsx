@@ -56,8 +56,17 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Grinding 3D/)).toHaveAttribute('src', '/stations/grinding-3d.html');
   });
 
+  it('has a Hanten MC card with its own figure and 3D machine', () => {
+    const hanten = stationDetail('hanten')!;
+    render(<StationCard detail={hanten} theme="light" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Hanten MC/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/hanten-light.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Hanten MC 3D/)).toHaveAttribute('src', '/stations/hanten-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
-    expect(stationDetail('hanten')).toBeNull();
+    expect(stationDetail('final')).toBeNull();
   });
 
   it('plays the interactive 3D machine under the figure and goes back to the picture', () => {

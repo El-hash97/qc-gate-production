@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori, HSB05, HSB06 and Grinding have cards so far.
+// Placeholder copy for review; Baritori, HSB05, HSB06, Grinding and Hanten MC have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -74,6 +74,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Load', value: '1 block' },
       { label: 'Wheel', value: 'Ø660 mm, 1,500 rpm' },
       { label: 'Operator', value: '1 person' },
+    ],
+  },
+  hanten: {
+    title: 'Hanten MC',
+    subtitle: 'Block Turnover',
+    image: { light: '/stations/hanten-light.svg', dark: '/stations/hanten-dark.svg' },
+    play: '/stations/hanten-3d.html',
+    description: [
+      'The block rolls in deck down under a mesh guard and stops inside a cage of two big rings that ride on support rollers.',
+      'A clamp bar comes down on it and a geared motor turns the cage 180° about the line axis, so the deck face comes up for finishing; a holding brake keeps it there while the clamp lifts.',
+      'The block rolls out deck up on the conveyor towards Final Proses, and the empty cage turns back for the next one.',
+    ],
+    specs: [
+      { label: 'Turn', value: '180° in about 1.6 s' },
+      { label: 'Drive', value: '0.75 kW, 60 : 1' },
+      { label: 'Dwell', value: 'about 1.3 s' },
+      { label: 'Operator', value: 'None, automatic' },
     ],
   },
 };

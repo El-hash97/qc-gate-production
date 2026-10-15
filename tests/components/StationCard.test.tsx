@@ -74,8 +74,17 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Final Proses 3D/)).toHaveAttribute('src', '/stations/final-3d.html');
   });
 
+  it('has a QC Gate 1 card with its own figure and 3D machine', () => {
+    const qc1 = stationDetail('qc1')!;
+    render(<StationCard detail={qc1} theme="light" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /QC Gate 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/qc1-light.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/QC Gate 1 3D/)).toHaveAttribute('src', '/stations/qc1-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
-    expect(stationDetail('qc1')).toBeNull();
+    expect(stationDetail('qc2')).toBeNull();
   });
 
   it('plays the interactive 3D machine under the figure and goes back to the picture', () => {

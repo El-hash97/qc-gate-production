@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Gate 1 Visual Inspection · Machine Skill</title>
+<meta name="description" content="Station QC Gate 1 of the BC finishing line: a turntable brings every face of the block round to the inspector under a light bar and a task lamp, and the light on the face decides whether it can be judged. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "QC Gate 1: the visual inspection of the BC finishing line, moving the way it does in the Blender layout"
+// The inspector checks every outside face against the limit samples for cracks and porosity. A visual
+// check is only valid in enough light: fine inspection asks for at least 1,000 lux on the surface.
+// Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): two portal frames 1.9 apart over the
+// roller line with a light bar on top, a powered turntable in the line with guide rails, the inspector at
+// the front with a task lamp and a side table holding the limit samples; roller tops 0.47; BC block
+// 0.475 x 0.336 x 0.371.
+// Parts: portals (posts, feet, beams), light bar (housing, diffuser), turntable (drive box, column, plate,
+// degree ring, guide rails), two conveyors with gear motors, task lamp (clamp, arm, head, beam), side table
+// with the sample board and three samples, inspector's mat, the block.
+// Physics: the light on the face being checked is the sum over the light sources of E = I cos(theta_face) / r^2.
+// The light bar is nine Lambertian points (I = Phi / (9 pi) cos(theta_source)); the task lamp is a spot of
+// 1,600 lm in a 30° half-angle cone, I = Phi / (2 pi (1 - cos 30°)). The face can be judged at >= 1,000 lux.
+// Hero: illuminance on the face, lux. Input: task lamp distance. Break: the task lamp fails.
+
+const lab = new Lab({
+  prompt: 'QC Gate 1: the visual inspection of the BC line, moving the way it does in the Blender layout',
+  no: 10, title: 'QC Gate 1', sub: 'visual inspection',
+  size: 5.0,
+  view: { az: 24, el: 18, dist: 1.45, target: [0, 0.9, 0.3], fov: 30 },
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0, 0.8, 0], reach: 0.6 },
+  pills: ['three.js', 'Photometry', 'Inverse square'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const ROLL_Y = 0.47
+const BLOCK = [0.475, 0.336, 0.371]
+const PX = 0.95, PZ = [-0.75, 0.75], TOP = 2.3
+const BAR = { y: TOP - 0.12, z: 0.45, half: 0.8, n: 9 }
+const IN = [-2.4, -0.6], OUT = [0.6, 2.4], CW = 0.3
+const PLATE_R = 0.5
+const LAMP_DIR = new THREE.Vector3(0.45, 0.67, 0.56).normalize() // from the face centre out towards the lamp
+const E_NEED = 1000
+
+// ------------------------------------------------------------------ materials
+const beigeDark = MAT.paint({ color: [0.62, 0.57, 0.47], roughness: 0.5, clearcoat: 0.2 })
+const green = MAT.paint({ color: [0.12, 0.5, 0.2], roughness: 0.4, clearcoat: 0.4 })
+const blue = MAT.paint({ color: [0.12, 0.25, 0.7], roughness: 0.35, clearcoat: 0.5 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const rubber = MAT.rubber()
+const blockMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.58 })
+
+// ------------------------------------------------------------------ the solver's state and input (labels below read them)
+const S = { E: 0, Etask: 0, Ebar: 0, face: 0, judged: [0, 0, 0, 0] }
+const dist = lab.slider({ id: 'dist', label: 'Task lamp distance', min: 0.5, max: 1.6, value: 0.95, unit: 'm', ends: ['0.5 m', '1.6 m'], digits: 2 })
+
+// ------------------------------------------------------------------ portals and the light bar
+for (const x of [-PX, PX]) {
+  for (const z of PZ) {
+    lab.mesh(GEO.rbox(0.1, TOP, 0.1, 0.01), beigeDark, { name: 'Portal post', pos: [x, TOP / 2, z], explode: [Math.sign(x) * 0.6, 0, 0], count: 1 })
+    lab.mesh(GEO.rbox(0.2, 0.02, 0.2, 0.004), steelDark, { name: 'Post foot', pos: [x, 0.01, z], explode: [Math.sign(x) * 0.6, 0, 0], count: 1 })
+  }
+  lab.mesh(GEO.rbox(0.1, 0.1, PZ[1] - PZ[0] + 0.1, 0.01), beigeDark, { name: 'Portal beam', pos: [x, TOP + 0.05, 0], explode: [Math.sign(x) * 0.6, 0.3, 0], count: 1 })
+}
+lab.mesh(GEO.rbox(2 * PX + 0.1, 0.06, 0.06, 0.008), steelDark, { name: 'Bar rail', pos: [0, TOP + 0.03, BAR.z], explode: [0, 0.5, 0] })
+lab.mesh(GEO.rbox(2 * BAR.half + 0.1, 0.07, 0.16, 0.01), steelDark, { name: 'Light bar', pos: [0, BAR.y, BAR.z], explode: [0, 0.5, 0], label: 'Light bar', at: [0.6, 0.06, 0], value: () => `${fmt(S.Ebar)} lx on the face` })
+lab.mesh(GEO.rbox(2 * BAR.half, 0.01, 0.12, 0.003), MAT.glow({ emissive: [1, 0.98, 0.92], emissiveIntensity: 2.2 }), { name: 'Diffuser', pos: [0, BAR.y - 0.04, BAR.z], explode: [0, 0.5, 0] })
+for (const x of [-PX, PX]) lab.mesh(GEO.rbox(0.03, 0.1, 0.03, 0.004), steel, { name: 'Bar hanger', pos: [x * 0.85, TOP - 0.02, BAR.z], explode: [0, 0.5, 0], count: 1 })
+
+// ------------------------------------------------------------------ turntable
+lab.mesh(GEO.rbox(0.7, 0.28, 0.7, 0.02), blue, { name: 'Turntable drive', pos: [0, 0.14, 0], explode: [0, -0.3, 0], label: 'Turntable', at: [0.35, 0.1, 0.35], value: () => `face ${S.face + 1} of 4` })
+lab.mesh(GEO.disc(0.12, ROLL_Y - 0.33), steelDark, { name: 'Turntable column', pos: [0, (ROLL_Y + 0.23) / 2, 0], explode: [0, -0.2, 0] })
+const table = new THREE.Group()
+const plate = new THREE.Mesh(GEO.disc(PLATE_R, 0.04, 0.006), MAT.steel({ roughness: 0.4 })); plate.position.y = ROLL_Y - 0.02; table.add(plate)
+const ring = new THREE.Mesh(GEO.ring(GEO.rbox(0.004, 0.003, 0.03, 0.001).translate(0, 0, PLATE_R - 0.03), 36, 'y'), steelDark); ring.position.y = ROLL_Y + 0.001; table.add(ring)
+for (const s of [-1, 1]) {
+  const rail = new THREE.Mesh(GEO.rbox(0.5, 0.04, 0.03, 0.008), green); rail.position.set(0, ROLL_Y + 0.11, s * (BLOCK[2] / 2 + 0.03)); table.add(rail)
+  for (const x of [-0.2, 0.2]) { const p = new THREE.Mesh(GEO.rbox(0.03, 0.09, 0.03, 0.005), green); p.position.set(x, ROLL_Y + 0.045, s * (BLOCK[2] / 2 + 0.03)); table.add(p) }
+}
+lab.add(table, { name: 'Turntable plate', explode: [0, 0.2, 0], count: 7 })
+
+// ------------------------------------------------------------------ conveyors
+const rollers = []
+for (const [x0, x1] of [IN, OUT]) {
+  for (const s of [-1, 1]) {
+    lab.mesh(GEO.rbox(x1 - x0, 0.09, 0.04, 0.006), steelDark, { name: 'Conveyor rail', pos: [(x0 + x1) / 2, ROLL_Y - 0.035, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+    for (const x of [x0 + 0.1, x1 - 0.1]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [x, (ROLL_Y - 0.08) / 2, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+  }
+  for (let x = x0 + 0.05; x < x1 - 0.03; x += 0.07) rollers.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [x, ROLL_Y - 0.023, 0], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 }))
+  lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [x0 + 0.5, 0.2, CW + 0.18], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0.3], count: 1, label: x0 > 0 ? 'To QC Gate 2' : undefined, at: [0.6, 0.3, 0] })
+}
+
+// ------------------------------------------------------------------ task lamp: clamp on the near post, arm, head, beam
+const CLAMP = new THREE.Vector3(PX, 1.55, PZ[1])
+lab.mesh(GEO.rbox(0.08, 0.1, 0.08, 0.01), steelDark, { name: 'Lamp clamp', pos: [CLAMP.x, CLAMP.y, CLAMP.z], explode: [0.4, 0, 0.4] })
+const lampArm = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 12), steel)
+lab.add(lampArm, { name: 'Lamp arm', explode: [0.3, 0, 0.4] })
+const head = new THREE.Group() // shade opens along its local +y
+const shade = new THREE.Mesh(GEO.lathe([[0.02, 0.06], [0.07, -0.04], [0.065, -0.045], [0.015, 0.055]], 48), MAT.paint({ color: [0.2, 0.2, 0.22], roughness: 0.5 })); head.add(shade)
+const lens = MAT.glow({ emissive: [1, 0.97, 0.9], emissiveIntensity: 3 })
+const lensMesh = new THREE.Mesh(GEO.disc(0.062, 0.006), lens); lensMesh.position.y = -0.04; head.add(lensMesh)
+lab.add(head, { name: 'Task lamp', explode: [0.3, 0.2, 0.5], count: 2, label: 'Task lamp', at: [0, 0.08, 0], value: () => `${fmt(dist.value, 2)} m · ${fmt(S.Etask)} lx` })
+const beamMat = MAT.glow({ emissive: [1, 0.96, 0.85], emissiveIntensity: 0.6 }); beamMat.transparent = true; beamMat.opacity = 0.12; beamMat.depthWrite = false
+const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 40, 1, true), beamMat)
+lab.add(beam, { name: 'Lamp beam', explode: [0.3, 0.2, 0.5] })
+
+// ------------------------------------------------------------------ side table with the limit samples, the inspector's mat
+const ST = [-1.45, 0.95]
+for (const [dx, dz] of [[-0.3, -0.18], [0.3, -0.18], [-0.3, 0.18], [0.3, 0.18]]) lab.mesh(GEO.rbox(0.04, 0.85, 0.04, 0.006), steelDark, { name: 'Table leg', pos: [ST[0] + dx, 0.425, ST[1] + dz], explode: [-0.4, -0.2, 0.4], count: 1 })
+lab.mesh(GEO.rbox(0.72, 0.03, 0.44, 0.006), beigeDark, { name: 'Table top', pos: [ST[0], 0.865, ST[1]], explode: [-0.4, -0.2, 0.4] })
+const board = new THREE.Group(); board.position.set(ST[0], 0.95, ST[1] - 0.05); board.rotation.x = -0.5
+board.add(new THREE.Mesh(GEO.rbox(0.6, 0.3, 0.02, 0.006), MAT.paint({ color: [0.92, 0.92, 0.9], roughness: 0.6 })))
+const sampleMats = [MAT.castIron({ color: [0.5, 0.48, 0.46], roughness: 0.7 }), MAT.castIron({ color: [0.52, 0.5, 0.48], roughness: 0.75 }), MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.55 })]
+const tags = [MAT.paint({ color: [0.85, 0.15, 0.1] }), MAT.paint({ color: [0.95, 0.7, 0.1] }), MAT.paint({ color: [0.15, 0.6, 0.25] })]
+for (let i = 0; i < 3; i++) {
+  const s = new THREE.Mesh(GEO.rbox(0.15, 0.15, 0.03, 0.006), sampleMats[i]); s.position.set(-0.19 + i * 0.19, 0.03, 0.02); board.add(s)
+  const t = new THREE.Mesh(GEO.rbox(0.12, 0.03, 0.012, 0.004), tags[i]); t.position.set(-0.19 + i * 0.19, -0.11, 0.015); board.add(t)
+}
+// a crack on the first sample, pores on the second
+board.add(new THREE.Mesh(GEO.pipe([[-0.24, 0.07, 0.037], [-0.19, 0.03, 0.037], [-0.16, -0.01, 0.037]], 0.003), steelDark))
+for (let i = 0; i < 7; i++) { const p = new THREE.Mesh(GEO.disc(0.006, 0.004), steelDark); p.rotation.x = Math.PI / 2; p.position.set(-0.03 + ((i * 37) % 7) * 0.012, -0.03 + ((i * 53) % 5) * 0.018, 0.037); board.add(p) }
+lab.add(board, { name: 'Limit samples', explode: [-0.4, 0.3, 0.4], count: 13, label: 'Limit samples', at: [0, 0.17, 0] })
+lab.mesh(GEO.rbox(1.0, 0.012, 0.5, 0.004), rubber, { name: 'Inspector mat', pos: [0, 0.006, 1.15], explode: [0, -0.1, 0.3] })
+
+// ------------------------------------------------------------------ the block: deck up, a passage on each side
+const block = new THREE.Group()
+block.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat))
+for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); block.add(b) }
+for (const s of [-1, 1]) { const p = new THREE.Mesh(GEO.tube(0.016, 0.01, 0.01), steelDark); p.rotation.x = Math.PI / 2; p.position.set(0.1, 0, s * (BLOCK[2] / 2 + 0.003)); block.add(p) }
+for (const s of [-1, 1]) { const p = new THREE.Mesh(GEO.tube(0.016, 0.01, 0.01), steelDark); p.rotation.z = Math.PI / 2; p.position.set(s * (BLOCK[0] / 2 + 0.003), 0, 0.05); block.add(p) }
+lab.add(block, { name: 'BC block', explode: [0, 0.6, 0.6], count: 9, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => `${S.judged.filter((x) => x).length} of 4 faces judged` })
+
+// ------------------------------------------------------------------ the solver: illuminance on the face looking at the inspector
+const PHI_BAR = 6000                          // lm, the LED light bar
+const PHI_TASK = 1600, HALF = (30 * Math.PI) / 180
+const I_TASK = PHI_TASK / (2 * Math.PI * (1 - Math.cos(HALF)))   // cd inside the cone
+const barPts = Array.from({ length: BAR.n }, (_, i) => new THREE.Vector3(-BAR.half + (2 * BAR.half * i) / (BAR.n - 1), BAR.y - 0.05, BAR.z))
+const tmp = new THREE.Vector3()
+function illuminance(P, n, lampPos, lampOn) {
+  let Ebar = 0
+  for (const s of barPts) {
+    tmp.copy(s).sub(P); const r = tmp.length(); tmp.divideScalar(r)
+    const cf = n.dot(tmp), cs = tmp.y // the bar emits downwards: the cosine at the source is the downward share
+    if (cf > 0 && cs > 0) Ebar += ((PHI_BAR / BAR.n / Math.PI) * cs * cf) / (r * r)
+  }
+  let Etask = 0
+  if (lampOn) {
+    tmp.copy(lampPos).sub(P); const r = tmp.length(); tmp.divideScalar(r)
+    const cf = n.dot(tmp)
+    if (cf > 0) Etask = (I_TASK * cf) / (r * r) // the face centre sits on the beam's axis, well inside the cone
+  }
+  return { Ebar, Etask }
+}
+lab.hero({ label: 'Light on the face', unit: 'lx', max: 2000, digits: 0 })
+
+// one cycle, shaped like the Blender animation: roll in, then check a face and turn a quarter, four times, roll out
+const CYCLE = [['roll in', 1.4], ['settle', 0.4]]
+for (let f = 0; f < 4; f++) CYCLE.push([`check ${f}`, 2.0], [`turn ${f}`, 1.0])
+CYCLE.push(['roll out', 1.4], ['next', 0.6])
+let step = 0, pt = 0
+const next = () => { step = (step + 1) % CYCLE.length; pt = 0 }
+const P = new THREE.Vector3(), N = new THREE.Vector3(0, 0, 1), UP = new THREE.Vector3(0, 1, 0)
+
+lab.onTick((dt) => {
+  pt += dt
+  const [name, dur] = CYCLE[step]
+  const u = clamp(pt / dur)
+  const e = smoothstep(0, 1, u)
+  const checking = name.startsWith('check')
+  const f = checking || name.startsWith('turn') ? Number(name.slice(-1)) : name === 'roll out' || name === 'next' ? 3 : 0
+  S.face = f
+  const quarters = name.startsWith('turn') ? f + e : name === 'roll out' || name === 'next' ? 4 : f
+  const ang = quarters * (Math.PI / 2)
+  table.rotation.y = ang
+
+  // the face looking at the inspector, and the lamp on its axis at the set distance
+  const half = f % 2 ? BLOCK[0] / 2 : BLOCK[2] / 2
+  P.set(0, ROLL_Y + BLOCK[1] / 2, half)
+  const lampPos = P.clone().addScaledVector(LAMP_DIR, dist.value)
+  const lampOn = !lab.broken
+  const { Ebar, Etask } = illuminance(P, N, lampPos, lampOn)
+  S.Ebar = Ebar; S.Etask = Etask
+  S.E = approach(S.E, Ebar + Etask, 0.15, dt)
+  if (checking && u > 0.9) S.judged[f] = S.E >= E_NEED ? 1 : 0
+
+  // place the lamp head facing the face, its arm back to the clamp, and its beam onto the face
+  lab.place(head, lampPos.x, lampPos.y, lampPos.z)
+  head.quaternion.setFromUnitVectors(UP, LAMP_DIR)       // the shade's open end (-y) faces the block
+  const armDir = lampPos.clone().sub(CLAMP)
+  lampArm.scale.y = Math.max(0.01, armDir.length())
+  const mid = lampPos.clone().add(CLAMP).multiplyScalar(0.5); lab.place(lampArm, mid.x, mid.y, mid.z)
+  lampArm.quaternion.setFromUnitVectors(UP, armDir.normalize())
+  const beamLen = Math.max(0.05, dist.value - 0.05)
+  beam.scale.set(Math.tan(HALF) * beamLen, beamLen, Math.tan(HALF) * beamLen)
+  const bMid = P.clone().addScaledVector(LAMP_DIR, beamLen / 2 + 0.01); lab.place(beam, bMid.x, bMid.y, bMid.z)
+  beam.quaternion.setFromUnitVectors(UP, LAMP_DIR) // the cone's tip (+y) at the lamp, its open base on the face
+  beam.visible = lampOn
+  lens.emissiveIntensity = lampOn ? 3 : 0.05
+
+  // the block rolls in onto the plate, turns with it, and rolls on to QC Gate 2
+  let bx = 0, alpha = 1
+  if (name === 'roll in') { bx = lerp(-1.8, 0, e); alpha = smoothstep(0, 0.25, u) }
+  else if (name === 'roll out') { bx = lerp(0, 1.8, e); alpha = 1 - smoothstep(0.75, 1, u) }
+  else if (name === 'next') alpha = 0
+  lab.place(block, bx, ROLL_Y + BLOCK[1] / 2, 0)
+  block.rotation.y = name === 'roll in' || name === 'roll out' || name === 'next' ? 0 : ang
+  const fading = alpha < 0.999
+  if (blockMat.transparent !== fading) { blockMat.transparent = fading; blockMat.needsUpdate = true }
+  blockMat.opacity = alpha
+  if (name === 'roll in' || name === 'roll out') rollers.forEach((r) => { r.rotation.y += dt * 9 })
+
+  if (u >= 1) { if (name === 'next') S.judged = [0, 0, 0, 0]; next() }
+  const dark = S.E < E_NEED
+  const say = checking ? (dark ? `face ${f + 1}: too dark to judge` : `checking face ${f + 1}`) : name.startsWith('turn') ? 'turning a quarter' : name
+  lab.setHero(S.E, {
+    state: lab.broken ? `task lamp out · ${say}` : say,
+    sub: `task lamp at ${fmt(dist.value, 2)} m: ${fmt(Etask)} lx + light bar ${fmt(Ebar)} lx · needs ${fmt(E_NEED)} lx`,
+    bad: checking && dark,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'Lamp fails', run() {}, reset() {} })
+lab.how(
+  'The block stops on a turntable and is turned a quarter at a time, so each outside face comes round to the inspector, who compares it with the limit samples for cracks and porosity. A visual check only counts in enough light: about 1,000 lux on the surface. The light on the face is added up source by source as intensity times the cosine of the angle it lands at, over the distance squared. The light bar overhead hits a side face at a grazing angle and gives little; the task lamp does the work, so its distance matters most: pull it back from 0.95 m to 1.3 m and the light roughly halves and the face can no longer be judged. If the task lamp fails, no face can be passed.',
+  [
+    'E = sum I cos(theta_face) / r^2',
+    'bar: I = Phi / (9 pi) cos(theta_source)   Phi = 6,000 lm',
+    'lamp: I = Phi / (2 pi (1 - cos 30°))   Phi = 1,600 lm',
+    'judge a face only if E >= 1,000 lx',
+  ],
+)
+lab.autoFilm({ runBeat: 'Every face, in good light.', runSub: 'A quarter turn at a time under the task lamp.', breakBeat: 'The lamp fails.', breakSub: 'Too dark to judge a single face.', sliderTo: 0.25 })
+// review hooks: __qc1.phase, __qc1.lux, __qc1.go('check 1')
+window.__qc1 = {
+  get phase() { return CYCLE[step][0] },
+  get lux() { return S.E },
+  go(name) { step = CYCLE.findIndex((c) => c[0] === name); pt = 0 },
+}
+lab.start()
+</script>
+</body>
+</html>

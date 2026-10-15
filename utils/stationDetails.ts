@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori to Final Proses have cards so far.
+// Placeholder copy for review; Baritori to QC Gate 1 have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -108,6 +108,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Nozzle distance', value: 'Within about 85 mm' },
       { label: 'Faces', value: '4, a quarter turn each' },
       { label: 'Operator', value: '1 person' },
+    ],
+  },
+  qc1: {
+    title: 'QC Gate 1',
+    subtitle: 'Visual Inspection',
+    image: { light: '/stations/qc1-light.svg', dark: '/stations/qc1-dark.svg' },
+    play: '/stations/qc1-3d.html',
+    description: [
+      'The block stops on a turntable between two portal frames, under an LED light bar, and is turned a quarter at a time so every outside face comes round to the inspector.',
+      'Each face is compared with the limit samples on the side table for cracks and porosity, under a task lamp that keeps at least 1,000 lux on the surface being judged.',
+      'Checked blocks roll on to QC Gate 2 for the final judgement.',
+    ],
+    specs: [
+      { label: 'Light on the face', value: '≥ 1,000 lux' },
+      { label: 'Faces', value: '4, a quarter turn each' },
+      { label: 'Reference', value: 'Limit samples' },
+      { label: 'Operator', value: '1 inspector' },
     ],
   },
 };

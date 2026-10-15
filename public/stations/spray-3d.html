@@ -1584,7 +1584,8 @@ for (const s of [-1, 1]) {
 for (let z = IN_Z[0] + 0.05; z < IN_Z[1] - 0.02; z += 0.07) rollers.in.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [0, ROLL_Y - 0.023, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.2, -0.4], count: 1 }))
 for (let i = 0; i < 12; i++) {
   const t = ((i + 0.5) / 12) * (Math.PI / 2)
-  rollers.turn.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Corner roller', pos: [C[0] + Math.cos(t) * R, ROLL_Y - 0.023, C[1] + Math.sin(t) * R], rot: [0, -t, Math.PI / 2], explode: [0.2, -0.2, 0.2], count: 1 }))
+  const m = lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Corner roller', pos: [C[0] + Math.cos(t) * R, ROLL_Y - 0.023, C[1] + Math.sin(t) * R], rot: [0, -t, Math.PI / 2], explode: [0.2, -0.2, 0.2], count: 1 })
+  rollers.turn.push({ m, q0: m.quaternion.clone() }) // laid radially; it spins about its own axis, on top of that
 }
 for (let x = OUT_X[0] - 0.05; x > OUT_X[1] + 0.02; x -= 0.07) rollers.out.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [x, ROLL_Y - 0.023, R], rot: [Math.PI / 2, 0, 0], explode: [-0.4, -0.2, 0], count: 1 }))
 lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [CW + 0.18, 0.2, -1.4], rot: [0, 0, Math.PI / 2], explode: [0.4, -0.2, -0.4], count: 1, label: 'From QC Gate 2', at: [0, 0.3, -0.6] })
@@ -1688,7 +1689,8 @@ lab.hero({ label: 'Thinnest oil film', unit: 'um', max: 5, digits: 1 })
 // one cycle, shaped like the Blender path: in from QC Gate 2, round the corner, under the portal, sprayed, out
 const DUR = { 'roll in': 1.4, corner: 1.5, 'to portal': 1.3, spray: 3, drip: 0.8, 'roll out': 1.8, next: 0.4 }
 const ORDER = Object.keys(DUR)
-let phase = 'roll in', pt = 0
+let phase = 'roll in', pt = 0, turnSpin = 0
+const spinQ = new THREE.Quaternion(), Y_AXIS = new THREE.Vector3(0, 1, 0)
 const go = (p) => { phase = p; pt = 0; if (p === 'roll in') S.film = [0, 0, 0, 0, 0] }
 
 lab.onTick((dt) => {
@@ -1723,7 +1725,7 @@ lab.onTick((dt) => {
   S.over = S.used * (1 - ETA)
 
   if (phase === 'roll in') rollers.in.forEach((r) => { r.rotation.x += dt * 9 })
-  if (phase === 'corner') rollers.turn.forEach((r) => { r.rotation.y += dt * 9 })
+  if (phase === 'corner') { turnSpin += dt * 9; spinQ.setFromAxisAngle(Y_AXIS, turnSpin); rollers.turn.forEach(({ m, q0 }) => m.quaternion.copy(q0).multiply(spinQ)) }
   if (phase === 'to portal' || phase === 'roll out') rollers.out.forEach((r) => { r.rotation.y += dt * 9 })
 
   if (u >= 1) go(ORDER[(ORDER.indexOf(phase) + 1) % ORDER.length])

@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori and HSB05 have cards so far.
+// Placeholder copy for review; Baritori, HSB05 and HSB06 have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -38,6 +38,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     specs: [
       { label: 'Cycle time', value: '10.4 s' },
       { label: 'Load', value: '1 block per hanger' },
+      { label: 'Media', value: 'Steel shot S330' },
+      { label: 'Operator', value: '1 person' },
+    ],
+  },
+  hsb06: {
+    title: 'HSB06',
+    subtitle: 'Rotary Table Shot Blast',
+    image: { light: '/stations/hsb06-light.svg', dark: '/stations/hsb06-dark.svg' },
+    play: '/stations/hsb06-3d.html',
+    description: [
+      'The operator steers a pillar jib manipulator by its handwheel, grips the block on the loading stand and swings it in through the door onto the rotary table.',
+      'With the doors shut the table turns while two blast wheels throw steel shot into the pockets and core holes the first machine could not reach.',
+      'The doors open, the manipulator lifts the block back out and sets it on the roller conveyor towards Grinding.',
+    ],
+    specs: [
+      { label: 'Cycle time', value: '5.2 s' },
+      { label: 'Load', value: '1 block on the table' },
       { label: 'Media', value: 'Steel shot S330' },
       { label: 'Operator', value: '1 person' },
     ],

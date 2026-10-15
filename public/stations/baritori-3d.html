@@ -1757,14 +1757,14 @@ lab.onTick((dt) => {
   else if (phase === 'back') cx = lerp(WORK_X, LOAD_X, e)
   lab.place(carriage, cx, 0, 0)
   const rodEnd = cx - 0.28
-  rod.scale.y = Math.max(0.01, rodEnd - PUSH_X0); rod.position.set((rodEnd + PUSH_X0) / 2, ROD_Y, 0)
+  rod.scale.y = Math.max(0.01, rodEnd - PUSH_X0); lab.place(rod, (rodEnd + PUSH_X0) / 2, ROD_Y, 0)
 
   // guard plate and the lift rod above it
   const down = phase === 'guard' ? e : ['deburr', 'turn'].includes(phase) ? 1 : phase === 'raise' ? 1 - e : 0
   const gy = lerp(GUARD_UP, GUARD_DOWN, down)
   lab.place(guard, 0, gy, 0)
   const rTop = BEAM_Y + 0.13, rBot = gy + 0.35
-  liftRod.scale.y = Math.max(0.01, rTop - rBot); liftRod.position.set(0, (rTop + rBot) / 2, 0)
+  liftRod.scale.y = Math.max(0.01, rTop - rBot); lab.place(liftRod, 0, (rTop + rBot) / 2, 0)
 
   // chipping: the flash comes off at the solver's rate, one face at a time; the cradle indexes 90° between faces
   if (phase === 'deburr' && live) {
@@ -1797,7 +1797,8 @@ lab.onTick((dt) => {
   const a = new THREE.Vector3(WORK_X, BEAM_Y - 0.18, ARM_Z), b = new THREE.Vector3(chiselAt[0], chiselAt[1] + 0.05, chiselAt[2] + 0.2)
   const dir = b.clone().sub(a)
   cable.scale.y = Math.max(0.01, dir.length())
-  cable.position.copy(a).add(b).multiplyScalar(0.5)
+  const mid = a.clone().add(b).multiplyScalar(0.5)
+  lab.place(cable, mid.x, mid.y, mid.z)
   cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize())
   chips.speed = working && live ? 1.6 : 0
   chips.opacity = working && live ? clamp(S.f / 20) : 0

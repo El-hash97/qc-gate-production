@@ -38,6 +38,15 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Baritori 3D/)).toHaveAttribute('src', '/stations/baritori-3d.html');
   });
 
+  it('has an HSB06 card with its own figure and 3D machine', () => {
+    const hsb06 = stationDetail('hsb06')!;
+    render(<StationCard detail={hsb06} theme="light" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /HSB06/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/hsb06-light.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/HSB06 3D/)).toHaveAttribute('src', '/stations/hsb06-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
     expect(stationDetail('hanten')).toBeNull();
   });

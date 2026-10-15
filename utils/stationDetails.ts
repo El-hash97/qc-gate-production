@@ -31,9 +31,9 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/hsb05-light.svg', dark: '/stations/hsb05-dark.svg' },
     play: '/stations/hsb05-3d.html',
     description: [
-      'The monorail hoist picks the cast block off the roller conveyor on a C-hook hanger and carries it into the octagonal blast chamber.',
-      'Inside, turbine wheels throw steel shot at the turning block to strip sand, scale and burrs from every face, while the dust collector draws the spent media out through the roof duct.',
-      'When the cycle ends the doors open, the hoist brings the block back out and hands it on to HSB06.',
+      'The monorail hoist picks the cast block off the in conveyor on a C-hook hanger and carries it through the left door into the octagonal blast chamber.',
+      'With both doors shut, turbine wheels throw steel shot at the turning block to strip sand, scale and burrs from every face, while the dust collector draws the spent media out through the roof duct.',
+      'When the cycle ends the doors open, the hoist carries the block out through the right door onto the out conveyor to HSB06, and comes back empty for the next one.',
     ],
     specs: [
       { label: 'Cycle time', value: '10.4 s' },

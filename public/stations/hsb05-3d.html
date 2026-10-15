@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HSB05 Hanger Shot Blast · Machine Skill</title>
-<meta name="description" content="Station HSB05 of the BC finishing line: a hanger shot blast that carries a cast block into an octagonal chamber on a monorail hoist and blasts it with steel shot. Built with the Machine Skill skill for Claude.">
+<meta name="description" content="Station HSB05 of the BC finishing line: a monorail hoist carries the cast block on a C-hook hanger in through the left door of an octagonal blast cabinet, four wheels blast it while it turns, and it comes out through the right door to HSB06. Built with the Machine Skill skill for Claude.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1525,15 +1525,18 @@ const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.
 
 // ------------------------------------------------------------------ research (step 1)
 // "HSB05: the hanger shot blast of the BC finishing line, moving the way it does in the Blender layout"
-// The real machine: a hook (hanger) type shot blast, Q37-style, sized for a 4-cylinder cast iron block.
+// The real machine: a hook (hanger) type shot blast, Q37-style, sized for a 4-cylinder cast iron block, with two
+// doors like HSB06: the block goes in through the left door and comes out through the right one.
 // Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): octagonal chamber 3.4 across flats,
-// 2.8 high on a 0.3 plinth, door 1.1 x 2.0, monorail underside at 2.35, roller conveyor top 0.80,
+// 2.8 high on a 0.3 plinth, two doors 1.1 x 2.0 on the faces 45 degrees either side of the front with the
+// control panel on the face between them, monorail underside at 2.35, roller conveyor top 0.80,
 // BC block 0.475 x 0.336 x 0.371 (L x H x W), about 36 kg.
-// Parts: plinth, 8 wall panels + corner posts, door frame, header split for the rail, two door leaves,
-// roof, round lid with hub and lifting eyes, 4 blast wheels (housing, 8-blade impeller, motor), floor
-// grating, monorail I-beam with inside hanger post and outside portal, trolley, electric hoist, wire
-// ropes, hook block, C-hook hanger, the block, roller conveyor (frame, legs, rollers), bucket
-// elevator, separator, dust collector with duct, operator console, stack light.
+// Parts: plinth, 6 wall panels + corner posts, two door faces (jambs, header split for the rail, yellow
+// posts, two leaves each), roof, round lid with hub and lifting eyes, 4 blast wheels (housing, 8-blade
+// impeller, motor), floor grating, V-shaped monorail (an I-beam leg out through each door, a hanger post at
+// the centre, a portal at each outer end), trolley, electric hoist, wire ropes, hook block, C-hook hanger,
+// the block, in and out roller conveyors, bucket elevator, separator, dust collector with duct, control
+// panel, stack light.
 // Physics: wheel tip speed v = pi D n / 60 (D 0.48 m); shot flow 2.5 kg/s per wheel (S330, d 0.84 mm,
 // 7,600 kg/m3); wheel power P = m v^2 / (2 eta) with eta 0.6 (about 11 kW each at 2,900 rpm);
 // dent diameter d_d = 0.24 mm (v / 72 m/s)^0.4; coverage (Avrami) C = 1 - exp(-k t) with
@@ -1545,7 +1548,7 @@ const lab = new Lab({
   prompt: 'HSB05: the hanger shot blast of the BC line, moving the way it does in the Blender layout',
   no: 5, title: 'HSB05', sub: 'hanger shot blast',
   size: 5.4,
-  view: { az: 34, el: 17, dist: 2.35, target: [0.15, 1.35, 0.8], fov: 30 },
+  view: { az: 0, el: 20, dist: 2.6, target: [0, 1.3, 1.3], fov: 30 },
   cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0, 1.35, 0], reach: 0.6 },
   pills: ['three.js', 'Shot blast', 'Avrami'],
 })
@@ -1560,11 +1563,15 @@ const TOP = BASE + H
 const DOOR_W = 1.1, DOOR_H = 2.0
 const RAIL_Y = 2.35                          // underside of the monorail bottom flange
 const CONV_Y = 0.8                           // roller tops
-const Z_IN = 0, Z_OUT = 3.05                 // trolley stations: chamber centre, over the conveyor
+const Z_OUT = 3.05                           // trolley station over each conveyor, along its leg
 const BLOCK = [0.475, 0.336, 0.371]
-const DECK_LOW = CONV_Y - 0.03, DECK_HIGH = DECK_LOW + 0.42
-// a wall at angle t (0 = facing +z, the door) has outward normal (sin t, 0, cos t)
+const DECK_LOW = CONV_Y - 0.07, DECK_HIGH = DECK_LOW + 0.46   // low: the tines sit between the rollers
+// a wall at angle t (0 = facing +z, the front) has outward normal (sin t, 0, cos t)
 const nrm = (t) => [Math.sin(t), 0, Math.cos(t)]
+// the two doors and the monorail legs through them: in on the left, out on the right, as angles off +z
+const LEGS = [-Math.PI / 4, Math.PI / 4]
+// a point (x across, z along) in a leg's frame, in the world
+const W = (a, x, z) => [x * Math.cos(a) + z * Math.sin(a), -x * Math.sin(a) + z * Math.cos(a)]
 
 // ------------------------------------------------------------------ materials
 const beige = MAT.paint({ color: [0.78, 0.72, 0.6], roughness: 0.45, clearcoat: 0.25 })
@@ -1580,8 +1587,8 @@ blockMat.transparent = true
 
 // ------------------------------------------------------------------ plinth, walls, roof, lid
 lab.mesh(GEO.lathe([[0, 0], [RV + 0.12, 0], [RV + 0.12, BASE], [0, BASE]], 8, { phi0: Math.PI / 8 }), steelDark, { name: 'Plinth', explode: [0, -0.2, 0] })
-for (let i = 1; i < 8; i++) {
-  const t = (i * Math.PI) / 4 // i = 0 is the door side, built below
+for (const i of [0, 2, 3, 4, 5, 6]) {
+  const t = (i * Math.PI) / 4 // i = 1 and 7 are the door faces, built below
   const [nx, , nz] = nrm(t)
   lab.mesh(GEO.rbox(SIDE, H, 0.06, 0.012), beige, {
     name: `Wall ${i}`, pos: [nx * AP, BASE + H / 2, nz * AP], rot: [0, t, 0],
@@ -1594,25 +1601,31 @@ for (let i = 0; i < 8; i++) {
   const a = Math.PI / 8 + (i * Math.PI) / 4
   lab.mesh(GEO.rbox(0.1, H + 0.04, 0.1, 0.015), beigeDark, { name: 'Corner post', pos: [Math.sin(a) * RV, BASE + H / 2, Math.cos(a) * RV], rot: [0, a, 0], explode: [Math.sin(a) * 0.9, 0, Math.cos(a) * 0.9], count: 1 })
 }
-// door side: two jambs, a header split by the rail slot, yellow posts like the layout
+// the two door faces: jambs, a header split by the rail slot, yellow posts and two leaves that swing out
 const JAMB = (SIDE - DOOR_W) / 2
-for (const s of [-1, 1]) {
-  lab.mesh(GEO.rbox(JAMB, DOOR_H, 0.06, 0.01), beige, { name: 'Door jamb', pos: [s * (DOOR_W / 2 + JAMB / 2), BASE + DOOR_H / 2, AP], explode: [0, 0, 0.9], xray: 'shell' })
-  lab.mesh(GEO.rbox(0.14, DOOR_H + 0.25, 0.16, 0.02), yellow, { name: 'Door post', pos: [s * (DOOR_W / 2 + 0.07), BASE + (DOOR_H + 0.25) / 2, AP + 0.1], explode: [0, 0, 1.0] })
-  const hw = (SIDE - 0.18) / 2
-  lab.mesh(GEO.rbox(hw, H - DOOR_H, 0.06, 0.01), beige, { name: 'Header', pos: [s * (0.09 + hw / 2), BASE + DOOR_H + (H - DOOR_H) / 2, AP], explode: [0, 0, 0.9], xray: 'shell' })
-}
-lab.mesh(GEO.rbox(DOOR_W + 0.28, 0.14, 0.16, 0.02), yellow, { name: 'Door lintel', pos: [0, BASE + DOOR_H + 0.18, AP + 0.1], explode: [0, 0, 1.0] })
-// door leaves hinge on the outer edge of the opening and swing out
-const leaves = [-1, 1].map((s) => {
-  const pivot = new THREE.Group(); pivot.position.set(s * DOOR_W / 2, BASE, AP + 0.04)
-  const leaf = new THREE.Mesh(GEO.rbox(DOOR_W / 2 - 0.01, DOOR_H - 0.02, 0.05, 0.01), beige)
-  leaf.position.set(-s * (DOOR_W / 4), DOOR_H / 2, 0.03)
-  const handle = new THREE.Mesh(GEO.rbox(0.03, 0.22, 0.04, 0.01), steel); handle.position.set(-s * (DOOR_W / 2 - 0.08), DOOR_H * 0.52, 0.08)
-  const seal = new THREE.Mesh(GEO.rbox(0.02, DOOR_H - 0.06, 0.03, 0.006), rubber); seal.position.set(-s * (DOOR_W / 2 - 0.02), DOOR_H / 2, 0.07)
-  pivot.add(leaf, handle, seal)
-  lab.add(pivot, { name: 'Door leaf', explode: [s * 0.4, 0, 1.4], count: 3 })
-  return { pivot, s }
+const leaves = []
+LEGS.forEach((t, i) => {
+  const g = new THREE.Group(); g.rotation.y = t
+  const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m }
+  for (const s of [-1, 1]) {
+    part(GEO.rbox(JAMB, DOOR_H, 0.06, 0.01), beige, s * (DOOR_W / 2 + JAMB / 2), BASE + DOOR_H / 2, AP)
+    part(GEO.rbox(0.14, DOOR_H + 0.25, 0.16, 0.02), yellow, s * (DOOR_W / 2 + 0.07), BASE + (DOOR_H + 0.25) / 2, AP + 0.1)
+    const hw = (SIDE - 0.18) / 2
+    part(GEO.rbox(hw, H - DOOR_H, 0.06, 0.01), beige, s * (0.09 + hw / 2), BASE + DOOR_H + (H - DOOR_H) / 2, AP)
+  }
+  part(GEO.rbox(DOOR_W + 0.28, 0.14, 0.16, 0.02), yellow, 0, BASE + DOOR_H + 0.18, AP + 0.1)
+  lab.add(g, { name: i ? 'Right door face (out)' : 'Left door face (in)', explode: [Math.sin(t) * 0.9, 0, Math.cos(t) * 0.9], xray: 'shell', count: 7, label: i ? 'Out door' : 'In door', at: [0, BASE + DOOR_H + 0.45, AP + 0.1] })
+  // door leaves hinge on the outer edge of the opening and swing out
+  for (const s of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.position.set(s * DOOR_W / 2, BASE, AP + 0.04)
+    const leaf = new THREE.Mesh(GEO.rbox(DOOR_W / 2 - 0.01, DOOR_H - 0.02, 0.05, 0.01), beige)
+    leaf.position.set(-s * (DOOR_W / 4), DOOR_H / 2, 0.03)
+    const handle = new THREE.Mesh(GEO.rbox(0.03, 0.22, 0.04, 0.01), steel); handle.position.set(-s * (DOOR_W / 2 - 0.08), DOOR_H * 0.52, 0.08)
+    const seal = new THREE.Mesh(GEO.rbox(0.02, DOOR_H - 0.06, 0.03, 0.006), rubber); seal.position.set(-s * (DOOR_W / 2 - 0.02), DOOR_H / 2, 0.07)
+    pivot.add(leaf, handle, seal)
+    lab.add(pivot, { parent: g, name: 'Door leaf', explode: [s * 0.4, 0, 1.4], count: 3 })
+    leaves.push({ pivot, s })
+  }
 })
 // roof and the round lid
 const oct = new THREE.Shape(Array.from({ length: 8 }, (_, i) => { const a = Math.PI / 8 + (i * Math.PI) / 4; return new THREE.Vector2(Math.sin(a) * (RV + 0.06), Math.cos(a) * (RV + 0.06)) }))
@@ -1660,24 +1673,29 @@ wheelAt.forEach((t, i) => {
   impellers.push({ wheel, group: g, t, y })
 })
 
-// ------------------------------------------------------------------ monorail, portal, inner post
-const RAIL_Z0 = -0.9, RAIL_Z1 = 3.75
+// ------------------------------------------------------------------ V-shaped monorail: a leg out through each door, portals, centre post
+const RAIL_Z0 = -0.25, RAIL_Z1 = 3.75
 const railLen = RAIL_Z1 - RAIL_Z0, railMid = (RAIL_Z0 + RAIL_Z1) / 2
-const rail = new THREE.Group()
-const flangeB = new THREE.Mesh(GEO.rbox(0.16, 0.02, railLen, 0.004), steelDark); flangeB.position.y = RAIL_Y + 0.01
-const web = new THREE.Mesh(GEO.rbox(0.014, 0.2, railLen, 0.003), steelDark); web.position.y = RAIL_Y + 0.12
-const flangeT = new THREE.Mesh(GEO.rbox(0.16, 0.02, railLen, 0.004), steelDark); flangeT.position.y = RAIL_Y + 0.23
-for (const m of [flangeB, web, flangeT]) m.position.z = railMid
-rail.add(flangeB, web, flangeT)
-lab.add(rail, { name: 'Monorail', explode: [0, 0.5, 0], count: 3, label: 'Monorail', at: [0, RAIL_Y + 0.24, 3.4] })
-// inside: a hanger post from the roof down to the rail's inner end
-lab.mesh(GEO.rbox(0.12, TOP - RAIL_Y - 0.24, 0.12, 0.01), steelDark, { name: 'Rail hanger post', pos: [0, (TOP + RAIL_Y + 0.24) / 2, RAIL_Z0 + 0.15], explode: [0, 0.5, 0] })
-// outside: a portal frame carries the outer end
-for (const s of [-1, 1]) {
-  lab.mesh(GEO.rbox(0.12, RAIL_Y + 0.38, 0.12, 0.01), yellow, { name: 'Portal column', pos: [s * 0.62, (RAIL_Y + 0.38) / 2, 3.55], explode: [s * 0.3, 0.3, 0.6] })
-  lab.mesh(GEO.rbox(0.26, 0.02, 0.26, 0.004), steelDark, { name: 'Base plate', pos: [s * 0.62, 0.01, 3.55], explode: [s * 0.3, 0.3, 0.6] })
-}
-lab.mesh(GEO.rbox(1.38, 0.14, 0.14, 0.01), yellow, { name: 'Portal beam', pos: [0, RAIL_Y + 0.31, 3.55], explode: [0, 0.6, 0.6] })
+LEGS.forEach((a, i) => {
+  const rail = new THREE.Group(); rail.rotation.y = a
+  const flangeB = new THREE.Mesh(GEO.rbox(0.16, 0.02, railLen, 0.004), steelDark); flangeB.position.y = RAIL_Y + 0.01
+  const web = new THREE.Mesh(GEO.rbox(0.014, 0.2, railLen, 0.003), steelDark); web.position.y = RAIL_Y + 0.12
+  const flangeT = new THREE.Mesh(GEO.rbox(0.16, 0.02, railLen, 0.004), steelDark); flangeT.position.y = RAIL_Y + 0.23
+  for (const m of [flangeB, web, flangeT]) m.position.z = railMid
+  rail.add(flangeB, web, flangeT)
+  lab.add(rail, { name: 'Monorail', explode: [Math.sin(a) * 0.3, 0.5, Math.cos(a) * 0.3], count: 3, label: i ? undefined : 'Monorail', at: [0, RAIL_Y + 0.24, 3.4] })
+  // outside: a portal frame carries the outer end
+  for (const s of [-1, 1]) {
+    const [x, z] = W(a, s * 0.62, 3.55)
+    lab.mesh(GEO.rbox(0.12, RAIL_Y + 0.38, 0.12, 0.01), yellow, { name: 'Portal column', pos: [x, (RAIL_Y + 0.38) / 2, z], rot: [0, a, 0], explode: [Math.sin(a) * 0.6, 0.3, Math.cos(a) * 0.6] })
+    lab.mesh(GEO.rbox(0.26, 0.02, 0.26, 0.004), steelDark, { name: 'Base plate', pos: [x, 0.01, z], rot: [0, a, 0], explode: [Math.sin(a) * 0.6, 0.3, Math.cos(a) * 0.6] })
+  }
+  const [bx, bz] = W(a, 0, 3.55)
+  lab.mesh(GEO.rbox(1.38, 0.14, 0.14, 0.01), yellow, { name: 'Portal beam', pos: [bx, RAIL_Y + 0.31, bz], rot: [0, a, 0], explode: [Math.sin(a) * 0.6, 0.6, Math.cos(a) * 0.6] })
+})
+// inside: a hanger post from the roof down to where the legs meet, with the switch the trolley turns on
+lab.mesh(GEO.rbox(0.12, TOP - RAIL_Y - 0.24, 0.12, 0.01), steelDark, { name: 'Rail hanger post', pos: [0, (TOP + RAIL_Y + 0.24) / 2, 0], explode: [0, 0.5, 0] })
+lab.mesh(GEO.disc(0.22, 0.04), steelDark, { name: 'Rail switch', pos: [0, RAIL_Y + 0.26, 0], explode: [0, 0.5, 0] })
 
 // ------------------------------------------------------------------ trolley, hoist, ropes, hook, C-hook hanger, block
 const carriage = new THREE.Group() // moves along z
@@ -1709,14 +1727,36 @@ hanger.add(hookBlock)
 spin.add(shank, swivel, arm, back, deck, ...tines, block)
 lab.add(hanger, { name: 'C-hook hanger', explode: [0, 0, 0], count: 12, label: 'Hanger', at: [-0.36, 0.5, 0], value: () => `coverage ${fmt(S.C * 100, 1)} %` })
 
-// ------------------------------------------------------------------ roller conveyor under the pick-up point
+// ------------------------------------------------------------------ roller conveyors: in under the left leg, out under the right
 const CZ0 = 2.25, CZ1 = 4.45
-for (const s of [-1, 1]) {
-  lab.mesh(GEO.rbox(0.06, 0.12, CZ1 - CZ0, 0.01), steelDark, { name: 'Conveyor rail', pos: [s * 0.38, CONV_Y - 0.06, (CZ0 + CZ1) / 2], explode: [s * 0.4, -0.2, 0.4] })
-  for (const z of [CZ0 + 0.15, CZ1 - 0.15]) lab.mesh(GEO.rbox(0.06, CONV_Y - 0.12, 0.06, 0.01), steelDark, { name: 'Conveyor leg', pos: [s * 0.38, (CONV_Y - 0.12) / 2, z], explode: [s * 0.4, -0.2, 0.4], count: 1 })
+const rollers = [[], []]
+LEGS.forEach((a, i) => {
+  const ex = [Math.sin(a) * 0.4, -0.2, Math.cos(a) * 0.4]
+  for (const s of [-1, 1]) {
+    const [x, z] = W(a, s * 0.38, (CZ0 + CZ1) / 2)
+    lab.mesh(GEO.rbox(0.06, 0.12, CZ1 - CZ0, 0.01), steelDark, { name: 'Conveyor rail', pos: [x, CONV_Y - 0.06, z], rot: [0, a, 0], explode: ex, label: s > 0 ? undefined : i ? 'Out: to HSB06' : 'In: from Baritori', at: [0, 0.3, 0.6] })
+    for (const zz of [CZ0 + 0.15, CZ1 - 0.15]) { const [lx, lz] = W(a, s * 0.38, zz); lab.mesh(GEO.rbox(0.06, CONV_Y - 0.12, 0.06, 0.01), steelDark, { name: 'Conveyor leg', pos: [lx, (CONV_Y - 0.12) / 2, lz], rot: [0, a, 0], explode: ex, count: 1 }) }
+  }
+  for (let zz = CZ0 + 0.08; zz < CZ1 - 0.05; zz += 0.11) {
+    const [x, z] = W(a, 0, zz)
+    const m = lab.mesh(GEO.disc(0.035, 0.7, 0.004, 24), steel, { name: 'Roller', pos: [x, CONV_Y - 0.035, z], rot: [0, a, Math.PI / 2], explode: ex, count: 1 })
+    rollers[i].push({ m, q0: m.quaternion.clone() }) // laid across the leg; it spins about its own axis on top of that
+  }
+})
+// the blocks on the conveyors: a raw one rolling in, a blasted one rolling out (hidden by scale: lab-kit sets
+// every part's .visible itself each frame)
+const shown = (o, on) => o.scale.setScalar(on ? 1 : 1e-4)
+function looseBlock(mat) {
+  const g = new THREE.Group(); g.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), mat))
+  for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); g.add(b) }
+  return g
 }
-const rollers = []
-for (let z = CZ0 + 0.08; z < CZ1 - 0.05; z += 0.11) rollers.push(lab.mesh(GEO.disc(0.035, 0.7, 0.004, 24), steel, { name: 'Roller', pos: [0, CONV_Y - 0.035, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.2, 0.4], count: 1 }))
+const rawMat = MAT.castIron({ color: [0.24, 0.2, 0.17], roughness: 0.82 }); rawMat.transparent = true
+const doneMat = MAT.castIron({ color: [0.6, 0.6, 0.59], roughness: 0.55 }); doneMat.transparent = true
+const inBlock = looseBlock(rawMat), outBlock = looseBlock(doneMat)
+lab.add(inBlock, { name: 'Raw block', explode: [-0.5, 0.4, 0.5], count: 5 })
+lab.add(outBlock, { name: 'Blasted block', explode: [0.5, 0.4, 0.5], count: 5 })
+shown(inBlock, false); shown(outBlock, false)
 
 // ------------------------------------------------------------------ media loop: bucket elevator, shot return, dust collector
 lab.mesh(GEO.rbox(0.42, TOP + 0.9, 0.5, 0.02), beigeDark, { name: 'Bucket elevator', pos: [-1.55, (TOP + 0.9) / 2, -1.75], explode: [-0.8, 0, -0.8] })
@@ -1727,11 +1767,11 @@ lab.mesh(GEO.pipe([[2.2, 2.0, -1.4], [1.9, TOP + 0.55, -1.05], [0.8, TOP + 0.55,
 for (const [x, z] of [[2.05, -1.95], [2.75, -1.95], [2.05, -1.25], [2.75, -1.25]]) lab.mesh(GEO.rbox(0.08, 0.4, 0.08, 0.01), steelDark, { name: 'Collector leg', pos: [x, 0.2, z], explode: [0.9, 0, -0.6], count: 1 })
 lab.mesh(GEO.disc(0.24, 0.3), steel, { name: 'Fan motor', pos: [2.4, 2.15, -1.6], explode: [0.9, 0.3, -0.6] })
 
-// ------------------------------------------------------------------ operator console beside the door
-lab.mesh(GEO.rbox(0.1, 1.1, 0.1, 0.01), steelDark, { name: 'Console post', pos: [1.25, 0.55, 2.15], explode: [0.5, 0, 0.6] })
-lab.mesh(GEO.rbox(0.42, 0.34, 0.2, 0.03), beigeDark, { name: 'Console', pos: [1.25, 1.25, 2.15], explode: [0.5, 0, 0.6] })
-lab.mesh(GEO.disc(0.025, 0.03), MAT.glow({ emissive: [0.1, 1, 0.3], emissiveIntensity: 1.5 }), { name: 'Start button', pos: [1.15, 1.2, 2.26], rot: [Math.PI / 2, 0, 0], explode: [0.5, 0, 0.6], count: 1 })
-lab.mesh(GEO.disc(0.035, 0.03), MAT.glow({ emissive: [1, 0.12, 0.08], emissiveIntensity: 1.2 }), { name: 'E-stop', pos: [1.33, 1.2, 2.26], rot: [Math.PI / 2, 0, 0], explode: [0.5, 0, 0.6], count: 1 })
+// ------------------------------------------------------------------ control panel on the front face, between the two doors
+lab.mesh(GEO.rbox(0.42, 0.62, 0.16, 0.03), beigeDark, { name: 'Control panel', pos: [0, BASE + 1.15, AP + 0.11], explode: [0, 0, 0.8], label: 'Control panel', at: [0, 0.4, 0] })
+lab.mesh(GEO.disc(0.025, 0.03), MAT.glow({ emissive: [0.1, 1, 0.3], emissiveIntensity: 1.5 }), { name: 'Start button', pos: [-0.09, BASE + 1.05, AP + 0.2], rot: [Math.PI / 2, 0, 0], explode: [0, 0, 0.8], count: 1 })
+lab.mesh(GEO.disc(0.035, 0.03), MAT.glow({ emissive: [1, 0.12, 0.08], emissiveIntensity: 1.2 }), { name: 'E-stop', pos: [0.09, BASE + 1.05, AP + 0.2], rot: [Math.PI / 2, 0, 0], explode: [0, 0, 0.8], count: 1 })
+lab.mesh(GEO.rbox(0.3, 0.16, 0.01, 0.004), MAT.glow({ emissive: [0.85, 0.9, 1], emissiveIntensity: 0.5 }), { name: 'Panel screen', pos: [0, BASE + 1.3, AP + 0.195], explode: [0, 0, 0.8], count: 1 })
 
 // ------------------------------------------------------------------ shot streams: each wheel throws a fan at the block
 const shotPaths = []
@@ -1766,11 +1806,15 @@ function solve(n, live) {
 lab.hero({ label: 'Coverage', unit: '%', max: 100, digits: 1 })
 const speed = lab.slider({ id: 'rpm', label: 'Blast wheel speed', min: 1800, max: 3000, value: 2900, unit: 'rpm', ends: ['1,800', '3,000'] })
 
-// one cycle, shaped like the Blender animation: lift, travel in, close, blast, open, travel out, lower, index
-const CYCLE = [['lift', 2.2], ['in', 3.4], ['close', 1.4], ['blast', 11], ['open', 1.4], ['out', 3.4], ['lower', 2.2], ['index', 2.4]]
+// one cycle, shaped like the Blender animation: pick up at the left door, in, close, blast, open, out through the
+// right door, set down on the out conveyor, and back empty for the next block
+const CYCLE = [['pickup', 1.6], ['lift', 2.2], ['in', 3.4], ['close', 1.4], ['blast', 11], ['open', 1.4], ['out', 3.4], ['lower', 2.2], ['release', 2.0], ['return', 5.0]]
 const CYCLE_LEN = CYCLE.reduce((s, [, d]) => s + d, 0)
-const phaseAt = (t) => { let a = t % CYCLE_LEN; for (const [name, d] of CYCLE) { if (a < d) return [name, a / d]; a -= d } return ['index', 1] }
-const SAY = { lift: 'lifting', in: 'travelling in', close: 'doors closing', blast: 'blasting', open: 'doors opening', out: 'travelling out', lower: 'lowering', index: 'next block' }
+const phaseAt = (t) => { let a = t % CYCLE_LEN; for (const [name, d] of CYCLE) { if (a < d) return [name, a / d]; a -= d } return ['return', 1] }
+const SAY = { pickup: 'picking up at the left door', lift: 'lifting', in: 'in through the left door', close: 'doors closing', blast: 'blasting', open: 'doors opening', out: 'out through the right door', lower: 'setting down on the out conveyor', release: 'on to HSB06', return: 'back empty for the next block' }
+const P_IN = W(LEGS[0], 0, Z_OUT), P_OUT = W(LEGS[1], 0, Z_OUT)
+let rollSpin = 0
+const spinQ = new THREE.Quaternion(), Y_AXIS = new THREE.Vector3(0, 1, 0)
 let clock = 0, simBlast = 0, spinAngle = 0, shake = 0, autoXray = true
 // a viewer who presses X-ray takes it over from the cycle
 addEventListener('keydown', (e) => { if (e.key === 'x' || e.key === 'X') autoXray = false })
@@ -1781,15 +1825,26 @@ lab.onTick((dt) => {
   const [phase, u] = phaseAt(clock)
   S.phase = phase
   const e = smoothstep(0, 1, u)
-  let z = Z_OUT, lift = 0
-  if (phase === 'lift') lift = e
-  else if (phase === 'in') { lift = 1; z = lerp(Z_OUT, Z_IN, e) }
-  else if (phase === 'close' || phase === 'blast' || phase === 'open') { lift = 1; z = Z_IN }
-  else if (phase === 'out') { lift = 1; z = lerp(Z_IN, Z_OUT, e) }
-  else if (phase === 'lower') lift = 1 - e
+  // path: 0 = over the in conveyor, 1 = the centre of the chamber, 2 = over the out conveyor
+  let p = 0, lift = 1, carry = true, turn = 0
+  if (phase === 'pickup') { lift = 1 - e; carry = false }
+  else if (phase === 'lift') lift = e
+  else if (phase === 'in') p = e
+  else if (phase === 'close') p = 1
+  else if (phase === 'blast') { p = 1; turn = e }                  // the trolley turns on the switch while it blasts
+  else if (phase === 'open') { p = 1; turn = 1 }
+  else if (phase === 'out') { p = 1 + e; turn = 1 }
+  else if (phase === 'lower') { p = 2; turn = 1; lift = 1 - e }
+  else if (phase === 'release') { p = 2; turn = 1; lift = e; carry = false }
+  else if (phase === 'return') { p = 2 - 2 * e; turn = smoothstep(0.85, 1.15, p); carry = false }
+  const [px, pz] = p <= 1 ? [lerp(P_IN[0], 0, p), lerp(P_IN[1], 0, p)] : [lerp(0, P_OUT[0], p - 1), lerp(0, P_OUT[1], p - 1)]
+  const heading = lerp(LEGS[0], LEGS[1], turn)
   const deckY = lerp(DECK_LOW, DECK_HIGH, lift)
-  lab.place(carriage, 0, 0, z)
-  lab.place(hanger, 0, deckY, z)
+  lab.place(carriage, px, 0, pz)
+  lab.place(hanger, px, deckY, pz)
+  carriage.rotation.y = heading
+  hanger.rotation.y = heading
+  block.visible = carry
   const top = RAIL_Y - 0.3, bottom = deckY + 1.03
   for (const r of ropes) { r.scale.y = Math.max(0.01, top - bottom); r.position.y = (top + bottom) / 2 }
   // doors: wide open, closed only while blasting
@@ -1800,8 +1855,8 @@ lab.onTick((dt) => {
   S.n = approach(S.n, want, want > S.n ? 0.9 : 2.2, dt)
   const { v, k, P } = solve(S.n, S.live)
   S.v = v; S.P = P; S.k = k
-  if (phase === 'blast') simBlast += dt * TIME_K
-  S.C = 1 - Math.exp(-k * simBlast)
+  // coverage only grows while blasting (dents stay when the wheels coast down): C = 1 - exp(-integral of k dt)
+  if (phase === 'blast') { simBlast += dt * TIME_K; S.C = 1 - (1 - S.C) * Math.exp(-k * dt * TIME_K) }
   const omega = (S.n * 2 * Math.PI) / 60
   impellers.forEach(({ wheel }, i) => { if (!(lab.broken && i === 0)) wheel.rotation.y += (omega * dt) / 60 }) // spin shown 1:60
   // the hanger turns slowly while blasting so every face sees the shot
@@ -1813,18 +1868,26 @@ lab.onTick((dt) => {
   // the casting brightens from rust brown to blasted grey with coverage
   blockMat.color.setRGB(lerp(0.24, 0.6, S.C), lerp(0.2, 0.6, S.C), lerp(0.17, 0.59, S.C))
   blockMat.roughness = lerp(0.82, 0.55, S.C)
-  // index: the blasted block rolls on to HSB06 and a raw one takes its place
-  if (phase === 'index') {
-    blockMat.opacity = u < 0.5 ? 1 - u * 2 : (u - 0.5) * 2
-    block.position.z = u < 0.5 ? smoothstep(0, 0.5, u) * 0.9 : 0
-    if (u >= 0.5 && simBlast > 0) { simBlast = 0; S.C = 0 }
-    rollers.forEach((r) => { r.rotation.x += dt * 8 })
-  } else { blockMat.opacity = 1; block.position.z = 0 }
+  // the conveyors: the blasted block rolls on to HSB06 from the out conveyor; a raw one rolls in while the
+  // hanger comes back, and the hanger picks it up at the left door
+  const [ix, iz] = W(LEGS[0], 0, phase === 'return' ? lerp(CZ1 - 0.2, Z_OUT, e) : Z_OUT)
+  lab.place(inBlock, ix, CONV_Y + BLOCK[1] / 2, iz); inBlock.rotation.y = LEGS[0]
+  shown(inBlock, phase === 'return' || phase === 'pickup')
+  rawMat.opacity = phase === 'return' ? smoothstep(0, 0.25, e) : 1
+  if (phase === 'pickup') { simBlast = 0; S.C = 0 }
+  const [ox, oz] = W(LEGS[1], 0, phase === 'release' ? lerp(Z_OUT, CZ1 - 0.2, e) : Z_OUT)
+  lab.place(outBlock, ox, CONV_Y + BLOCK[1] / 2, oz); outBlock.rotation.y = LEGS[1]
+  shown(outBlock, phase === 'release')
+  if (phase === 'release') { doneMat.color.copy(blockMat.color); doneMat.opacity = 1 - smoothstep(0.75, 1, u) }
+  rollSpin += dt * 8
+  spinQ.setFromAxisAngle(Y_AXIS, rollSpin)
+  if (phase === 'return') rollers[0].forEach(({ m, q0 }) => m.quaternion.copy(q0).multiply(spinQ))
+  if (phase === 'release') rollers[1].forEach(({ m, q0 }) => m.quaternion.copy(q0).multiply(spinQ))
   // while the doors are shut the walls turn to glass, so the blast stays in view
   if (!lab.filmMode && autoXray) lab.target.xray = phase === 'close' || phase === 'blast' || (phase === 'open' && u < 0.6) ? 1 : 0
   // stack light: green ready, yellow moving, red blasting
-  lamps[0].emissiveIntensity = phase === 'index' || phase === 'lift' ? 3 : 0.2
-  lamps[1].emissiveIntensity = ['in', 'out', 'close', 'open', 'lower'].includes(phase) ? 3 : 0.2
+  lamps[0].emissiveIntensity = phase === 'pickup' || phase === 'lift' ? 3 : 0.2
+  lamps[1].emissiveIntensity = ['in', 'out', 'close', 'open', 'lower', 'release', 'return'].includes(phase) ? 3 : 0.2
   lamps[2].emissiveIntensity = phase === 'blast' ? 3 : 0.2
   // after a blade is lost, the tripped wheel shakes as it coasts down
   if (lab.broken) {
@@ -1854,7 +1917,7 @@ lab.breakIt({
   reset() { S.live = WHEELS; S.F = 0; shake = 0; impellers[0].group.position.y = impellers[0].y },
 })
 lab.how(
-  'Four blast wheels fling S330 steel shot at the block while the C-hook turns it. Shot speed is the wheel tip speed; each impact leaves a dent, and the share of the surface dented grows as 1 - e<sup>-kt</sup> (Avrami). The blast phase is shown 10x fast (110 s in 11 s) and wheel spin 1:60. Losing a blade throws an imbalance load on that wheel; it trips and the other three finish the cycle at three quarters of the rate. Simplified: every wheel lands the same share of its shot on the block, and dent size scales with v<sup>0.4</sup>.',
+  'The hoist picks the block up on its C-hook at the left door, carries it in along the monorail and the doors close. Four blast wheels fling S330 steel shot at the block while the C-hook turns it; meanwhile the trolley turns on the switch at the centre, so when the doors open it carries the block out through the right door onto the conveyor to HSB06 and comes back empty for the next one. Shot speed is the wheel tip speed; each impact leaves a dent, and the share of the surface dented grows as 1 - e<sup>-kt</sup> (Avrami). The blast phase is shown 10x fast (110 s in 11 s) and wheel spin 1:60. Losing a blade throws an imbalance load on that wheel; it trips and the other three finish the cycle at three quarters of the rate. Simplified: every wheel lands the same share of its shot on the block, and dent size scales with v<sup>0.4</sup>.',
   [
     'v = pi D n / 60          D = 0.48 m',
     'P = m_dot v^2 / (2 eta)  m_dot = 2.5 kg/s, eta = 0.6',
@@ -1866,7 +1929,7 @@ lab.how(
 )
 lab.autoFilm({ runBeat: 'It blasts.', runSub: 'Coverage climbs as the shot dents every face.', breakBeat: 'Lose a blade.', breakSub: 'The wheel trips on imbalance; three finish the job.', sliderTo: 0.9 })
 // jump to a moment of the cycle (review shots, and a host page that wants a phase)
-window.__hsb = { at(t) { clock = t; simBlast = 0 }, cycle: CYCLE_LEN }
+window.__hsb = { at(t) { clock = t; simBlast = 0; S.C = 0 }, cycle: CYCLE_LEN, get stats() { return { ...S, simBlast } } }
 lab.start()
 </script>
 </body>

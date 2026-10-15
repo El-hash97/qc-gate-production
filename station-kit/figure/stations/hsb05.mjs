@@ -1,7 +1,10 @@
 // Isometric figure of station HSB05 (hanger shot blast) for the station
 // detail card in /visualisasi. Shapes follow the Blender layout: an octagonal
-// blast cabinet with a round lid, a door between two posts, a monorail hoist
-// carrying a BC block on a hanger, and the roller conveyor feeding it.
+// blast cabinet with a round lid and two doors, like HSB06: the block goes in
+// through the left door and comes out through the right one, with the control
+// panel on the face between them. A monorail leg runs out through each door;
+// the hoist carries a BC block on a hanger from the in conveyor into the
+// chamber, and the blasted block leaves on the out conveyor.
 //   node station-kit/figure/stations/hsb05.mjs [outDir]   →   <outDir>/hsb05-{light,dark}.svg
 //   (outDir defaults to public/stations, relative to where you run it)
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -14,9 +17,12 @@ const WIDTH = 600;
 const HEIGHT = 420;
 
 // ---- world (z up, about 1 unit = 1 cm) -------------------------------------
-const PAD = { x: -166, y: -92, w: 262, d: 334, r: 8 };
+// The in door is on the +y face (left in the picture) and the out door on the +x face (right); the face
+// between them, facing 45 degrees, carries the control panel. Everything on the out side is the in side
+// mirrored across x = y, so each piece is drawn once and the mirror flag (SW) swaps x and y.
+const PAD = { x: -166, y: -92, w: 408, d: 334, r: 8 };
 const R = 72; // cabinet circumradius
-const AP = R * Math.cos(Math.PI / 8); // apothem: the door face sits at y = AP
+const AP = R * Math.cos(Math.PI / 8); // apothem: each door face sits at AP from the centre
 const BODY = [6, 92];
 const DOOR = { x0: -21, x1: 21, z0: 12, z1: 78, depth: 22 };
 const BEAM_Y = [70, 228];
@@ -24,7 +30,7 @@ const BEAM_Z = 114; // underside of the bottom flange
 const TROLLEY_Y = 101;
 const CONV = { y0: 120, y1: 214, z: 31 }; // roller tops at z
 const HANG = { x: -12, y: 91.5, w: 24, d: 19, r: 1 }; // block on the hanger
-const QUEUE = { x: -12, y: 172, w: 24, d: 19, r: 1 }; // block waiting on the conveyor
+const QUEUE = { x: -12, y: 172, w: 24, d: 19, r: 1 }; // block on a conveyor
 const BLOCK_H = 17;
 
 const octagon = (radius, cx = 0, cy = 0) =>
@@ -34,7 +40,7 @@ const octagon = (radius, cx = 0, cy = 0) =>
   });
 
 const P = k.fitProjection(
-  [...k.boxCorners(PAD, -8, 0), [0, 0, 112], [-158, -84, 132], [-106, -28, 132], [-158, -28, 132], [0, BEAM_Y[0], BEAM_Z + 16], [-34, BEAM_Y[1], BEAM_Z + 16], [34, BEAM_Y[1], BEAM_Z + 16]],
+  [...k.boxCorners(PAD, -8, 0), [0, 0, 112], [-158, -84, 132], [-106, -28, 132], [-158, -28, 132], [0, BEAM_Y[1], BEAM_Z + 16], [BEAM_Y[1], 0, BEAM_Z + 16], [-34, BEAM_Y[1], BEAM_Z + 16], [BEAM_Y[1], 34, BEAM_Z + 16]],
   WIDTH,
   HEIGHT,
   { pad: 26, azimuth: 58 },
@@ -45,16 +51,27 @@ const S = (paths, style) => k.solidSvg(paths, style);
 const L = (d, style) => k.lineSvg(d, style);
 const D = (points, style) => k.dotsSvg(points, style);
 const slab = (plan, z, h, steps = 3, bevel = 0.5) => k.slabOf(plan, z, h, P, steps, bevel);
-const poly = (points, cls) => `<path class="${cls}" d="${k.pathOf(points.map(at), true)}"/>`;
 const byDepth = (list, of = (p) => p) => [...list].sort((a, b) => k.depthOf(of(a), P) - k.depthOf(of(b), P));
+
+// ---- the mirror: SW swaps x and y, turning the in side (+y) into the out side (+x) ----
+let SW = false;
+const P3 = (p) => (SW ? [p[1], p[0], p[2]] : p);
+const PL = (pl) => (SW ? { ...pl, x: pl.y, y: pl.x, w: pl.d, d: pl.w } : pl);
+const A = (p) => at(P3(p));
+const sl = (plan, z, h, steps = 3, bevel = 0.5) => slab(PL(plan), z, h, steps, bevel);
+const seg = (p, q) => k.segment(P3(p), P3(q), P);
+const ring = (x, y, r, z, n = 24) => (SW ? k.ring(y, x, r, z, P, n) : k.ring(x, y, r, z, P, n));
+const cyl = (x, y, r, z, h, n = 16, bevel = 0) => (SW ? k.cylinder(y, x, r, z, h, P, n, bevel) : k.cylinder(x, y, r, z, h, P, n, bevel));
+const sideSeam = (plan, z, steps) => k.sideSeam(PL(plan), z, P, steps);
+const onTop = (a, b, z) => k.lineOnTop(SW ? [a[1], a[0]] : a, SW ? [b[1], b[0]] : b, z, P);
+const poly = (points, cls) => `<path class="${cls}" d="${k.pathOf(points.map(A), true)}"/>`;
+const mirrored = (sw, draw) => { SW = sw; const out = draw(); SW = false; return out; };
 
 // ---- floor -------------------------------------------------------------------
 function floor() {
   const out = [`<path class="iso-halo" d="${k.haloOf(PAD, -8, 8, P)}"/>`];
   out.push(S(slab(PAD, -8, 8, 8, 1.4), { tone: "lo" }));
   out.push(L(k.planOutline(k.insetPlan(PAD, 5), 0, P), { tone: "faint" }));
-  // walkway lines run edge to edge across the pad, beside the conveyor
-  for (const x of [-48, 44]) out.push(L(k.lineOnTop([x, PAD.y + 5], [x, PAD.y + PAD.d - 5], 0, P), { tone: "faint" }));
   // anchor bolts at the pad corners
   const bolts = k.corners(PAD, 12);
   out.push(L(bolts.map(([x, y]) => k.ring(x, y, 2.4, 0, P, 16)).join(""), { tone: "lo" }));
@@ -109,25 +126,24 @@ function cabinet() {
   out.push(S(k.cylinder(0, 0, 13, top + 7, 6, P, 48, 0.6), { tone: "mid" }));
   out.push(L(k.knurl(0, 0, 13, top + 8, top + 12, 40, P), { tone: "faint" }));
   out.push(D(Array.from({ length: 8 }, (_, i) => at([Math.cos((i * Math.PI) / 4) * 9, Math.sin((i * Math.PI) / 4) * 9, top + 13])), { size: 0.45 }));
-  // rivets along both panel seams on the three faces that face the viewer
+  // rivets along both panel seams on the face between the doors (face 0, facing 45 degrees)
   const faceAt = (i, t, z) => {
     const [[ax, ay], [bx, by]] = [body[i], body[(i + 1) % 8]];
     return [ax + (bx - ax) * t, ay + (by - ay) * t, z];
   };
-  const facing = [7, 0, 1]; // faces whose normals point at 0°, 45° and 90°
   const rivets = [];
-  for (const i of facing) for (const z of [36, 64]) for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) rivets.push(at(faceAt(i, t, z + 1.4)));
+  for (const z of [36, 64]) for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) rivets.push(at(faceAt(0, t, z + 1.4)));
   out.push(D(rivets, { size: 0.4, tone: "mid" }));
-  // inspection hatch on the front-right face, between the seams
-  const hatch = [[0.22, 40], [0.78, 40], [0.78, 60], [0.22, 60]].map(([t, z]) => at(faceAt(0, t, z)));
-  out.push(L(k.pathOf(hatch, true), { tone: "lo" }));
-  out.push(D([[0.27, 43], [0.73, 43], [0.73, 57], [0.27, 57]].map(([t, z]) => at(faceAt(0, t, z))), { size: 0.45, tone: "mid" }));
-  out.push(L(k.segment(faceAt(0, 0.44, 50), faceAt(0, 0.56, 50), P), { tone: "mid" }));
-  // name plate on the +x face
-  const plate = { x: AP, y: -16, w: 1, d: 32, r: 0.3 };
-  out.push(S(slab(plate, 46, 14, 2), { tone: "mid", crease: "none" }));
-  out.push(k.faceTextSvg(k.sideMatrix([AP + 1, 0], 51, P, "right"), "HSB 05", { size: 5.2, tone: "hi", anchor: "middle" }));
-  out.push(D([at([AP + 1, -13, 57]), at([AP + 1, 13, 57]), at([AP + 1, -13, 49]), at([AP + 1, 13, 49])], { size: 0.4 }));
+  // the control panel on that face: a box standing off it, buttons, a screen
+  const [[ax, ay], [bx, by]] = [body[0], body[1]];
+  const len = Math.hypot(bx - ax, by - ay);
+  const u = [(bx - ax) / len, (by - ay) / len], n = [Math.SQRT1_2, Math.SQRT1_2];
+  const c = [(ax + bx) / 2, (ay + by) / 2];
+  const pt = (s, d) => [c[0] + u[0] * s + n[0] * d, c[1] + u[1] * s + n[1] * d];
+  out.push(S(k.extrude([pt(-11, 0), pt(11, 0), pt(11, 6), pt(-11, 6)], 38, 28, P, { bevel: 0.4 }), { tone: "mid" }));
+  const face = (s, z) => at([...pt(s, 6), z]);
+  out.push(L(k.pathOf([face(-8, 56), face(8, 56), face(8, 63), face(-8, 63)], true), { tone: "lo" }));
+  out.push(D([face(-5, 46), face(0, 46), face(5, 46)], { size: 0.8, tone: "hi" }));
   // stack light on the rim
   const [lx, ly] = [46, -40];
   out.push(S(k.cylinder(lx, ly, 3, top, 3, P, 20), { tone: "mid" }));
@@ -142,22 +158,23 @@ function door() {
   const { x0, x1, z0, z1, depth } = DOOR;
   const back = AP - depth;
   const out = [];
-  // chamber inside: back wall, the left reveal (faces +x, so it is seen) and the floor
+  // chamber inside: back wall, the reveal that faces the viewer and the floor
   out.push(poly([[x0, back, z0], [x1, back, z0], [x1, back, z1], [x0, back, z1]], "hsb-cav"));
   out.push(poly([[x0, back, z0], [x0, AP, z0], [x0, AP, z1], [x0, back, z1]], "hsb-cav hsb-cav-side"));
   out.push(poly([[x0, back, z0], [x1, back, z0], [x1, AP, z0], [x0, AP, z0]], "hsb-cav hsb-cav-floor"));
-  out.push(L(k.pathOf([at([x0, back, z1]), at([x0, back, z0]), at([x1, back, z0])]) + k.segment([x0, back, z0], [x0, AP, z0], P), { tone: "lo" }));
+  out.push(L(k.pathOf([A([x0, back, z1]), A([x0, back, z0]), A([x1, back, z0])]) + seg([x0, back, z0], [x0, AP, z0]), { tone: "lo" }));
   // grating of the blast floor, edge to edge across the chamber floor
-  out.push(L(Array.from({ length: 6 }, (_, i) => k.lineOnTop([x0, back + 3 + i * 3.4], [x1, back + 3 + i * 3.4], z0, P)).join(""), { tone: "faint" }));
+  out.push(L(Array.from({ length: 6 }, (_, i) => onTop([x0, back + 3 + i * 3.4], [x1, back + 3 + i * 3.4], z0)).join(""), { tone: "faint" }));
   // rubber curtain strips hanging from the lintel
-  out.push(L(Array.from({ length: 9 }, (_, i) => k.segment([x0 + 4.2 * (i + 1), back + 6, z1], [x0 + 4.2 * (i + 1), back + 6, z1 - 18], P)).join(""), { tone: "lo" }));
-  out.push(L(k.pathOf([at([x0, AP, z0]), at([x1, AP, z0]), at([x1, AP, z1]), at([x0, AP, z1])], true), { tone: "mid" }));
+  out.push(L(Array.from({ length: 9 }, (_, i) => seg([x0 + 4.2 * (i + 1), back + 6, z1], [x0 + 4.2 * (i + 1), back + 6, z1 - 18])).join(""), { tone: "lo" }));
+  out.push(L(k.pathOf([A([x0, AP, z0]), A([x1, AP, z0]), A([x1, AP, z1]), A([x0, AP, z1])], true), { tone: "mid" }));
   // posts and header, bolted to the cabinet face
   for (const x of [-29, 21]) {
-    out.push(S(slab({ x, y: AP - 6, w: 8, d: 12, r: 0.8 }, 0, z1 + 12, 2, 0.5), { tone: "mid" }));
-    out.push(D([14, 30, 46, 62, 78].map((z) => at([x + 4, AP + 6, z])), { size: 0.45 }));
+    out.push(S(sl({ x, y: AP - 6, w: 8, d: 12, r: 0.8 }, 0, z1 + 12, 2, 0.5), { tone: "mid" }));
+    out.push(D([14, 30, 46, 62, 78].map((z) => A([x + 4, AP + 6, z])), { size: 0.45 }));
   }
-  out.push(S(slab({ x: -29, y: AP - 6, w: 58, d: 12, r: 0.8 }, z1, 12, 2, 0.6), { tone: "mid", inner: L(k.sideSeam({ x: -29, y: AP - 6, w: 58, d: 12, r: 0.8 }, z1 + 6, P, 2), { tone: "faint" }) }));
+  const header = { x: -29, y: AP - 6, w: 58, d: 12, r: 0.8 };
+  out.push(S(sl(header, z1, 12, 2, 0.6), { tone: "mid", inner: L(sideSeam(header, z1 + 6, 2), { tone: "faint" }) }));
   return out.join("");
 }
 
@@ -165,41 +182,41 @@ function leaf(x) {
   // a door leaf swung fully open against its post, panel outline and handle
   const plan = { x, y: AP + 6, w: 3, d: 44, r: 0.6 };
   const fx = x + 3;
-  const out = [S(slab(plan, DOOR.z0 - 4, DOOR.z1 - DOOR.z0 + 8, 2, 0.4), { tone: "mid" })];
-  out.push(L(k.pathOf([at([fx, AP + 11, DOOR.z0 + 2]), at([fx, AP + 45, DOOR.z0 + 2]), at([fx, AP + 45, DOOR.z1 - 2]), at([fx, AP + 11, DOOR.z1 - 2])], true), { tone: "lo" }));
-  out.push(S(slab({ x: fx, y: AP + 40, w: 2.4, d: 3, r: 0.6 }, 40, 12, 2), { tone: "mid" }));
+  const out = [S(sl(plan, DOOR.z0 - 4, DOOR.z1 - DOOR.z0 + 8, 2, 0.4), { tone: "mid" })];
+  out.push(L(k.pathOf([A([fx, AP + 11, DOOR.z0 + 2]), A([fx, AP + 45, DOOR.z0 + 2]), A([fx, AP + 45, DOOR.z1 - 2]), A([fx, AP + 11, DOOR.z1 - 2])], true), { tone: "lo" }));
+  out.push(S(sl({ x: fx, y: AP + 40, w: 2.4, d: 3, r: 0.6 }, 40, 12, 2), { tone: "mid" }));
   // hinges on the post side
-  for (const z of [DOOR.z0 + 6, DOOR.z1 - 10]) out.push(S(k.cylinder(x + 1.5, AP + 6.5, 1.6, z, 6, P, 12), { tone: "mid" }));
+  for (const z of [DOOR.z0 + 6, DOOR.z1 - 10]) out.push(S(cyl(x + 1.5, AP + 6.5, 1.6, z, 6, 12), { tone: "mid" }));
   return out.join("");
 }
 
-// ---- monorail, trolley, hoist, hook and hanger -------------------------------
+// ---- monorail leg, portal, trolley, hoist, hook and hanger --------------------
 function beam() {
   const [y0, y1] = BEAM_Y;
   const out = [];
   // bracket on top of the door header carrying the inner end of the beam
-  out.push(S(slab({ x: -5, y: AP - 4, w: 10, d: 10, r: 0.6 }, DOOR.z1 + 12, BEAM_Z - DOOR.z1 - 12, 2, 0.4), { tone: "mid" }));
-  out.push(S(slab({ x: -9, y: AP - 6, w: 18, d: 14, r: 0.6 }, DOOR.z1 + 12, 2, 2), { tone: "mid" }));
+  out.push(S(sl({ x: -5, y: AP - 4, w: 10, d: 10, r: 0.6 }, DOOR.z1 + 12, BEAM_Z - DOOR.z1 - 12, 2, 0.4), { tone: "mid" }));
+  out.push(S(sl({ x: -9, y: AP - 6, w: 18, d: 14, r: 0.6 }, DOOR.z1 + 12, 2, 2), { tone: "mid" }));
   // I-beam: bottom flange, web, top flange
-  out.push(S(slab({ x: -5, y: y0, w: 10, d: y1 - y0, r: 0.4 }, BEAM_Z, 2, 2), { tone: "mid" }));
-  out.push(S(slab({ x: -1, y: y0, w: 2, d: y1 - y0, r: 0.3 }, BEAM_Z + 2, 8, 2), { tone: "mid", crease: "none" }));
-  out.push(S(slab({ x: -5, y: y0, w: 10, d: y1 - y0, r: 0.4 }, BEAM_Z + 10, 2, 2, 0.4), { tone: "mid" }));
-  out.push(D([y0 + 4, y1 - 4].map((y) => at([0, y, BEAM_Z + 12])), { size: 0.45 }));
+  out.push(S(sl({ x: -5, y: y0, w: 10, d: y1 - y0, r: 0.4 }, BEAM_Z, 2, 2), { tone: "mid" }));
+  out.push(S(sl({ x: -1, y: y0, w: 2, d: y1 - y0, r: 0.3 }, BEAM_Z + 2, 8, 2), { tone: "mid", crease: "none" }));
+  out.push(S(sl({ x: -5, y: y0, w: 10, d: y1 - y0, r: 0.4 }, BEAM_Z + 10, 2, 2, 0.4), { tone: "mid" }));
+  out.push(D([y0 + 4, y1 - 4].map((y) => A([0, y, BEAM_Z + 12])), { size: 0.45 }));
   return out.join("");
 }
 
 function portalColumn(x) {
   const y = BEAM_Y[1] - 10;
   return [
-    S(slab({ x: x - 6, y: y - 3, w: 12, d: 12, r: 0.6 }, 0, 2, 2), { tone: "mid" }),
-    D(k.corners({ x: x - 6, y: y - 3, w: 12, d: 12 }, 2).map(([px, py]) => at([px, py, 2])), { size: 0.4 }),
-    S(slab({ x: x - 3, y, w: 6, d: 6, r: 0.4 }, 2, BEAM_Z + 10, 2, 0.4), { tone: "mid" }),
+    S(sl({ x: x - 6, y: y - 3, w: 12, d: 12, r: 0.6 }, 0, 2, 2), { tone: "mid" }),
+    D(k.corners({ x: x - 6, y: y - 3, w: 12, d: 12 }, 2).map(([px, py]) => A([px, py, 2])), { size: 0.4 }),
+    S(sl({ x: x - 3, y, w: 6, d: 6, r: 0.4 }, 2, BEAM_Z + 10, 2, 0.4), { tone: "mid" }),
   ].join("");
 }
 
 function portalTop() {
   const y = BEAM_Y[1] - 10;
-  return S(slab({ x: -40, y: y - 1, w: 80, d: 8, r: 0.5 }, BEAM_Z + 12, 6, 2, 0.5), { tone: "mid" });
+  return S(sl({ x: -40, y: y - 1, w: 80, d: 8, r: 0.5 }, BEAM_Z + 12, 6, 2, 0.5), { tone: "mid" });
 }
 
 function hoist() {
@@ -244,12 +261,13 @@ function hangerFront() {
 // ---- BC block (47.5 × 37.1 × 33.6 cm): deck with four bores, head bolts -----
 function block(plan, z, { lit = false } = {}) {
   const top = z + BLOCK_H;
-  const out = [S(slab(plan, z, BLOCK_H, 2, 0.6), { tone: "hi", crease: "lo", lit, inner: L(k.sideSeam(plan, z + 5, P, 2), { tone: "faint" }) })];
+  const pl = PL(plan);
+  const out = [S(slab(pl, z, BLOCK_H, 2, 0.6), { tone: "hi", crease: "lo", lit, inner: L(k.sideSeam(pl, z + 5, P, 2), { tone: "faint" }) })];
   const cy = plan.y + plan.d / 2;
   const bores = [0, 1, 2, 3].map((i) => plan.x + 4 + i * 5.33);
-  out.push(L(bores.map((x) => k.ring(x, cy, 2.2, top, P, 24)).join(""), { tone: lit ? "lit" : "mid" }));
+  out.push(L(bores.map((x) => ring(x, cy, 2.2, top)).join(""), { tone: lit ? "lit" : "mid" }));
   const bolts = [];
-  for (const x of [plan.x + 1.6, ...bores.map((b) => b + 2.66).slice(0, 3), plan.x + plan.w - 1.6]) bolts.push(at([x, plan.y + 2, top]), at([x, plan.y + plan.d - 2, top]));
+  for (const x of [plan.x + 1.6, ...bores.map((b) => b + 2.66).slice(0, 3), plan.x + plan.w - 1.6]) bolts.push(A([x, plan.y + 2, top]), A([x, plan.y + plan.d - 2, top]));
   out.push(D(bolts, { size: 0.4, tone: "mid" }));
   return out.join("");
 }
@@ -258,50 +276,45 @@ function block(plan, z, { lit = false } = {}) {
 function conveyorBack() {
   const { y0, y1, z } = CONV;
   const out = [];
-  for (const [x, y] of byDepth([[-20, y0 + 8], [-20, y1 - 8]], ([x, y]) => [x, y, 0])) {
-    out.push(S(k.cylinder(x, y, 4, 0, 1.4, P, 16), { tone: "mid" }));
-    out.push(S(slab({ x: x - 1.6, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
+  for (const [x, y] of byDepth([[-20, y0 + 8], [-20, y1 - 8]], ([x, y]) => P3([x, y, 0]))) {
+    out.push(S(cyl(x, y, 4, 0, 1.4, 16), { tone: "mid" }));
+    out.push(S(sl({ x: x - 1.6, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
   }
-  out.push(S(slab({ x: -25, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
-  for (let y = y0 + 3; y < y1 - 3; y += 6.4) out.push(S(slab({ x: -21, y, w: 42, d: 4.4, r: 2.2 }, z - 4.4, 4.4, 6), { tone: "mid", crease: "none" }));
+  out.push(S(sl({ x: -25, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
+  for (let y = y0 + 3; y < y1 - 3; y += 6.4) out.push(S(sl({ x: -21, y, w: 42, d: 4.4, r: 2.2 }, z - 4.4, 4.4, 6), { tone: "mid", crease: "none" }));
   return out.join("");
 }
 
 function conveyorFront() {
   const { y0, y1, z } = CONV;
   const out = [];
-  for (const [x, y] of byDepth([[20, y0 + 8], [20, y1 - 8]], ([x, y]) => [x, y, 0])) {
-    out.push(S(k.cylinder(x, y, 4, 0, 1.4, P, 16), { tone: "mid" }));
-    out.push(S(slab({ x: x - 1.6, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
+  for (const [x, y] of byDepth([[20, y0 + 8], [20, y1 - 8]], ([x, y]) => P3([x, y, 0]))) {
+    out.push(S(cyl(x, y, 4, 0, 1.4, 16), { tone: "mid" }));
+    out.push(S(sl({ x: x - 1.6, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
   }
-  out.push(S(slab({ x: 21, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
-  out.push(D(Array.from({ length: 14 }, (_, i) => at([25, y0 + 3 + i * 6.4 + 2.2, z - 3])), { size: 0.35, tone: "lo" }));
+  out.push(S(sl({ x: 21, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
+  out.push(D(Array.from({ length: 14 }, (_, i) => A([25, y0 + 3 + i * 6.4 + 2.2, z - 3])), { size: 0.35, tone: "lo" }));
   // end stop
-  out.push(S(slab({ x: -25, y: y1, w: 50, d: 4, r: 0.6 }, z - 7, 14, 2, 0.4), { tone: "mid" }));
+  out.push(S(sl({ x: -25, y: y1, w: 50, d: 4, r: 0.6 }, z - 7, 14, 2, 0.4), { tone: "mid" }));
   return out.join("");
 }
 
-// ---- operator panel on a pedestal right of the door --------------------------
-function console_() {
-  const out = [];
-  out.push(S(slab({ x: 50, y: 92, w: 12, d: 12, r: 0.6 }, 0, 2, 2), { tone: "mid" }));
-  out.push(S(slab({ x: 53, y: 95, w: 6, d: 6, r: 0.4 }, 2, 48, 2, 0.3), { tone: "mid" }));
-  const box = { x: 46, y: 90, w: 20, d: 14, r: 1 };
-  out.push(S(slab(box, 50, 24, 3, 0.6), { tone: "mid" }));
-  const fy = box.y + box.d;
-  // buttons on the front face, the start button lit, a key switch and a screen
-  const buttons = [[50, 58], [55, 58], [60, 58]];
-  out.push(L(buttons.map(([x, z]) => k.sideRing([x, fy, z], 1.6, "y", P)).join(""), { tone: "lo" }));
-  out.push(D(buttons.map(([x, z]) => at([x, fy, z])), { size: 0.8, tone: "hi" }));
-  out.push(L(k.pathOf([at([49, fy, 63]), at([63, fy, 63]), at([63, fy, 71]), at([49, fy, 71])], true), { tone: "mid" }));
-  out.push(L(k.sideRing([62.5, fy, 54], 2.2, "y", P), { tone: "mid" }));
-  return out.join("");
-}
+// the out side (+x): door, monorail leg and portal, the out conveyor with a blasted block on it
+const outSide = () => mirrored(true, () => [
+  door(),
+  leaf(-32),
+  conveyorBack(),
+  block(QUEUE, CONV.z),
+  conveyorFront(),
+  portalColumn(-34),
+  beam(),
+  leaf(29),
+  portalTop(),
+  portalColumn(34),
+].join(""));
 
-const body = [
-  floor(),
-  collector(),
-  cabinet(),
+// the in side (+y): door, the in conveyor with the next raw block, the hoist carrying a block in
+const inSide = () => [
   door(),
   leaf(-32),
   conveyorBack(),
@@ -316,8 +329,9 @@ const body = [
   leaf(29),
   portalTop(),
   portalColumn(34),
-  console_(),
-];
+].join("");
+
+const body = [floor(), collector(), cabinet(), outSide(), inSide()];
 
 const STYLE = `<style>
 .iso[data-theme="light"] .hsb-cav{fill:#cfcfcb}.iso[data-theme="light"] .hsb-cav-side{fill:#dadad6}.iso[data-theme="light"] .hsb-cav-floor{fill:#c4c4c0}
@@ -326,7 +340,7 @@ const STYLE = `<style>
 </style>`;
 
 const LABEL =
-  "Station HSB05, hanger shot blast: an octagonal blast cabinet with a round lid and an open door between two posts. A monorail hoist carries a BC block on a C-hook hanger from the roller conveyor into the chamber.";
+  "Station HSB05, hanger shot blast: an octagonal blast cabinet with a round lid and two doors, with the control panel on the face between them. A monorail hoist carries a BC block on a C-hook hanger from the in conveyor through the left door into the chamber; after blasting it comes out through the right door onto the out conveyor towards HSB06.";
 
 for (const theme of ["light", "dark"]) {
   const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });

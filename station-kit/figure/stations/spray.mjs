@@ -77,26 +77,29 @@ const roll = (plan) => S(slab(plan, CONV_Z - 4.6, 4.6, 6), { tone: "mid", crease
 const rail = (plan) => S(slab({ ...plan, r: 0.5 }, CONV_Z - 8, 9, 2, 0.4), { tone: "mid" });
 const leg = (x, y) => S(slab({ x: x - 2, y: y - 2, w: 4, d: 4, r: 0.4 }, 0, CONV_Z - 7, 2), { tone: "mid", crease: "none" });
 
-// incoming, along +y at x = 0: the far rail, the rollers, then (after the block on it) the near rail
-function inBack() {
-  const out = [leg(-CW - 2, IN_Y[0] + 8), leg(-CW - 2, -20)];
-  out.push(rail({ x: -CW - 4, y: IN_Y[0], w: 4, d: IN_Y[1] - IN_Y[0] }));
+// The line's centre path: up the incoming straight (x = 0), round the corner, out along y = R. Each rail is one
+// band at a fixed offset from it, so the straights and the corner join without end faces stacking up.
+const bandAt = (o, n = 18) => {
+  const pts = [[o, IN_Y[0]], [o, IN_Y[1]]];
+  for (let i = 1; i < n; i++) { const t = (i / n) * (Math.PI / 2); pts.push([C[0] + Math.cos(t) * (R + o), C[1] + Math.sin(t) * (R + o)]); }
+  pts.push([OUT_X[0], R + o], [OUT_X[1], R + o]);
+  return pts;
+};
+const railBand = (o0, o1) => S(k.extrude([...bandAt(o1), ...bandAt(o0).reverse()], CONV_Z - 8, 9, P, { convex: false }), { tone: "mid" });
+const legsAt = (o) => [leg(o, IN_Y[0] + 8), leg(o, -20), ...[OUT_X[0] - 14, PORTAL.x - 36, OUT_X[1] + 8].map((x) => leg(x, R + o))].join("");
+
+// the inside rail (behind everything on the line) and, after the blocks, the outside rail
+const innerRail = () => legsAt(-CW - 2) + railBand(-CW - 4, -CW);
+const outerRail = () => legsAt(CW + 2) + railBand(CW, CW + 4);
+
+function inRollers() {
+  const out = [];
   for (let y = IN_Y[0] + 3; y < IN_Y[1] - 3; y += 7) out.push(roll({ x: -CW, y, w: 2 * CW, d: 4.6, r: 2.3 }));
   return out.join("");
 }
-function inFront() {
-  return [leg(CW + 2, IN_Y[0] + 8), leg(CW + 2, -20), rail({ x: CW, y: IN_Y[0], w: 4, d: IN_Y[1] - IN_Y[0] })].join("");
-}
 
-// the corner: annular rails and radial rollers, a little wider at the outside
-const arcRing = (r0, r1, n = 18) => {
-  const pts = [];
-  for (let i = 0; i <= n; i++) { const t = (i / n) * (Math.PI / 2); pts.push([C[0] + Math.cos(t) * r1, C[1] + Math.sin(t) * r1]); }
-  for (let i = n; i >= 0; i--) { const t = (i / n) * (Math.PI / 2); pts.push([C[0] + Math.cos(t) * r0, C[1] + Math.sin(t) * r0]); }
-  return pts;
-};
-function corner() {
-  const out = [S(k.extrude(arcRing(R - CW - 4, R - CW), CONV_Z - 8, 9, P, { convex: false }), { tone: "mid" })];
+// the corner rollers: radial, a little wider at the outside
+function cornerRollers() {
   const rollers = [];
   for (let i = 0; i < 9; i++) {
     const t = ((i + 0.5) / 9) * (Math.PI / 2);
@@ -105,27 +108,12 @@ function corner() {
     const ring = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [cx + rx * a * CW + tx * b * 2.3 * (1 + a * 0.3), cy + ry * a * CW + ty * b * 2.3 * (1 + a * 0.3)]);
     rollers.push([[cx, cy, CONV_Z], S(k.extrude(ring, CONV_Z - 4.6, 4.6, P), { tone: "mid", crease: "none" })]);
   }
-  out.push(...byDepth(rollers));
-  out.push(S(k.extrude(arcRing(R + CW, R + CW + 4), CONV_Z - 8, 9, P, { convex: false }), { tone: "mid" }));
-  return out.join("");
+  return byDepth(rollers).join("");
 }
 
-// outgoing, along -x at y = R
-function outBack() {
-  const out = [];
-  for (const x of [OUT_X[0] - 14, PORTAL.x - 36, OUT_X[1] + 8]) out.push(leg(x, OUT_Y - CW - 2));
-  out.push(rail({ x: OUT_X[1], y: OUT_Y - CW - 4, w: OUT_X[0] - OUT_X[1], d: 4 }));
-  return out.join("");
-}
 function outRollers() {
   const out = [];
   for (let x = OUT_X[1] + 3; x < OUT_X[0] - 3; x += 7) out.push(roll({ x, y: OUT_Y - CW, w: 4.6, d: 2 * CW, r: 2.3 }));
-  return out.join("");
-}
-function outFront() {
-  const out = [];
-  for (const x of [OUT_X[0] - 14, PORTAL.x - 36, OUT_X[1] + 8]) out.push(leg(x, OUT_Y + CW + 2));
-  out.push(rail({ x: OUT_X[1], y: OUT_Y + CW, w: OUT_X[0] - OUT_X[1], d: 4 }));
   return out.join("");
 }
 
@@ -186,15 +174,14 @@ const body = [
   floor(),
   walls(),
   pump(),
-  inBack(),
-  block(0, -60, "y"),
-  inFront(),
-  corner(),
   post(PX - PW, OUT_Y - PD),
   post(PX + PW, OUT_Y - PD),
-  outBack(),
+  innerRail(),
   tank(),
+  inRollers(),
+  cornerRollers(),
   outRollers(),
+  block(0, -60, "y"),
   block(-168, OUT_Y, "x"),
   sprayBar(OUT_Y - PD),
   nozzle(PX, OUT_Y - PD + 1, AXIS_Z - 1.5),
@@ -203,7 +190,7 @@ const body = [
   mist([PX, OUT_Y, PTOP - 6], [PX, OUT_Y, BTOP], 3.5, [0]),
   mist([PX + PW, OUT_Y, PTOP - 6], [PX + BLOCK.w / 2, OUT_Y, AXIS_Z], 2.5, [1]),
   mist([PX, OUT_Y + PD - 2, AXIS_Z], [PX, OUT_Y + BLOCK.d / 2, AXIS_Z], 3.5, [0]),
-  outFront(),
+  outerRail(),
   sprayBar(OUT_Y + PD),
   nozzle(PX, OUT_Y + PD - 1, AXIS_Z - 1.5),
   post(PX - PW, OUT_Y + PD),

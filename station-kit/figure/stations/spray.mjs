@@ -129,7 +129,7 @@ function outFront() {
   return out.join("");
 }
 
-// ---- BC block, deck up; long axis along "x" or "y" (it keeps its heading round the corner) ----
+// ---- BC block, deck up; along "x" (outgoing) or "y" (incoming) ---------------------
 function block(cx, cy, along = "x", { lit = false } = {}) {
   const { h } = BLOCK;
   const [w, d] = along === "x" ? [BLOCK.w, BLOCK.d] : [BLOCK.d, BLOCK.w];
@@ -195,14 +195,14 @@ const body = [
   outBack(),
   tank(),
   outRollers(),
-  block(-168, OUT_Y, "y"),
+  block(-168, OUT_Y, "x"),
   sprayBar(OUT_Y - PD),
   nozzle(PX, OUT_Y - PD + 1, AXIS_Z - 1.5),
-  mist([PX - PW, OUT_Y, PTOP - 6], [PX - BLOCK.d / 2, OUT_Y, AXIS_Z], 2.5, [1, 2]),
-  block(PX, OUT_Y, "y", { lit: true }),
+  mist([PX - PW, OUT_Y, PTOP - 6], [PX - BLOCK.w / 2, OUT_Y, AXIS_Z], 2.5, [1, 2]),
+  block(PX, OUT_Y, "x", { lit: true }),
   mist([PX, OUT_Y, PTOP - 6], [PX, OUT_Y, BTOP], 3.5, [0]),
-  mist([PX + PW, OUT_Y, PTOP - 6], [PX + BLOCK.d / 2, OUT_Y, AXIS_Z], 3, [1]),
-  mist([PX, OUT_Y + PD - 2, AXIS_Z], [PX, OUT_Y + BLOCK.w / 2, AXIS_Z], 2.5, [0]),
+  mist([PX + PW, OUT_Y, PTOP - 6], [PX + BLOCK.w / 2, OUT_Y, AXIS_Z], 2.5, [1]),
+  mist([PX, OUT_Y + PD - 2, AXIS_Z], [PX, OUT_Y + BLOCK.d / 2, AXIS_Z], 3.5, [0]),
   outFront(),
   sprayBar(OUT_Y + PD),
   nozzle(PX, OUT_Y + PD - 1, AXIS_Z - 1.5),

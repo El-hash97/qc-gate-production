@@ -119,10 +119,10 @@ for (const sz of [-1, 1]) lab.mesh(GEO.disc(0.014, 2 * PW, 0.002, 16), steel, { 
 // the five nozzles: [position, the point it aims at] in the world, for the faces top, +z, -z, +x, -x
 const NOZ = [
   [[PX, PTOP - 0.05, R], [PX, AXIS_Y + BLOCK[1] / 2, R]],
-  [[PX, AXIS_Y, R + PD - 0.02], [PX, AXIS_Y, R + BLOCK[0] / 2]],
-  [[PX, AXIS_Y, R - PD + 0.02], [PX, AXIS_Y, R - BLOCK[0] / 2]],
-  [[PX + PW, PTOP - 0.05, R], [PX + BLOCK[2] / 2, AXIS_Y, R]],
-  [[PX - PW, PTOP - 0.05, R], [PX - BLOCK[2] / 2, AXIS_Y, R]],
+  [[PX, AXIS_Y, R + PD - 0.02], [PX, AXIS_Y, R + BLOCK[2] / 2]],
+  [[PX, AXIS_Y, R - PD + 0.02], [PX, AXIS_Y, R - BLOCK[2] / 2]],
+  [[PX + PW, PTOP - 0.05, R], [PX + BLOCK[0] / 2, AXIS_Y, R]],
+  [[PX - PW, PTOP - 0.05, R], [PX - BLOCK[0] / 2, AXIS_Y, R]],
 ]
 const nozzleMat = MAT.brass()
 NOZ.forEach(([p, q], i) => {
@@ -146,16 +146,15 @@ lab.mesh(GEO.rbox(2 * PW - 0.1, 0.01, 2 * CW - 0.08, 0.004), MAT.fluid({ color: 
 const block = new THREE.Group()
 block.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat))
 for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); block.add(b) }
-// local faces: top, +z, -z, +x, -x. The block keeps its heading round the corner (it does not turn with the line), so
-// under the portal it rides crosswise: its local +x (an end) faces the world's +z nozzle, its local +z (a long side)
-// the world's -x nozzle.
+// local faces: top, +z, -z, +x, -x. Under the portal the block heads along -x (turned half round), so its local +z
+// faces the world's -z nozzle and its local +x the world's -x nozzle.
 const skinMats = [], E = 0.004
 const skins = [
   [[BLOCK[0] - 0.02, 0.002, BLOCK[2] - 0.02], [0, BLOCK[1] / 2 + E, 0], 0],
-  [[BLOCK[0] - 0.02, BLOCK[1] - 0.02, 0.002], [0, 0, BLOCK[2] / 2 + E], 4],
-  [[BLOCK[0] - 0.02, BLOCK[1] - 0.02, 0.002], [0, 0, -BLOCK[2] / 2 - E], 3],
-  [[0.002, BLOCK[1] - 0.02, BLOCK[2] - 0.02], [BLOCK[0] / 2 + E, 0, 0], 1],
-  [[0.002, BLOCK[1] - 0.02, BLOCK[2] - 0.02], [-BLOCK[0] / 2 - E, 0, 0], 2],
+  [[BLOCK[0] - 0.02, BLOCK[1] - 0.02, 0.002], [0, 0, BLOCK[2] / 2 + E], 2],
+  [[BLOCK[0] - 0.02, BLOCK[1] - 0.02, 0.002], [0, 0, -BLOCK[2] / 2 - E], 1],
+  [[0.002, BLOCK[1] - 0.02, BLOCK[2] - 0.02], [BLOCK[0] / 2 + E, 0, 0], 4],
+  [[0.002, BLOCK[1] - 0.02, BLOCK[2] - 0.02], [-BLOCK[0] / 2 - E, 0, 0], 3],
 ]
 for (const [size, pos, face] of skins) {
   const m = MAT.fluid({ color: [0.32, 0.2, 0.04], transparent: true, opacity: 0, depthWrite: false })
@@ -180,8 +179,7 @@ const mist = NOZ.map(([p, q]) => {
 })
 
 // ------------------------------------------------------------------ the solver: film build-up from each nozzle
-// world faces under the portal: top, +z and -z (the ends), +x and -x (the long sides)
-const AREA = [BLOCK[0] * BLOCK[2], BLOCK[1] * BLOCK[2], BLOCK[1] * BLOCK[2], BLOCK[0] * BLOCK[1], BLOCK[0] * BLOCK[1]]
+const AREA = [BLOCK[0] * BLOCK[2], BLOCK[0] * BLOCK[1], BLOCK[0] * BLOCK[1], BLOCK[1] * BLOCK[2], BLOCK[1] * BLOCK[2]]
 const rateUm = (i, clog) => (ETA * (Q_ML * (i === 0 ? clog : 1) * 1e-6) / 60 / AREA[i]) * 1e6 // um per second
 const finalMin = (t, clog) => Math.min(...AREA.map((_, i) => rateUm(i, clog) * t))
 lab.hero({ label: 'Thinnest oil film', unit: 'um', max: 5, digits: 1 })
@@ -200,14 +198,13 @@ lab.onTick((dt) => {
   S.clog = approach(S.clog, lab.broken ? 0.2 : 1, 1.5, dt)
   S.phase = phase
 
-  // the block's path: up the incoming line, round the corner without turning, along to the portal and out crosswise
-  let bx = 0, bz = 0, alpha = 1
-  const heading = -Math.PI / 2
+  // the block's path: up the incoming line, round the corner (turning with it), along to the portal and out
+  let bx = 0, bz = 0, heading = -Math.PI / 2, alpha = 1
   if (phase === 'roll in') { bz = lerp(IN_Z[0] + 0.2, 0, e); alpha = smoothstep(0, 0.25, u) }
-  else if (phase === 'corner') { const t = u * (Math.PI / 2); bx = C[0] + Math.cos(t) * R; bz = C[1] + Math.sin(t) * R }
-  else if (phase === 'to portal') { bx = lerp(-R, PX, e); bz = R }
-  else if (phase === 'spray' || phase === 'drip') { bx = PX; bz = R }
-  else if (phase === 'roll out') { bx = lerp(PX, OUT_X[1] + 0.3, e); bz = R; alpha = 1 - smoothstep(0.8, 1, u) }
+  else if (phase === 'corner') { const t = u * (Math.PI / 2); bx = C[0] + Math.cos(t) * R; bz = C[1] + Math.sin(t) * R; heading = -Math.PI / 2 - t }
+  else if (phase === 'to portal') { bx = lerp(-R, PX, e); bz = R; heading = -Math.PI }
+  else if (phase === 'spray' || phase === 'drip') { bx = PX; bz = R; heading = -Math.PI }
+  else if (phase === 'roll out') { bx = lerp(PX, OUT_X[1] + 0.3, e); bz = R; heading = -Math.PI; alpha = 1 - smoothstep(0.8, 1, u) }
   else if (phase === 'next') alpha = 0
   lab.place(block, bx, AXIS_Y, bz)
   block.rotation.set(0, heading, 0)
@@ -233,7 +230,7 @@ lab.onTick((dt) => {
   const say = spraying ? 'spraying five faces' : phase === 'drip' ? 'dripping off over the tank' : phase === 'roll out' ? 'oiled: on to Junbiki' : phase
   lab.setHero(live ? S.min : finalMin(time.value, S.clog), {
     state: lab.broken ? `top nozzle clogged, ${fmt(S.clog * 100)} % flow · ${say}` : say,
-    sub: `${fmt(time.value, 1)} s spray · top ${fmt(rateUm(0, S.clog) * time.value, 1)} um, sides ${fmt(rateUm(3, 1) * time.value, 1)} um, ends ${fmt(rateUm(1, 1) * time.value, 1)} um · minimum ${H_MIN} um`,
+    sub: `${fmt(time.value, 1)} s spray · top ${fmt(rateUm(0, S.clog) * time.value, 1)} um, sides ${fmt(rateUm(1, 1) * time.value, 1)} um, ends ${fmt(rateUm(3, 1) * time.value, 1)} um · minimum ${H_MIN} um`,
     bad: finalMin(time.value, S.clog) < H_MIN,
   })
 })

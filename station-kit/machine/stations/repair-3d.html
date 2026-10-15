@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Line Repair Rework Benches · Machine Skill</title>
+<meta name="description" content="Station Line Repair of the BC finishing line: blocks judged Repair at QC Gate 2 wait on a pallet behind the safety fence, are reworked at two benches against the wall, and go back to QC Gate 2. The queue is an M/M/2 system: how long a block takes to come back follows the Erlang C formula. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "Line Repair: blocks judged Repair at QC Gate 2 are reworked here and go back to QC Gate 2"
+// From the user's Blender layout (1 unit = 0.1 m): a fenced area across the factory road, about 5.5 x 5.5 m;
+// a beige wall 2.4 m high at the back; two workbenches against it, each 1.02 x 0.56 m and 0.74 m high with a dark
+// top and a bench vise on the corner; a yellow-green safety fence 2.8 m high (posts, four rails) 3.9 m in front
+// of the benches; a timber pallet stacked with Repair blocks near the end of the fence. Nothing moves in the
+// layout; the motion here (blocks to the benches, the hand grinder, the out pallet) is an interpretation.
+// Parts: floor, wall, two benches (body, top, vise), two hand grinders, safety fence, in pallet, out pallet,
+// the blocks.
+// Model: the rework area is a queue with two servers (M/M/2). Repair blocks arrive at lambda = share x line
+// rate; a bench reworks one in 1/mu on average. Erlang C gives the chance a block has to wait and the mean wait:
+// P_wait = (a^c / c!) / (1 - rho) / (sum_{k<c} a^k / k! + (a^c / c!) / (1 - rho)),  a = lambda / mu, rho = a / c
+// W_q = P_wait / (c mu - lambda),  W = W_q + 1 / mu.  With rho >= 1 the queue has no steady state and grows.
+// Hero: time from QC Gate 2 back to QC Gate 2 (W, min). Input: Repair share, %. Break: one bench goes down.
+
+const lab = new Lab({
+  prompt: 'Line Repair: the rework benches behind the fence, working the way the Blender layout lays them out',
+  no: 14, title: 'Line Repair', sub: 'rework benches',
+  size: 5.6,
+  view: { az: 28, el: 26, dist: 1.7, target: [0, 0.8, -0.2], fov: 30, frameX: -0.06 },
+  cut: { a: [1, 0, 0], b: [0, 1, 0], center: [0, 1, -1], reach: 0.6 },
+  pills: ['three.js', 'Erlang C', 'Rework queue'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const BLOCK = [0.475, 0.336, 0.371]
+const WALL_Z = -2.2, WALL_H = 2.4
+const BENCH_H = 0.74, BENCH = [1.02, 0.56]
+const BENCH_X = [-0.6, 0.6], BENCH_Z = WALL_Z + 0.05 + BENCH[1] / 2
+const FENCE_Z = 1.7, FENCE_X = [-1.1, 0.7], FENCE_H = 2.8
+const PAL_IN = [-1.9, 0.95], PAL_OUT = [1.9, 0.95], PAL_TOP = 0.14
+
+// ------------------------------------------------------------------ materials
+const beige = MAT.paint({ color: [0.84, 0.74, 0.58], roughness: 0.6, clearcoat: 0.1 })
+const topMat = MAT.paint({ color: [0.24, 0.24, 0.25], roughness: 0.55, clearcoat: 0.1 })
+const fenceMat = MAT.paint({ color: [0.78, 0.85, 0.2], roughness: 0.4, clearcoat: 0.3 })
+const wood = MAT.satin({ color: [0.46, 0.29, 0.13] })
+const floorMat = MAT.paint({ color: [0.42, 0.42, 0.43], roughness: 0.8, clearcoat: 0 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const blue = MAT.paint({ color: [0.12, 0.25, 0.7], roughness: 0.35, clearcoat: 0.5 })
+
+// ------------------------------------------------------------------ the solver's state and input (labels below read them)
+const LINE_RATE = 300                            // blocks an hour through the line (assumed, about a 12 s takt)
+const MEAN_S = 8                                 // min a bench takes to rework one block (assumed)
+const S = { c: 2, rho: 0, W: 0, Wq: 0, Lq: 0, Pw: 0, queue: 0, busy: 0, back: 0, lastWait: 0, t: 0 }
+const share = lab.slider({ id: 'share', label: 'Repair share', min: 1, max: 8, value: 4, unit: '%', ends: ['1 %', '8 %'], digits: 1 })
+
+// ------------------------------------------------------------------ the area: floor, wall, safety fence
+lab.mesh(GEO.rbox(5.6, 0.02, 4.8, 0.004), floorMat, { name: 'Floor', pos: [0, 0.01, 0.2], explode: [0, -0.3, 0] })
+lab.mesh(GEO.rbox(5.6, WALL_H, 0.15, 0.01), beige, { name: 'Wall', pos: [0, WALL_H / 2, WALL_Z - 0.075], explode: [0, 0, -0.8], xray: 'shell' })
+const fence = { name: 'Safety fence', explode: [0, 0, 0.8], count: 1 }
+for (const x of [FENCE_X[0], (FENCE_X[0] + FENCE_X[1]) / 2, FENCE_X[1]]) lab.mesh(GEO.rbox(0.06, FENCE_H, 0.06, 0.008), fenceMat, { ...fence, name: 'Fence post', pos: [x, FENCE_H / 2, FENCE_Z] })
+for (const [i, y] of [0.37, 1.46, 1.69, FENCE_H - 0.03].entries()) lab.mesh(GEO.rbox(FENCE_X[1] - FENCE_X[0] + 0.06, 0.06, 0.05, 0.008), fenceMat, { ...fence, name: 'Fence rail', pos: [(FENCE_X[0] + FENCE_X[1]) / 2, y, FENCE_Z], label: i === 3 ? 'Safety fence' : undefined, at: [0, 0.1, 0] })
+
+// ------------------------------------------------------------------ the two benches, each with a vise and a hand grinder
+const grinders = BENCH_X.map((bx, i) => {
+  const ex = [bx * 0.6, 0, -0.5]
+  lab.mesh(GEO.rbox(BENCH[0], BENCH_H - 0.06, BENCH[1], 0.01), beige, { name: 'Bench body', pos: [bx, (BENCH_H - 0.06) / 2, BENCH_Z], explode: ex, count: 1, label: i ? undefined : 'Repair bench', at: [0, 0.5, 0.3], value: i ? undefined : () => `${S.busy} of ${S.c} benches busy` })
+  lab.mesh(GEO.rbox(BENCH[0] + 0.04, 0.06, BENCH[1] + 0.04, 0.008), topMat, { name: 'Bench top', pos: [bx, BENCH_H - 0.03, BENCH_Z], explode: ex, count: 1 })
+  for (const dz of [-0.1, 0.1]) lab.mesh(GEO.rbox(BENCH[0] - 0.1, 0.004, 0.003, 0.001), topMat, { name: 'Drawer line', pos: [bx, BENCH_H * 0.55 + dz * 1.5, BENCH_Z + BENCH[1] / 2 + 0.002], explode: ex, count: 1 })
+  // the vise on the front corner
+  const vx = bx + BENCH[0] / 2 - 0.1, vz = BENCH_Z + BENCH[1] / 2 - 0.05
+  lab.mesh(GEO.rbox(0.14, 0.06, 0.16, 0.01), steelDark, { name: 'Vise body', pos: [vx, BENCH_H + 0.03, vz - 0.03], explode: ex, count: 1 })
+  lab.mesh(GEO.rbox(0.14, 0.06, 0.03, 0.006), steelDark, { name: 'Vise jaw', pos: [vx, BENCH_H + 0.07, vz + 0.06], explode: ex, count: 1 })
+  lab.mesh(GEO.disc(0.008, 0.2), steel, { name: 'Vise handle', pos: [vx, BENCH_H + 0.05, vz + 0.1], rot: [0, 0, Math.PI / 2], explode: ex, count: 1 })
+  // the hand grinder: body, wheel, guard; parked at the bench end when idle
+  const g = new THREE.Group()
+  const body = new THREE.Mesh(GEO.disc(0.032, 0.22), blue); body.rotation.z = Math.PI / 2; body.position.x = 0.12; g.add(body)
+  const head = new THREE.Mesh(GEO.rbox(0.06, 0.05, 0.06, 0.01), steelDark); g.add(head)
+  const wheel = new THREE.Mesh(GEO.disc(0.05, 0.008), MAT.steelDark({ roughness: 0.8 })); wheel.position.set(0, -0.035, 0); g.add(wheel)
+  const guard = new THREE.Mesh(GEO.lathe([[0.055, 0], [0.055, 0.02]], 24, { phi0: 0, phiLen: Math.PI }), steel); guard.position.y = -0.03; g.add(guard)
+  lab.add(g, { name: 'Hand grinder', explode: [bx * 0.6, 0.4, -0.3], count: 4 })
+  const sparks = lab.flow({ paths: Array.from({ length: 6 }, (_, k) => [[0, 0, 0], [0.04 + k * 0.01, -0.05, 0.08 + k * 0.02], [0.06 + k * 0.03, -0.2, 0.2 + k * 0.05]]), parent: g, count: 50, length: 0.2, speed: 0, color: () => [1, 0.65, 0.2] })
+  return { g, wheel, sparks, bx }
+})
+
+// ------------------------------------------------------------------ the pallets: in (from QC Gate 2) and out (back to QC Gate 2)
+function pallet([x, z], name, label, value) {
+  const ex = [Math.sign(x) * 0.6, 0, 0.4]
+  for (const dz of [-0.4, 0, 0.4]) lab.mesh(GEO.rbox(1.2, 0.02, 0.1, 0.004), wood, { name: `${name} board`, pos: [x, 0.01, z + dz], explode: ex, count: 1 })
+  for (const dx of [-0.5, 0, 0.5]) for (const dz of [-0.4, 0, 0.4]) lab.mesh(GEO.rbox(0.1, 0.08, 0.1, 0.006), wood, { name: `${name} block`, pos: [x + dx, 0.06, z + dz], explode: ex, count: 1 })
+  lab.mesh(GEO.rbox(1.2, 0.03, 1.0, 0.006), wood, { name: `${name} deck`, pos: [x, PAL_TOP - 0.015, z], explode: ex, label, at: [0, 0.8, 0], value })
+}
+pallet(PAL_IN, 'In pallet', 'In: from QC Gate 2', () => `${S.queue} waiting`)
+pallet(PAL_OUT, 'Out pallet', 'Out: back to QC Gate 2', () => `${S.back} sent back`)
+
+// ------------------------------------------------------------------ the blocks: a pool, each placed by the queue each frame
+const shown = (o, on) => o.scale.setScalar(on ? 1 : 1e-4)   // lab-kit sets .visible itself each frame
+const pool = Array.from({ length: 26 }, () => {
+  const mat = MAT.castIron({ color: [0.6, 0.6, 0.59], roughness: 0.55 }); mat.transparent = true
+  const g = new THREE.Group(); g.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), mat))
+  for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); g.add(b) }
+  lab.add(g, { name: 'BC block', explode: [0, 0.6, 0.4], count: 5 })
+  shown(g, false)
+  return { g, mat, state: 'idle', pos: new THREE.Vector3(), from: new THREE.Vector3(), to: new THREE.Vector3(), p: 1, alpha: 0, svc: 0, arrive: 0, bench: -1 }
+})
+const slot = ([x, z], i) => {
+  const layer = Math.min(1, Math.floor(i / 6)), k = i % 6
+  return new THREE.Vector3(x + (k % 2 ? 0.27 : -0.27), PAL_TOP + BLOCK[1] / 2 + layer * BLOCK[1], z + (Math.floor(k / 2) - 1) * 0.42)
+}
+const benchSpot = (b) => new THREE.Vector3(BENCH_X[b], BENCH_H + BLOCK[1] / 2, BENCH_Z)
+
+// ------------------------------------------------------------------ the solver: Erlang C for c benches
+function erlang(lam, mu, c) {
+  const a = lam / mu, rho = a / c
+  if (rho >= 1) return { rho, Pw: 1, Wq: Infinity, W: Infinity, Lq: Infinity }
+  let sum = 0, term = 1
+  for (let k = 0; k < c; k++) { sum += term; term *= a / (k + 1) }   // term ends as a^c / c!
+  const tail = term / (1 - rho)
+  const Pw = tail / (sum + tail)
+  const Wq = Pw / (c * mu - lam)
+  return { rho, Pw, Wq, W: Wq + 1 / mu, Lq: lam * Wq }
+}
+lab.hero({ label: 'Back to QC Gate 2 in', unit: 'min', max: 60, digits: 0 })
+
+// the shift plays out the same way every time: a seeded generator for arrivals and rework times
+let seed = 20261015
+const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+const expo = (mean) => -Math.log(1 - rnd()) * mean
+const queue = [], benches = [null, null], outStack = []
+let simT = 0, nextArrival = 1.5, leaving = 0
+const lam = () => (share.value / 100) * LINE_RATE / 60      // blocks a minute
+const MOVE = 0.9                                            // s for a block to be carried pallet to bench or back
+// the shown time runs 60x: one second on screen is one minute on the floor
+function startMove(b, to) { b.from.copy(b.pos); b.to.copy(to); b.p = 0 }
+
+lab.onTick((dt) => {
+  simT += dt                                      // minutes
+  const c = lab.broken ? 1 : 2
+  // arrivals from QC Gate 2
+  while (simT >= nextArrival) {
+    const b = pool.find((q) => q.state === 'idle')
+    if (b) { b.state = 'queue'; b.arrive = nextArrival; b.alpha = 0; b.pos.copy(slot(PAL_IN, Math.min(queue.length, 11))); b.p = 1; queue.push(b) }
+    nextArrival += expo(1 / lam())
+  }
+  // a free bench takes the next block in the queue
+  for (let i = 0; i < 2; i++) {
+    if (i >= c || benches[i] || !queue.length) continue
+    const b = queue.shift()
+    b.state = 'toBench'; b.bench = i; b.svc = expo(MEAN_S); b.alpha = 1; S.lastWait = simT - b.arrive
+    benches[i] = b; startMove(b, benchSpot(i))
+  }
+  // rework, then out to the pallet that goes back to QC Gate 2
+  for (const b of pool) {
+    if (b.state === 'toBench' && b.p >= 1) b.state = 'work'
+    if (b.state === 'work') {
+      b.svc -= dt
+      if (b.svc <= 0) { benches[b.bench] = null; b.state = 'toOut'; outStack.push(b); startMove(b, slot(PAL_OUT, outStack.length - 1)) }
+    }
+    if (b.state === 'toOut' && b.p >= 1) b.state = 'out'
+  }
+  // a full out pallet goes back to QC Gate 2
+  if (!leaving && outStack.length >= 6 && outStack.every((b) => b.state === 'out')) leaving = 1.5
+  if (leaving) {
+    leaving = Math.max(0, leaving - dt)
+    for (const b of outStack) b.alpha = leaving / 1.5
+    if (!leaving) { for (const b of outStack) { b.state = 'idle'; shown(b.g, false) } S.back += outStack.length; outStack.length = 0 }
+  }
+  // place every block: the queue closes up and fades in on arrival, carried blocks swing over in an arc
+  queue.forEach((b, i) => { b.pos.lerp(slot(PAL_IN, Math.min(i, 11)), 1 - Math.exp(-dt / 0.15)); b.alpha = Math.min(1, b.alpha + dt * 2) })
+  for (const b of pool) {
+    if (b.state === 'idle') continue
+    if (b.p < 1) {
+      b.p = Math.min(1, b.p + dt / MOVE)
+      const e = smoothstep(0, 1, b.p)
+      b.pos.lerpVectors(b.from, b.to, e); b.pos.y += Math.sin(b.p * Math.PI) * 0.3
+    }
+    shown(b.g, b.state !== 'queue' || queue.indexOf(b) < 12)
+    lab.place(b.g, b.pos.x, b.pos.y, b.pos.z)
+    const fading = b.alpha < 0.999
+    if (b.mat.transparent !== fading) { b.mat.transparent = fading; b.mat.needsUpdate = true }
+    b.mat.opacity = b.alpha
+  }
+  // the grinders work the block on their bench, or rest at the bench end
+  grinders.forEach((gr, i) => {
+    const b = benches[i]
+    const working = b && b.state === 'work'
+    const x = working ? gr.bx + Math.sin(simT * 1.7 + i) * 0.16 : gr.bx - BENCH[0] / 2 + 0.12
+    const y = working ? BENCH_H + BLOCK[1] + 0.04 : BENCH_H + 0.06
+    const z = working ? BENCH_Z + Math.sin(simT * 0.9 + i * 2) * 0.08 : BENCH_Z + 0.12
+    lab.place(gr.g, x, y, z)
+    gr.wheel.rotation.y += working ? dt * 60 : 0
+    gr.sparks.speed = working ? 2.5 : 0
+    gr.sparks.opacity = working ? 0.8 : 0
+  })
+
+  // the numbers
+  const mu = 1 / MEAN_S, q = erlang(lam(), mu, c)
+  S.c = c; S.rho = q.rho; S.W = q.W; S.Wq = q.Wq; S.Lq = q.Lq; S.Pw = q.Pw
+  S.queue = queue.length; S.busy = benches.filter((b) => b).length; S.t = simT
+  const stable = q.rho < 1
+  // past saturation there is no steady state: show how long the blocks now waiting would take to clear
+  const now = queue.length / (c * mu) + MEAN_S
+  lab.setHero(stable ? q.W : now, {
+    state: lab.broken ? `one bench down · ${queue.length} waiting` : `${S.busy} of ${c} benches busy · ${queue.length} waiting`,
+    sub: stable
+      ? `${fmt(lam() * 60, 1)} blocks/h in · benches ${fmt(q.rho * 100)} % busy · ${fmt(q.Pw * 100)} % wait, ${fmt(q.Wq, 1)} min on average · ${fmt(MEAN_S)} min rework`
+      : `${fmt(lam() * 60, 1)} blocks/h in, ${fmt(c * mu * 60, 1)} blocks/h out · the queue grows by ${fmt((lam() - c * mu) * 60, 1)} an hour`,
+    bad: !stable || q.W > 30,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'One bench down', run() {}, reset() {} })
+lab.how(
+  'Blocks judged Repair at QC Gate 2 come across the factory road on a pallet and wait behind the safety fence. Two benches against the wall rework them, taking about 8 minutes a block on average with a hand grinder and the bench vise, and each reworked block goes onto the out pallet, which goes back to QC Gate 2 for judging again. With blocks arriving at random and rework times that vary, the area is a queue with two servers: Erlang C gives the chance a block has to wait and how long, and the time back to QC Gate 2 is that wait plus the rework itself. At 4 % Repair the two benches are 80 % busy and a block is back in about 22 minutes. Lose one bench and more blocks arrive than one bench can rework: there is no steady state, and the pallet fills without end. Time on screen runs 60x: a second is a minute.',
+  [
+    'lambda = share x 300 blocks/h,  mu = 1 / 8 min per bench,  c = 2',
+    'a = lambda / mu,  rho = a / c',
+    'P_wait = (a^c/c!)/(1-rho) / (sum_{k<c} a^k/k! + (a^c/c!)/(1-rho))',
+    'W_q = P_wait / (c mu - lambda),  W = W_q + 1/mu',
+    'rho >= 1: no steady state, the queue grows by lambda - c mu',
+  ],
+)
+lab.autoFilm({ runBeat: 'Two benches, one queue.', runSub: 'Repair blocks wait their turn and go back to QC Gate 2.', breakBeat: 'One bench goes down.', breakSub: 'More arrive than one bench can rework; the queue grows without end.', sliderTo: 0.5 })
+// review hooks: __repair.stats
+window.__repair = { get stats() { return { ...S, queue: queue.length, out: outStack.length } } }
+lab.start()
+</script>
+</body>
+</html>

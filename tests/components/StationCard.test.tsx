@@ -110,8 +110,17 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Junbiki 3D/)).toHaveAttribute('src', '/stations/junbiki-3d.html');
   });
 
+  it('has a Line Repair card with its own figure and 3D machine', () => {
+    const repair = stationDetail('lineRepair')!;
+    render(<StationCard detail={repair} theme="light" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Line Repair/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/repair-light.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Line Repair 3D/)).toHaveAttribute('src', '/stations/repair-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
-    expect(stationDetail('lineRepair')).toBeNull();
+    expect(stationDetail('ngBox')).toBeNull();
   });
 
   it('plays the interactive 3D machine under the figure and goes back to the picture', () => {

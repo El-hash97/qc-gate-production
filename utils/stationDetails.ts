@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori to Junbiki have cards so far.
+// Placeholder copy for review; every station on the line and Line Repair have cards.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -176,6 +176,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Lane slope', value: 'About 2 %' },
       { label: 'Into the queue', value: 'About 0.3 m/s' },
       { label: 'Lift', value: '1.5 m up, travels to the lane' },
+    ],
+  },
+  lineRepair: {
+    title: 'Line Repair',
+    subtitle: 'Rework Benches',
+    image: { light: '/stations/repair-light.svg', dark: '/stations/repair-dark.svg' },
+    play: '/stations/repair-3d.html',
+    description: [
+      'Blocks judged Repair at QC Gate 2 come across the factory road on a pallet and wait behind the yellow safety fence.',
+      'Two benches against the wall rework them one at a time with a hand grinder and the bench vise, about 8 minutes a block.',
+      'Each reworked block goes onto the out pallet, which goes back to QC Gate 2 to be judged again.',
+    ],
+    specs: [
+      { label: 'Benches', value: '2, with a vise each' },
+      { label: 'Rework', value: 'About 8 min a block' },
+      { label: 'Back to QC Gate 2', value: 'About 22 min at 4 % Repair' },
+      { label: 'Next', value: 'QC Gate 2' },
     ],
   },
 };

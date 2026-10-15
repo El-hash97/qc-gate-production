@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori, HSB05 and HSB06 have cards so far.
+// Placeholder copy for review; Baritori, HSB05, HSB06 and Grinding have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -56,6 +56,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Cycle time', value: '5.2 s' },
       { label: 'Load', value: '1 block on the table' },
       { label: 'Media', value: 'Steel shot S330' },
+      { label: 'Operator', value: '1 person' },
+    ],
+  },
+  grinding: {
+    title: 'Grinding',
+    subtitle: 'Stub Grinding Booth',
+    image: { light: '/stations/grinding-light.svg', dark: '/stations/grinding-dark.svg' },
+    play: '/stations/grinding-3d.html',
+    description: [
+      'The operator brings the blasted block over from HSB06 on a hanging manipulator and into an open booth with a large grinding wheel on each side wall.',
+      'The block is pressed against the right wheel and then the left, so the gate and riser stubs left by casting are ground flush and the block sits true on the machining fixtures.',
+      'A wooden screen and a mesh guard keep the sparks in the booth, and the block goes on to Hanten MC.',
+    ],
+    specs: [
+      { label: 'Cycle time', value: '5.2 s' },
+      { label: 'Load', value: '1 block' },
+      { label: 'Wheel', value: 'Ø660 mm, 1,500 rpm' },
       { label: 'Operator', value: '1 person' },
     ],
   },

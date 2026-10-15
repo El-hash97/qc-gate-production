@@ -47,6 +47,15 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/HSB06 3D/)).toHaveAttribute('src', '/stations/hsb06-3d.html');
   });
 
+  it('has a Grinding card with its own figure and 3D machine', () => {
+    const grinding = stationDetail('grinding')!;
+    render(<StationCard detail={grinding} theme="dark" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Grinding/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/grinding-dark.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Grinding 3D/)).toHaveAttribute('src', '/stations/grinding-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
     expect(stationDetail('hanten')).toBeNull();
   });

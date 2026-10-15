@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grinding Booth · Machine Skill</title>
+<meta name="description" content="Station Grinding of the BC finishing line: a manipulator presses the blasted block against two large grinding wheels in an open booth to grind the gate and riser stubs flush. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "Grinding: the stub grinding booth of the BC finishing line, moving the way it does in the Blender layout"
+// After the two shot blasts the gate and riser stubs left by casting are ground flush, so the block sits
+// true on the machining fixtures. In the Blender layout the operator carries the block from HSB06 on a
+// hanging manipulator, holds it to the wheels in an open booth, and takes it on to the start of the line.
+// Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): booth 2.4 wide, 2.1 deep, 2.3 high,
+// open at the front; a grinding wheel 0.66 across and 0.1 wide on each side wall, each driven by a motor
+// bolted outside the wall; fixture table at the back; wooden screen door; mesh guard rail; stands at 0.80;
+// BC block 0.475 x 0.336 x 0.371.
+// Parts: back wall, side walls, roof, lintel, front posts, extraction hood and duct, 2 wheels (wheel,
+// flanges, nut, spindle housing, guard, tool rest), 2 motors (body, fins, fan cowl, terminal box,
+// bracket), fixture table, screen door with hinges, guard rail with mesh, pillar, boom, trolley, pole,
+// reach arm, steering ring, gripper, two stands.
+// Physics: wheel speed v = pi D n / 60 (D 0.66 m, 1,500 rpm, about 52 m/s); tangential force F_t = mu F_n
+// (mu 0.4, F_n the push); grinding power P = F_t v; removal rate Q = P / u with specific grinding energy
+// u = 40 J/mm3 for grey iron; two riser stubs of 30 mm x 8 mm per end, so V = 11.3 cm3 per end.
+// Hero: stubs removed, %. Input: push force. Break: the wheel glazes, mu falls to 0.12, removal slows.
+
+const lab = new Lab({
+  prompt: 'Grinding: the stub grinding booth of the BC line, moving the way it does in the Blender layout',
+  no: 7, title: 'Grinding', sub: 'stub grinding booth',
+  size: 5.2,
+  view: { az: -32, el: 20, dist: 2.2, target: [0.1, 1.05, 0.8], fov: 30 },
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0, 1.1, 0], reach: 0.6 },
+  pills: ['three.js', 'Grinding', 'Specific energy'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const W = 1.2, Z0 = -1.0, Z1 = 1.1, HT = 2.3, T = 0.08   // booth half width, back and front, height, wall
+const WR = 0.33, WW = 0.1                                // wheel radius and width
+const WX = 0.85, WY = 1.15, WZ = 0.25                    // wheel centre (x is either side)
+const BLOCK = [0.475, 0.336, 0.371]
+const GRIND_H = WY - BLOCK[1] / 2                        // block base height while grinding
+const PRESS_Z = WZ + WR + BLOCK[2] / 2                   // block centre when its back face bears on the rim
+const STAND_Y = 0.8
+const ARM = 0.7                                          // reach arm: gripper to pole, along +z
+const PIL = [0, 3.0]
+const BOOM_Y = 3.2
+const STAND_IN = [2.0, 1.5], STAND_OUT = [-2.0, 1.5]
+
+// ------------------------------------------------------------------ materials
+const beige = MAT.paint({ color: [0.78, 0.72, 0.6], roughness: 0.45, clearcoat: 0.25 })
+const beigeDark = MAT.paint({ color: [0.62, 0.57, 0.47], roughness: 0.5, clearcoat: 0.2 })
+const yellow = MAT.paint({ color: [0.86, 0.72, 0.1], roughness: 0.36, clearcoat: 0.5 })
+const blue = MAT.paint({ color: [0.08, 0.16, 0.55], roughness: 0.35, clearcoat: 0.5 })
+const wood = MAT.paint({ color: [0.52, 0.32, 0.18], roughness: 0.75, clearcoat: 0.05 })
+const stone = MAT.paint({ color: [0.55, 0.53, 0.5], roughness: 0.95, clearcoat: 0 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const rubber = MAT.rubber()
+const blockMat = MAT.castIron({ color: [0.6, 0.6, 0.59], roughness: 0.6 }) // blasted grey
+blockMat.transparent = true
+
+// ------------------------------------------------------------------ booth
+lab.mesh(GEO.rbox(2 * W, HT, T, 0.01), beige, { name: 'Back wall', pos: [0, HT / 2, Z0], explode: [0, 0, -0.8], xray: 'shell' })
+for (const s of [-1, 1]) {
+  lab.mesh(GEO.rbox(T, HT, Z1 - Z0, 0.01), beige, { name: 'Side wall', pos: [s * W, HT / 2, (Z0 + Z1) / 2], explode: [s * 0.8, 0, 0], xray: 'shell', count: 1 })
+  lab.mesh(GEO.rbox(0.16, HT, 0.16, 0.02), beigeDark, { name: 'Front post', pos: [s * (W - 0.02), HT / 2, Z1], explode: [s * 0.8, 0, 0.3], count: 1 })
+}
+lab.mesh(GEO.rbox(2 * W + 0.14, 0.1, Z1 - Z0 + 0.14, 0.01), beigeDark, { name: 'Roof', pos: [0, HT + 0.05, (Z0 + Z1) / 2], explode: [0, 0.8, 0], xray: 'shell' })
+lab.mesh(GEO.rbox(2 * W, 0.24, 0.16, 0.01), beigeDark, { name: 'Lintel', pos: [0, HT - 0.12, Z1], explode: [0, 0.6, 0.3] })
+lab.mesh(GEO.rbox(0.5, 0.2, 0.5, 0.03), beigeDark, { name: 'Extraction hood', pos: [0, HT + 0.2, -0.3], explode: [0, 1.0, 0] })
+lab.mesh(GEO.pipe([[0, HT + 0.3, -0.3], [0, HT + 0.7, -0.4], [0, HT + 0.85, -0.9], [0, HT + 0.85, -1.6]], 0.1), steelDark, { name: 'Extraction duct', explode: [0, 1.0, -0.2] })
+lab.mesh(GEO.rbox(1.0, 0.012, 0.9, 0.003), rubber, { name: 'Spark mat', pos: [0, 0.006, 0.55], explode: [0, -0.1, 0] })
+
+// ------------------------------------------------------------------ grinding wheels, guards, motors
+const wheels = []
+for (const s of [-1, 1]) {
+  // spindle housing from the wall to the wheel
+  lab.mesh(GEO.disc(0.07, W - WX - WW / 2 - T / 2), steelDark, { name: 'Spindle housing', pos: [s * (W + WX + WW / 2 - T / 2) / 2, WY, WZ], rot: [0, 0, Math.PI / 2], explode: [s * 0.4, 0, 0], count: 1 })
+  const spin = new THREE.Group(); spin.position.set(s * WX, WY, WZ)
+  const disc = new THREE.Mesh(GEO.disc(WR, WW, 0.008), stone); disc.rotation.z = Math.PI / 2; spin.add(disc)
+  for (const f of [-1, 1]) { const fl = new THREE.Mesh(GEO.disc(0.1, 0.02), steel); fl.rotation.z = Math.PI / 2; fl.position.x = f * (WW / 2 + 0.01); spin.add(fl) }
+  const nut = new THREE.Mesh(GEO.disc(0.035, 0.04, 0.005, 6), steelDark); nut.rotation.z = Math.PI / 2; nut.position.x = -s * (WW / 2 + 0.04); spin.add(nut)
+  // a dressing groove on the face, so the turning reads
+  const groove = new THREE.Mesh(GEO.tube(WR * 0.72, WR * 0.7, 0.004), steelDark); groove.rotation.z = Math.PI / 2; groove.position.x = -s * (WW / 2 + 0.001); spin.add(groove)
+  lab.add(spin, { name: s < 0 ? 'Left wheel' : 'Right wheel', explode: [s * 0.3, 0, 0.3], count: 5, label: s > 0 ? 'Grinding wheel' : undefined, at: [0, WR + 0.08, 0], value: s > 0 ? () => `${fmt(S.n)} rpm · ${fmt(S.v)} m/s` : undefined })
+  // guard: a band over the top and back of the wheel, open at the front where the work goes
+  lab.mesh(GEO.lathe([[WR + 0.03, -WW / 2 - 0.03], [WR + 0.06, -WW / 2 - 0.03], [WR + 0.06, WW / 2 + 0.03], [WR + 0.03, WW / 2 + 0.03]], 64, { phi0: Math.PI * 0.75, phiLen: Math.PI * 1.15 }), beigeDark, { name: 'Wheel guard', pos: [s * WX, WY, WZ], rot: [0, 0, Math.PI / 2], explode: [s * 0.3, 0.3, 0.3], count: 1 })
+  lab.mesh(GEO.rbox(0.14, 0.03, 0.12, 0.006), steelDark, { name: 'Tool rest', pos: [s * WX, WY - 0.2, WZ + WR + 0.07], explode: [s * 0.3, 0, 0.4], count: 1 })
+  // motor outside the wall: finned body on a bracket, fan cowl, terminal box
+  const mx = s * (W + 0.3)
+  lab.mesh(GEO.disc(0.19, 0.46), blue, { name: 'Motor', pos: [mx, WY, WZ], rot: [0, 0, Math.PI / 2], explode: [s * 0.8, 0, 0], label: s > 0 ? 'Motor' : undefined, at: [0, 0.25, 0] })
+  lab.mesh(GEO.ring(GEO.rbox(0.4, 0.02, 0.04, 0.004).translate(0, 0.2, 0), 16, 'x'), blue, { name: 'Cooling fins', pos: [mx, WY, WZ], explode: [s * 0.8, 0, 0], count: 16 })
+  lab.mesh(GEO.disc(0.17, 0.08), steelDark, { name: 'Fan cowl', pos: [mx + s * 0.27, WY, WZ], rot: [0, 0, Math.PI / 2], explode: [s * 1.0, 0, 0] })
+  lab.mesh(GEO.rbox(0.16, 0.12, 0.16, 0.02), blue, { name: 'Terminal box', pos: [mx, WY + 0.24, WZ], explode: [s * 0.8, 0.2, 0] })
+  lab.mesh(GEO.rbox(0.36, WY - 0.19, 0.3, 0.01), steelDark, { name: 'Motor bracket', pos: [mx, (WY - 0.19) / 2, WZ], explode: [s * 0.8, -0.2, 0] })
+  wheels.push({ spin, s })
+}
+
+// ------------------------------------------------------------------ fixture table at the back
+for (const [dx, dz] of [[-0.35, -0.85], [0.35, -0.85], [-0.35, -0.45], [0.35, -0.45]]) lab.mesh(GEO.rbox(0.05, 0.8, 0.05, 0.006), steelDark, { name: 'Table leg', pos: [dx, 0.4, dz], explode: [0, -0.2, -0.4], count: 1 })
+lab.mesh(GEO.rbox(0.9, 0.05, 0.6, 0.008), steel, { name: 'Gauge plate', pos: [0, 0.82, -0.65], explode: [0, -0.1, -0.4], label: 'Gauge plate', at: [0.3, 0.05, 0.2] })
+lab.mesh(GEO.rbox(0.05, 0.1, 0.5, 0.006), steelDark, { name: 'Datum stop', pos: [-0.38, 0.9, -0.65], explode: [0, 0, -0.4] })
+
+// ------------------------------------------------------------------ wooden screen door (open) and the mesh guard rail
+const door = new THREE.Group(); door.position.set(-W - 0.08, 0, Z1 + 0.05); door.rotation.y = -0.25
+const leaf = new THREE.Mesh(GEO.rbox(1.1, 2.0, 0.05, 0.01), wood); leaf.position.set(-0.56, 1.05, 0); door.add(leaf)
+for (let c = 0; c < 2; c++) for (let r = 0; r < 3; r++) { const p = new THREE.Mesh(GEO.rbox(0.42, 0.52, 0.02, 0.006), MAT.paint({ color: [0.45, 0.27, 0.15], roughness: 0.8 })); p.position.set(-0.8 + c * 0.48, 0.45 + r * 0.6, 0.03); door.add(p) }
+for (const y of [0.3, 1.8]) { const h = new THREE.Mesh(GEO.disc(0.02, 0.12), steelDark); h.position.set(0, y, 0); door.add(h) }
+lab.add(door, { name: 'Screen door', explode: [-0.6, 0, 0.6], count: 9, label: 'Screen door', at: [-0.6, 2.05, 0] })
+const RX = [-0.1, 0.8, 1.7], RZ = 2.35
+for (const x of RX) lab.mesh(GEO.rbox(0.04, 1.0, 0.04, 0.006), yellow, { name: 'Rail post', pos: [x, 0.5, RZ], explode: [0, 0, 0.5], count: 1 })
+for (const y of [0.08, 0.98]) lab.mesh(GEO.rbox(RX[2] - RX[0] + 0.04, 0.04, 0.04, 0.006), yellow, { name: 'Rail bar', pos: [(RX[0] + RX[2]) / 2, y, RZ], explode: [0, 0, 0.5], count: 1 })
+lab.mesh(GEO.rbox(RX[2] - RX[0], 0.86, 0.006, 0.002), MAT.steel({ roughness: 0.5, transparent: true, opacity: 0.35 }), { name: 'Mesh infill', pos: [(RX[0] + RX[2]) / 2, 0.53, RZ], explode: [0, 0, 0.5] })
+
+// ------------------------------------------------------------------ stands
+for (const [[sx, sz], name] of [[STAND_IN, 'From HSB06'], [STAND_OUT, 'To Hanten']]) {
+  for (const [dx, dz] of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]) lab.mesh(GEO.rbox(0.04, STAND_Y - 0.07, 0.04, 0.006), beigeDark, { name: 'Stand leg', pos: [sx + dx, (STAND_Y - 0.07) / 2, sz + dz], explode: [Math.sign(sx) * 0.4, -0.2, 0.3], count: 1 })
+  lab.mesh(GEO.rbox(0.48, 0.03, 0.48, 0.006), beigeDark, { name: 'Stand top', pos: [sx, STAND_Y - 0.055, sz], explode: [Math.sign(sx) * 0.4, -0.2, 0.3] })
+  lab.mesh(GEO.disc(0.24, 0.03), steel, { name: 'Stand plate', pos: [sx, STAND_Y - 0.025, sz], explode: [Math.sign(sx) * 0.4, -0.1, 0.3], label: name, at: [0, 0.05, 0.2] })
+}
+
+// ------------------------------------------------------------------ pillar jib manipulator
+lab.mesh(GEO.rbox(0.5, 0.03, 0.5, 0.006), steelDark, { name: 'Pillar base', pos: [PIL[0], 0.015, PIL[1]], explode: [0, 0, 0.8] })
+lab.mesh(GEO.disc(0.1, BOOM_Y + 0.05), yellow, { name: 'Pillar', pos: [PIL[0], (BOOM_Y + 0.05) / 2, PIL[1]], explode: [0, 0, 0.8], label: 'Pillar jib', at: [0.1, -0.8, 0] })
+lab.mesh(GEO.disc(0.17, 0.08), steelDark, { name: 'Slewing ring', pos: [PIL[0], BOOM_Y + 0.08, PIL[1]], explode: [0, 0.2, 0.8] })
+const boom = new THREE.Group(); boom.position.set(PIL[0], BOOM_Y, PIL[1])
+const BOOM_L = 2.7
+const beam = new THREE.Mesh(GEO.rbox(BOOM_L, 0.14, 0.14, 0.012), yellow); beam.position.set(BOOM_L / 2 - 0.15, 0.17, 0); boom.add(beam)
+const tie = new THREE.Mesh(GEO.pipe([[0, 0.5, 0], [1.3, 0.24, 0]], 0.02), steel); boom.add(tie)
+const mast = new THREE.Mesh(GEO.disc(0.06, 0.5), yellow); mast.position.y = 0.3; boom.add(mast)
+const endStop = new THREE.Mesh(GEO.rbox(0.04, 0.2, 0.18, 0.006), rubber); endStop.position.set(BOOM_L - 0.15, 0.17, 0); boom.add(endStop)
+lab.add(boom, { name: 'Boom', explode: [0, 0.4, 0.8], count: 4 })
+const trolley = new THREE.Group()
+trolley.add(new THREE.Mesh(GEO.rbox(0.24, 0.1, 0.22, 0.02), steelDark))
+for (const s of [-1, 1]) for (const x of [-0.07, 0.07]) { const w = new THREE.Mesh(GEO.disc(0.035, 0.025), steel); w.rotation.x = Math.PI / 2; w.position.set(x, 0.07, s * 0.09); trolley.add(w) }
+lab.add(trolley, { name: 'Trolley', explode: [0, 0.4, 0.8], count: 5 })
+const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1, 20), MAT.chrome())
+lab.add(pole, { name: 'Hanging pole', explode: [0, 0.3, 0.8] })
+// head: in its own frame the gripper is at the origin and the arm runs out along +z to the pole
+const head = new THREE.Group()
+const ARM_Y = BLOCK[1] + 0.12
+const arm = new THREE.Mesh(GEO.rbox(0.06, 0.06, ARM, 0.01), steelDark); arm.position.set(0, ARM_Y, ARM / 2); head.add(arm)
+const bar = new THREE.Mesh(GEO.rbox(0.6, 0.05, 0.1, 0.01), steelDark); bar.position.y = BLOCK[1] + 0.06; head.add(bar)
+for (const s of [-1, 1]) {
+  const jaw = new THREE.Mesh(GEO.rbox(0.04, 0.3, 0.12, 0.008), steelDark); jaw.position.set(s * (BLOCK[0] / 2 + 0.025), BLOCK[1] - 0.08, 0); head.add(jaw)
+  const pad = new THREE.Mesh(GEO.rbox(0.012, 0.16, 0.09, 0.004), rubber); pad.position.set(s * (BLOCK[0] / 2 + 0.002), BLOCK[1] - 0.12, 0); head.add(pad)
+}
+const collar = new THREE.Mesh(GEO.disc(0.06, 0.1), steelDark); collar.position.set(0, ARM_Y, ARM); head.add(collar)
+const steer = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.015, 12, 56), yellow); steer.rotation.x = Math.PI / 2; steer.position.set(0, ARM_Y + 0.45, ARM); head.add(steer)
+for (let i = 0; i < 3; i++) { const sp = new THREE.Mesh(GEO.rbox(0.22, 0.014, 0.014, 0.004), steel); const a = (i * 2 * Math.PI) / 3; sp.position.set(Math.cos(a) * 0.11, ARM_Y + 0.45, ARM + Math.sin(a) * 0.11); sp.rotation.y = -a; head.add(sp) }
+lab.add(head, { name: 'Gripper, arm and steering ring', explode: [0, 0.2, 0.8], count: 10, label: 'Manipulator', at: [0, ARM_Y + 0.45, ARM] })
+
+// ------------------------------------------------------------------ the block, with two riser stubs at each end of its back face
+const block = new THREE.Group()
+const blockBody = new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat); blockBody.position.y = BLOCK[1] / 2; block.add(blockBody)
+for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] + 0.003, 0); block.add(b) }
+const stubMat = MAT.castIron({ color: [0.32, 0.28, 0.24], roughness: 0.85 }) // the stubs are still rough casting
+stubMat.transparent = true
+const stubs = [1, -1].map((s) => [-0.07, 0.07].map((dy) => { // end 0 is the right end (ground first), end 1 the left
+  const m = new THREE.Mesh(GEO.disc(0.015, 0.008), stubMat); m.rotation.x = Math.PI / 2
+  m.position.set(s * 0.14, BLOCK[1] / 2 + dy, -BLOCK[2] / 2 - 0.004); block.add(m); return m
+}))
+lab.add(block, { name: 'BC block', explode: [0, 0.3, 0], count: 9, label: 'Block', at: [0, BLOCK[1], 0], value: () => `stubs ${fmt(S.removed * 100)} %` })
+
+// ------------------------------------------------------------------ sparks off the rim: fixed fans at each wheel's contact point
+const sparkPaths = (s) => Array.from({ length: 12 }, (_, i) => {
+  const from = [s * WX + (i - 6) * 0.006, WY - 0.06, WZ + WR - 0.02]
+  return [from, [from[0] + (i - 6) * 0.02, from[1] - 0.12, from[2] + 0.18], [from[0] + (i - 6) * 0.05, 0.02, from[2] + 0.45 + (i % 4) * 0.05]]
+})
+const sparks = [-1, 1].map((s) => lab.flow({ paths: sparkPaths(s), count: 240, length: 0.2, speed: 0, color: () => [1, 0.62, 0.2] }))
+
+// ------------------------------------------------------------------ the solver
+const D_WHEEL = 2 * WR, N_WHEEL = 1500
+const U_SPEC = 40e9                  // J/m3, specific grinding energy of grey iron (40 J/mm3)
+const V_END = 2 * Math.PI * 0.015 ** 2 * 0.008 // two 30 mm x 8 mm riser stubs per end, m3
+const TIME_K = 15                    // grinding is shown 15x fast
+const S = { n: 0, v: 0, mu: 0.4, Ft: 0, P: 0, Q: 0, removed: 0 }
+function solve(Fn, mu, n) {
+  const v = (Math.PI * D_WHEEL * n) / 60
+  const Ft = mu * Fn
+  const P = Ft * v
+  return { v, Ft, P, Q: P / U_SPEC }
+}
+
+lab.hero({ label: 'Stubs removed', unit: '%', max: 100, digits: 0 })
+const push = lab.slider({ id: 'push', label: 'Push force', min: 100, max: 400, value: 250, unit: 'N', ends: ['100 N', '400 N'] })
+
+// waypoints for the gripper: [x, z, block base height]
+const AT = {
+  in: [STAND_IN[0], STAND_IN[1], STAND_Y],
+  inUp: [STAND_IN[0], STAND_IN[1], GRIND_H],
+  frontR: [WX - 0.1, PRESS_Z + 0.25, GRIND_H],
+  pressR: [WX - 0.1, PRESS_Z, GRIND_H],
+  frontL: [-WX + 0.1, PRESS_Z + 0.25, GRIND_H],
+  pressL: [-WX + 0.1, PRESS_Z, GRIND_H],
+  outUp: [STAND_OUT[0], STAND_OUT[1], GRIND_H],
+  out: [STAND_OUT[0], STAND_OUT[1], STAND_Y],
+}
+// one cycle, shaped like the Blender animation: [phase, seconds (0 = until the stubs are gone), from, to]
+const CYCLE = [
+  ['pick', 1.2, 'in', 'inUp'],
+  ['to right wheel', 2.0, 'inUp', 'frontR'],
+  ['press right', 0.6, 'frontR', 'pressR'],
+  ['grind right', 0, 'pressR', 'pressR'],
+  ['back off', 0.6, 'pressR', 'frontR'],
+  ['to left wheel', 1.4, 'frontR', 'frontL'],
+  ['press left', 0.6, 'frontL', 'pressL'],
+  ['grind left', 0, 'pressL', 'pressL'],
+  ['clear', 0.6, 'pressL', 'frontL'],
+  ['to Hanten', 2.0, 'frontL', 'outUp'],
+  ['set down', 1.0, 'outUp', 'out'],
+  ['return', 2.4, 'out', 'in'],
+]
+const SAY = { pick: 'lifting from the HSB06 stand', 'to right wheel': 'to the right wheel', 'press right': 'pressing in', 'grind right': 'grinding the right stubs', 'back off': 'backing off', 'to left wheel': 'across to the left wheel', 'press left': 'pressing in', 'grind left': 'grinding the left stubs', clear: 'clearing the wheel', 'to Hanten': 'on to Hanten', 'set down': 'setting down', return: 'back for the next block' }
+let step = 0, pt = 0
+const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
+
+lab.onTick((dt) => {
+  const [phase, dur, from, to] = CYCLE[step]
+  pt += dt
+  const u = dur ? clamp(pt / dur) : 0
+  const e = smoothstep(0, 1, u)
+  const [gx, gz, gh] = lerp3(AT[from], AT[to], e)
+
+  // the wheels run all the time; grinding draws power from the push
+  S.n = approach(S.n, N_WHEEL, 0.8, dt)
+  S.mu = lab.broken ? approach(S.mu, 0.12, 1.2, dt) : approach(S.mu, 0.4, 0.6, dt)
+  const grinding = phase === 'grind right' || phase === 'grind left'
+  const sol = solve(grinding ? push.value : 0, S.mu, S.n)
+  S.v = sol.v; S.Ft = sol.Ft; S.P = sol.P; S.Q = sol.Q
+  if (grinding) {
+    const goal = phase === 'grind right' ? 0.5 : 1
+    S.removed = Math.min(goal, S.removed + (S.Q * TIME_K * dt) / (2 * V_END))
+    if (S.removed >= goal - 1e-6) { step++; pt = 0 }
+  } else if (u >= 1) { step = (step + 1) % CYCLE.length; pt = 0; if (step === 0) S.removed = 0 }
+
+  // manipulator: gripper, arm out to the pole, trolley and boom slewing to follow
+  const px = gx, pz = gz + ARM
+  lab.place(head, gx, gh, gz)
+  const slew = Math.atan2(pz - PIL[1], px - PIL[0])
+  boom.rotation.y = -slew
+  lab.place(trolley, px, BOOM_Y - 0.06, pz); trolley.rotation.y = -slew
+  const pTop = BOOM_Y - 0.1, pBot = gh + ARM_Y
+  pole.scale.y = Math.max(0.01, pTop - pBot); lab.place(pole, px, (pTop + pBot) / 2, pz)
+
+  // the block rides in the gripper; at the end of the cycle it stays on the Hanten stand and a new one waits
+  let alpha = 1
+  if (phase === 'return') { lab.place(block, STAND_OUT[0], STAND_Y, STAND_OUT[1]); alpha = 1 - smoothstep(0.3, 0.8, u) }
+  else lab.place(block, gx, gh, gz)
+  if (phase === 'pick') alpha = smoothstep(0, 0.4, u)
+  blockMat.opacity = stubMat.opacity = alpha
+  // the stubs shrink as they are ground flush: the right pair first, then the left
+  stubs.forEach((pair, end) => {
+    const left = clamp(1 - (S.removed * 2 - end))
+    for (const m of pair) { m.scale.y = Math.max(0.02, left); m.position.z = -BLOCK[2] / 2 - 0.004 * left }
+  })
+
+  // wheels turn (shown 1:40), sparks fly while the block bears on a wheel
+  wheels.forEach(({ spin, s }) => { spin.rotation.x -= s * ((S.n * 2 * Math.PI) / 60 / 40) * dt })
+  sparks.forEach((f, j) => {
+    const on = (phase === 'grind right' && j === 1) || (phase === 'grind left' && j === 0)
+    f.speed = on ? 1.4 : 0
+    f.opacity = on ? clamp(S.P / 2500) : 0
+  })
+
+  lab.setHero(S.removed * 100, {
+    state: lab.broken ? `wheel glazed · ${SAY[phase]}` : SAY[phase],
+    sub: lab.broken
+      ? `mu ${fmt(S.mu, 2)} · ${fmt(S.P / 1000, 1)} kW into the cut · ${fmt(S.Q * 1e9)} mm³/s · dress the wheel`
+      : `push ${fmt(push.value)} N · ${fmt(S.v)} m/s · ${fmt(S.P / 1000, 1)} kW into the cut · ${fmt(S.Q * 1e9)} mm³/s`,
+    bad: lab.broken,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({
+  label: 'Glaze the wheel',
+  run(lab) { lab.sparks.emit(lab.machine.localToWorld(new THREE.Vector3(WX, WY, WZ + WR)), 80, 2) },
+  reset() { S.mu = 0.4 },
+})
+lab.how(
+  'The operator holds the blasted block on a hanging manipulator and presses its back face against the rim of the right wheel, then the left, until the gate and riser stubs are ground flush. The wheel turns at 52 m/s; the push and the wheel friction set the tangential force, so the power going into the cut is mu F v, and the volume of iron it removes each second is that power over the specific grinding energy of grey iron. Grinding is shown 15x fast and the wheel turns 1:40. A glazed wheel slips: its friction falls, the power into the cut falls with it and the stubs come off three times slower until it is dressed. Simplified: all the cut power removes metal, and the stubs are plain cylinders.',
+  [
+    'v = pi D n / 60          D = 0.66 m, n = 1,500 rpm',
+    'F_t = mu F_n             mu = 0.4 (glazed 0.12)',
+    'P = F_t v',
+    'Q = P / u                u = 40 J/mm^3 (grey iron)',
+    'V_end = 2 pi r^2 h       r = 15 mm, h = 8 mm',
+    't_end = V_end / Q',
+  ],
+)
+lab.autoFilm({ runBeat: 'It grinds the stubs.', runSub: 'Right wheel, left wheel, and on to Hanten.', breakBeat: 'Glaze the wheel.', breakSub: 'Friction falls; the stubs come off three times slower.', sliderTo: 0.85 })
+// jump to a phase for review shots: __grind.go('grind right', 0.25) starts there with a quarter of the stubs gone
+window.__grind = { go(name, removed = 0) { step = CYCLE.findIndex((c) => c[0] === name); pt = 0; S.removed = removed } }
+lab.start()
+</script>
+</body>
+</html>

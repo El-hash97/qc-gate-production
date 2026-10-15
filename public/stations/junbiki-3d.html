@@ -1666,6 +1666,9 @@ for (const s of [-1, 1]) { const arm = new THREE.Mesh(GEO.rbox(0.04, 0.14, 0.7, 
 lab.add(carriage, { name: 'Lift carriage', explode: [0, 0.4, -0.8], count: 1 + carRollers.length + 2 })
 
 // ------------------------------------------------------------------ the moving blocks: one on the lift, one per lane rolling
+// lab-kit sets every part's .visible itself each frame (the intro assembly), so a block that is not in play is
+// hidden by scale instead
+const shown = (obj, on) => obj.scale.setScalar(on ? 1 : 1e-4)
 function blockGroup(mat) {
   const g = new THREE.Group()
   const inner = new THREE.Group(); inner.rotation.y = Math.PI / 2; g.add(inner)
@@ -1677,7 +1680,7 @@ const liftMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.5 })
 const liftBlock = blockGroup(liftMat)
 lab.add(liftBlock, { name: 'BC block', explode: [0, 0.6, -0.6], count: 5, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => `lot for lane ${S.lane + 1}` })
 const rollers = LX.map((x, k) => {
-  const g = blockGroup(blockMat); g.visible = false
+  const g = blockGroup(blockMat); shown(g, false)
   lab.add(g, { name: 'Rolling block', parent: top, explode: [0, 0.3, 0], count: 5, label: k === 2 ? 'Rolling' : undefined, at: [0, BLOCK[1] / 2, 0], value: k === 2 ? () => `${fmt(S.v, 2)} m/s` : undefined })
   return { g, active: false, s: 0, v: 0, stuck: 0, pushed: false }
 })
@@ -1730,13 +1733,13 @@ lab.onTick((dt) => {
     if (waitPush) { pt = 0; if (!busy) waitPush = false }
     const ue = smoothstep(0, 1, clamp(pt / dur))
     bz = lerp(0, Z0 + 0.24, ue); bx = lx; by = ly + BLOCK[1] / 2
-    if (!waitPush && pt >= dur) { const r = rollers[S.lane]; r.active = true; r.s = 0.24; r.v = V0; r.stuck = 0; r.pushed = false; r.g.visible = true; show = false }
+    if (!waitPush && pt >= dur) { const r = rollers[S.lane]; r.active = true; r.s = 0.24; r.v = V0; r.stuck = 0; r.pushed = false; shown(r.g, true); show = false }
   } else if (phase === 'back') { lx = lerp(target, HOME, e); ly = ROLL_Y + RISE * (1 - e); show = false }
   else if (phase === 'next') show = false
   lab.place(lift, lx, 0, 0)
   lab.place(carriage, lx, ly, 0)
   lab.place(liftBlock, bx, by, bz)
-  liftBlock.visible = show
+  shown(liftBlock, show)
   const fading = alpha < 0.999
   if (liftMat.transparent !== fading) { liftMat.transparent = fading; liftMat.needsUpdate = true }
   liftMat.opacity = alpha
@@ -1766,7 +1769,7 @@ lab.onTick((dt) => {
       else { r.stuck += h; if (r.stuck > 3) { r.pushed = true; S.stalls++; S.stallT = 8 } }
       if (r.s >= tail) {
         S.vHit = r.pushed ? 0 : r.v; S.E = 0.5 * MASS * S.vHit * S.vHit
-        r.active = false; r.g.visible = false; S.n[k]++; S.staged++
+        r.active = false; shown(r.g, false); S.n[k]++; S.staged++
         if (S.n[k] >= CAP) S.loading[k] = 2.5     // the lot is complete: it goes out to the truck
         refreshStaged()
         break

@@ -65,8 +65,17 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Hanten MC 3D/)).toHaveAttribute('src', '/stations/hanten-3d.html');
   });
 
+  it('has a Final Proses card with its own figure and 3D machine', () => {
+    const final = stationDetail('final')!;
+    render(<StationCard detail={final} theme="dark" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Final Proses/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/final-dark.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Final Proses 3D/)).toHaveAttribute('src', '/stations/final-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
-    expect(stationDetail('final')).toBeNull();
+    expect(stationDetail('qc1')).toBeNull();
   });
 
   it('plays the interactive 3D machine under the figure and goes back to the picture', () => {

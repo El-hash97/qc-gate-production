@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Final Proses Air Blow-off · Machine Skill</title>
+<meta name="description" content="Station Final Proses of the BC finishing line: the operator turns the block a quarter at a time in a hand-indexed cage and blows the last loose shot out of every face with an air gun. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "Final Proses: the last touch-up and air blow-off of the BC finishing line, moving the way it does in the Blender layout"
+// After the turnover the operator gives the block a last check: edges touched up, and every passage blown out
+// with compressed air so no loose shot rides on to machining.
+// Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): an open booth over the roller line
+// (back wall 2.3 high, two portal frames 2.2 apart with a rail along their tops), a hand-indexed cage of two
+// rings 0.76 across in the line over a shot grating, a pendant control box with an e-stop and an index lever,
+// a rack of green air tools; roller tops 0.47; BC block 0.475 x 0.336 x 0.371.
+// Parts: back wall, light panel, portals (posts, beams), hose rail, trolley, hose, blow gun (nozzle, body,
+// grip, trigger), cage (rings with index notches, tie bars, platform, clamp), bearing stands and rollers,
+// index lever, grating and tray, two conveyors, control box, tool rack with three tools, the block.
+// Physics: a choked air jet leaves a 2.5 mm nozzle at u_e = 313 m/s; along a free jet the centreline speed
+// falls as u = 6.2 u_e d / x, scaled by sqrt of the supply pressure's share of 6 bar; the drag on an S330
+// grain is F = 1/2 rho u^2 C_d A; a grain wedged in a passage holds with about 20 times its weight. Grains
+// come out at k = k0 (F / F_hold - 1) per second while F > F_hold. Air use: m_dot = C_d A p0 sqrt(k/(R T0)) 0.579.
+// Hero: loose shot removed, %. Input: nozzle distance. Break: the air supply drops to 2 bar.
+
+const lab = new Lab({
+  prompt: 'Final Proses: the last air blow-off of the BC line, moving the way it does in the Blender layout',
+  no: 9, title: 'Final Proses', sub: 'air blow-off',
+  size: 5.0,
+  view: { az: 26, el: 18, dist: 1.4, target: [0, 0.85, 0.3], fov: 30 },
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0, 0.8, 0], reach: 0.6 },
+  pills: ['three.js', 'Free jet', 'Air blow-off'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const ROLL_Y = 0.47
+const BLOCK = [0.475, 0.336, 0.371]
+const AXIS_Y = ROLL_Y + BLOCK[1] / 2          // the cage turns about the block's own centre line
+const RING_R = 0.38, RING_T = 0.04
+const IN = [-2.4, -0.42], OUT = [0.42, 2.4], CW = 0.3
+const WALL_Z = -1.0, PX = 1.1, PZ = [-0.95, 0.9], TOP = 2.3
+const RAIL_Z = 0.25, RAIL_Y = TOP - 0.12
+
+// ------------------------------------------------------------------ materials
+const beige = MAT.paint({ color: [0.78, 0.72, 0.6], roughness: 0.45, clearcoat: 0.25 })
+const beigeDark = MAT.paint({ color: [0.62, 0.57, 0.47], roughness: 0.5, clearcoat: 0.2 })
+const green = MAT.paint({ color: [0.12, 0.42, 0.18], roughness: 0.4, clearcoat: 0.4 })
+const red = MAT.paint({ color: [0.78, 0.14, 0.1], roughness: 0.4, clearcoat: 0.4 })
+const blue = MAT.paint({ color: [0.08, 0.16, 0.55], roughness: 0.35, clearcoat: 0.5 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const rubber = MAT.rubber()
+const blockMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.58 })
+
+// ------------------------------------------------------------------ booth: back wall, light, portals, rail
+lab.mesh(GEO.rbox(4.6, TOP + 0.08, 0.06, 0.01), beige, { name: 'Back wall', pos: [0, (TOP + 0.08) / 2, WALL_Z], explode: [0, 0, -0.8], xray: 'shell' })
+lab.mesh(GEO.rbox(1.3, 0.3, 0.05, 0.01), beigeDark, { name: 'Light panel', pos: [0, 1.75, WALL_Z + 0.06], explode: [0, 0, -0.6] })
+lab.mesh(GEO.rbox(1.2, 0.04, 0.02, 0.005), MAT.glow({ emissive: [1, 0.97, 0.9], emissiveIntensity: 1.6 }), { name: 'Lamp tube', pos: [0, 1.75, WALL_Z + 0.09], explode: [0, 0, -0.6] })
+for (const x of [-PX, PX]) {
+  for (const z of PZ) {
+    lab.mesh(GEO.rbox(0.12, TOP, 0.12, 0.01), beigeDark, { name: 'Portal post', pos: [x, TOP / 2, z], explode: [Math.sign(x) * 0.6, 0, 0], count: 1 })
+    lab.mesh(GEO.rbox(0.22, 0.02, 0.22, 0.004), steelDark, { name: 'Post foot', pos: [x, 0.01, z], explode: [Math.sign(x) * 0.6, 0, 0], count: 1 })
+  }
+  lab.mesh(GEO.rbox(0.12, 0.12, PZ[1] - PZ[0] + 0.12, 0.01), beigeDark, { name: 'Portal beam', pos: [x, TOP + 0.06, (PZ[0] + PZ[1]) / 2], explode: [Math.sign(x) * 0.6, 0.3, 0], count: 1 })
+}
+lab.mesh(GEO.rbox(2 * PX + 0.12, 0.08, 0.08, 0.01), steelDark, { name: 'Hose rail', pos: [0, RAIL_Y, RAIL_Z], explode: [0, 0.6, 0], label: 'Hose rail', at: [0.8, 0.06, 0] })
+const trolley = new THREE.Group()
+trolley.add(new THREE.Mesh(GEO.rbox(0.18, 0.1, 0.14, 0.02), steelDark))
+for (const s of [-1, 1]) { const w = new THREE.Mesh(GEO.disc(0.03, 0.02), steel); w.rotation.x = Math.PI / 2; w.position.set(s * 0.05, 0.07, 0.06); trolley.add(w) }
+lab.add(trolley, { name: 'Hose trolley', explode: [0, 0.6, 0], count: 3 })
+const hose = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 10), rubber)
+lab.add(hose, { name: 'Air hose', explode: [0, 0.4, 0.3] })
+
+// ------------------------------------------------------------------ the solver's state and input (labels below read them)
+const S = { p0: 7e5, u: 0, F: 0, ratio: 0, k: 0, Q: 0, face: 0, faces: [0, 0, 0, 0], removed: 0 }
+const gap = lab.slider({ id: 'gap', label: 'Nozzle distance', min: 20, max: 150, value: 50, unit: 'mm', ends: ['20 mm', '150 mm'] })
+
+// ------------------------------------------------------------------ blow gun (its frame: nozzle tip at the origin, pointing -z)
+const gun = new THREE.Group()
+const nozzle = new THREE.Mesh(GEO.disc(0.006, 0.1), steel); nozzle.rotation.x = Math.PI / 2; nozzle.position.z = 0.05; gun.add(nozzle)
+const body = new THREE.Mesh(GEO.rbox(0.035, 0.05, 0.12, 0.012), green); body.position.set(0, 0.01, 0.15); gun.add(body)
+const grip = new THREE.Mesh(GEO.rbox(0.03, 0.11, 0.04, 0.01), rubber); grip.position.set(0, -0.06, 0.19); grip.rotation.x = -0.25; gun.add(grip)
+const trigger = new THREE.Mesh(GEO.rbox(0.01, 0.04, 0.012, 0.003), steel); trigger.position.set(0, -0.03, 0.15); gun.add(trigger)
+lab.add(gun, { name: 'Blow gun', explode: [0, 0.2, 0.5], count: 4, label: 'Blow gun', at: [0, 0.06, 0.15], value: () => `${fmt(gap.value)} mm · ${fmt(S.u)} m/s at the shot` })
+
+// ------------------------------------------------------------------ the hand-indexed cage over the shot tray
+lab.mesh(GEO.rbox(0.8, 0.06, 0.8, 0.005), steelDark, { name: 'Shot tray', pos: [0, 0.03, 0], explode: [0, -0.3, 0] })
+for (let i = 0; i < 16; i++) lab.mesh(GEO.rbox(0.012, 0.012, 0.74, 0.002), steel, { name: 'Grating bar', pos: [-0.36 + i * 0.048, 0.068, 0], explode: [0, -0.3, 0], count: 1 })
+const sup = []
+for (const sx of [-0.27, 0.27]) for (const sz of [-1, 1]) {
+  const a = (35 * Math.PI) / 180, d = RING_R + RING_T + 0.07
+  const y = AXIS_Y - Math.cos(a) * d, z = sz * Math.sin(a) * d
+  lab.mesh(GEO.rbox(0.08, y - 0.06, 0.1, 0.01), steelDark, { name: 'Bearing stand', pos: [sx, (y + 0.06) / 2, z], explode: [0, -0.3, sz * 0.3], count: 1 })
+  sup.push(lab.mesh(GEO.disc(0.07, 0.05), MAT.steel({ roughness: 0.25 }), { name: 'Support roller', pos: [sx, y, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.3, sz * 0.3], count: 1 }))
+}
+const cage = new THREE.Group(); cage.position.set(0, AXIS_Y, 0)
+for (const x of [-0.2, 0.2]) {
+  const r = new THREE.Mesh(GEO.tube(RING_R + RING_T, RING_R, 0.05), MAT.steel({ roughness: 0.35 })); r.rotation.z = Math.PI / 2; r.position.x = x; cage.add(r)
+  for (let i = 0; i < 4; i++) { const n = new THREE.Mesh(GEO.rbox(0.05, 0.03, 0.03, 0.005), steelDark); const a = (i * Math.PI) / 2; n.position.set(x, Math.cos(a) * (RING_R + RING_T + 0.012), Math.sin(a) * (RING_R + RING_T + 0.012)); n.rotation.x = a; cage.add(n) }
+}
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + (i * Math.PI) / 2
+  const bar = new THREE.Mesh(GEO.disc(0.018, 0.44), steel); bar.rotation.z = Math.PI / 2; bar.position.set(0, Math.cos(a) * (RING_R - 0.02), Math.sin(a) * (RING_R - 0.02)); cage.add(bar)
+}
+for (const z of [-0.12, 0.12]) { const rail = new THREE.Mesh(GEO.rbox(0.44, 0.03, 0.04, 0.006), steelDark); rail.position.set(0, -BLOCK[1] / 2 - 0.015, z); cage.add(rail) }
+const clampBar = new THREE.Mesh(GEO.rbox(0.44, 0.03, 0.08, 0.006), steelDark); clampBar.position.y = BLOCK[1] / 2 + 0.115; cage.add(clampBar)
+lab.add(cage, { name: 'Index cage', explode: [0, 0.5, 0.4], count: 16, label: 'Index cage', at: [0.2, RING_R + 0.1, 0], value: () => `face ${S.face + 1} of 4` })
+// the index plunger and its red lever, beside the near ring
+lab.mesh(GEO.rbox(0.06, 0.2, 0.06, 0.008), steelDark, { name: 'Plunger housing', pos: [0.33, AXIS_Y - RING_R - 0.02, 0.3], explode: [0.3, 0, 0.3] })
+const lever = new THREE.Group(); lever.position.set(0.33, AXIS_Y - RING_R + 0.05, 0.3)
+const arm = new THREE.Mesh(GEO.disc(0.012, 0.3), steel); arm.position.y = 0.15; lever.add(arm)
+const knob = new THREE.Mesh(GEO.disc(0.025, 0.06), red); knob.position.y = 0.32; lever.add(knob)
+lab.add(lever, { name: 'Index lever', explode: [0.3, 0.1, 0.3], count: 2, label: 'Index lever', at: [0, 0.34, 0] })
+
+// ------------------------------------------------------------------ conveyors
+const rollers = []
+for (const [x0, x1] of [IN, OUT]) {
+  for (const s of [-1, 1]) {
+    lab.mesh(GEO.rbox(x1 - x0, 0.09, 0.04, 0.006), steelDark, { name: 'Conveyor rail', pos: [(x0 + x1) / 2, ROLL_Y - 0.035, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+    for (const x of [x0 + 0.1, x1 - 0.1]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [x, (ROLL_Y - 0.08) / 2, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+  }
+  for (let x = x0 + 0.05; x < x1 - 0.03; x += 0.07) rollers.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [x, ROLL_Y - 0.023, 0], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 }))
+  lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [x0 + 0.5, 0.2, CW + 0.18], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0.3], count: 1, label: x0 > 0 ? 'To QC Gate 1' : undefined, at: [0.6, 0.3, 0] })
+}
+
+// ------------------------------------------------------------------ control box and the tool rack
+lab.mesh(GEO.rbox(0.3, 0.4, 0.14, 0.02), beigeDark, { name: 'Control box', pos: [PX, 1.25, PZ[1] + 0.13], explode: [0.4, 0, 0.5], label: 'Controls', at: [0, 0.22, 0.07] })
+lab.mesh(GEO.disc(0.035, 0.04), MAT.glow({ emissive: [1, 0.12, 0.08], emissiveIntensity: 1.2 }), { name: 'E-stop', pos: [PX + 0.07, 1.47, PZ[1] + 0.13], explode: [0.4, 0.2, 0.5] })
+const lampOn = MAT.glow({ emissive: [0.1, 1, 0.3], emissiveIntensity: 0.3 })
+lab.mesh(GEO.disc(0.02, 0.02), lampOn, { name: 'Air lamp', pos: [PX - 0.07, 1.33, PZ[1] + 0.21], rot: [Math.PI / 2, 0, 0], explode: [0.4, 0, 0.6] })
+lab.mesh(GEO.disc(0.03, 0.03), green, { name: 'Valve knob', pos: [PX - 0.07, 1.18, PZ[1] + 0.21], rot: [Math.PI / 2, 0, 0], explode: [0.4, 0, 0.6] })
+const RACK = [-0.95, 1.15]
+lab.mesh(GEO.rbox(0.05, 1.05, 0.05, 0.008), steelDark, { name: 'Rack post', pos: [RACK[0], 0.525, RACK[1]], explode: [-0.4, 0, 0.5] })
+lab.mesh(GEO.rbox(0.5, 0.04, 0.16, 0.008), steelDark, { name: 'Rack shelf', pos: [RACK[0], 1.07, RACK[1]], explode: [-0.4, 0, 0.5], label: 'Air tools', at: [0, 0.3, 0] })
+for (const dx of [-0.17, 0, 0.17]) {
+  lab.mesh(GEO.tube(0.05, 0.04, 0.22), green, { name: 'Holster', pos: [RACK[0] + dx, 0.98, RACK[1]], explode: [-0.4, 0, 0.5], count: 1 })
+  lab.mesh(GEO.disc(0.028, dx === 0 ? 0.32 : 0.24), dx === 0 ? MAT.steel() : green, { name: 'Air tool', pos: [RACK[0] + dx, 1.12, RACK[1]], explode: [-0.4, 0.2, 0.5], count: 1 })
+}
+
+// ------------------------------------------------------------------ the block: centred, deck (bores) on +y, two passages on each side face
+const block = new THREE.Group()
+block.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat))
+for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); block.add(b) }
+for (const s of [-1, 1]) for (const x of [-0.12, 0.1]) { const p = new THREE.Mesh(GEO.tube(0.016, 0.01, 0.01), steelDark); p.rotation.x = Math.PI / 2; p.position.set(x, 0, s * (BLOCK[2] / 2 + 0.003)); block.add(p) }
+lab.add(block, { name: 'BC block', explode: [0, 0.6, 0.6], count: 9, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => `${fmt(S.removed * 100)} % clear` })
+
+// ------------------------------------------------------------------ loose shot falling out of the face being blown, and the jet itself
+const shotPaths = Array.from({ length: 14 }, (_, i) => {
+  const x = -0.18 + (i / 13) * 0.36, z0 = 0.2
+  return [[x, AXIS_Y - 0.02, z0], [x + ((i % 3) - 1) * 0.02, AXIS_Y - 0.15, z0 + 0.06], [x + ((i % 5) - 2) * 0.03, 0.08, z0 + 0.04 - (i % 4) * 0.06]]
+})
+const shot = lab.flow({ paths: shotPaths, count: 160, length: 0.06, speed: 0, color: () => [0.25, 0.25, 0.27] })
+const jet = lab.flow({ parent: gun, paths: [[[0, 0, 0], [0, 0, -0.02], [0, 0, -0.05]], [[0, 0, 0], [0.004, 0.002, -0.02], [0.01, 0.004, -0.05]], [[0, 0, 0], [-0.004, -0.002, -0.02], [-0.01, -0.004, -0.05]]], count: 60, length: 0.3, speed: 0, color: () => [0.85, 0.9, 1] })
+
+// ------------------------------------------------------------------ the solver: a free air jet on a wedged grain of shot
+const U_E = 313, D_N = 2.5e-3, RHO = 1.2, CD = 0.44
+const D_SHOT = 0.84e-3, M_SHOT = (7600 * Math.PI * D_SHOT ** 3) / 6, G = 9.81
+const F_HOLD = 20 * M_SHOT * G               // a grain wedged in a passage holds with ~20x its weight
+const K0 = 0.8                               // 1/s, how fast grains come free once the jet beats the wedge
+const P_REF = 7e5                            // Pa absolute: 6 bar gauge
+function jetAt(xmm, p0) {
+  const x = xmm / 1000
+  const u = (x > 6.2 * D_N ? (6.2 * U_E * D_N) / x : U_E) * Math.sqrt(Math.max(0, (p0 - 1e5) / (P_REF - 1e5)))
+  const F = (0.5 * RHO * u * u * CD * Math.PI * D_SHOT ** 2) / 4
+  const ratio = F / F_HOLD
+  const k = K0 * Math.max(0, ratio - 1)
+  const mdot = ((0.8 * Math.PI * D_N ** 2) / 4) * p0 * Math.sqrt(1.4 / (287 * 293)) * 0.5787
+  return { u, F, ratio, k, Q: (mdot / RHO) * 60e3 } // Q: free air, L/min
+}
+lab.hero({ label: 'Loose shot removed', unit: '%', max: 100, digits: 0 })
+
+// one cycle, shaped like the Blender animation: roll in, clamp, blow a face, index a quarter, ... four faces, out
+const CYCLE = [['roll in', 1.4], ['clamp', 0.5]]
+for (let f = 0; f < 4; f++) CYCLE.push([`blow ${f}`, 2.6], [`index ${f}`, 1.0])
+CYCLE.push(['unclamp', 0.5], ['roll out', 1.4], ['next', 0.6])
+let step = 0, pt = 0
+const next = () => { step = (step + 1) % CYCLE.length; pt = 0 }
+
+lab.onTick((dt) => {
+  pt += dt
+  const [name, dur] = CYCLE[step]
+  const u = clamp(pt / dur)
+  const e = smoothstep(0, 1, u)
+  S.p0 = approach(S.p0, lab.broken ? 3e5 : P_REF, 0.5, dt)
+  const j = jetAt(gap.value, S.p0)
+  S.u = j.u; S.F = j.F; S.ratio = j.ratio
+
+  // the cage turns a quarter on each index, by the operator pulling the lever and swinging the ring round
+  const blowing = name.startsWith('blow')
+  const f = blowing || name.startsWith('index') ? Number(name.slice(-1)) : name === 'roll in' || name === 'clamp' ? 0 : 3
+  S.face = f
+  const quarters = name.startsWith('index') ? f + e : ['unclamp', 'roll out', 'next'].includes(name) ? 4 : f
+  const ang = quarters * (Math.PI / 2)
+  cage.rotation.x = ang
+  lever.rotation.z = name.startsWith('index') ? Math.sin(u * Math.PI) * -0.6 : 0
+  sup.forEach((r) => { r.rotation.x = (-ang * (RING_R + RING_T)) / 0.07 })
+
+  // grains come out of the face being blown at the jet's rate
+  if (blowing) S.faces[f] = 1 - (1 - S.faces[f]) * Math.exp(-j.k * dt)
+  S.k = blowing ? j.k : 0
+  S.Q = blowing ? j.Q : 0
+  S.removed = S.faces.reduce((a, b) => a + b, 0) / 4
+
+  // the gun: on the face being blown, sweeping along it, backed off while the cage turns
+  const half = f % 2 ? BLOCK[1] / 2 : BLOCK[2] / 2         // the face looking at the operator
+  const gz = half + gap.value / 1000 + (blowing ? 0 : 0.15)
+  const gx = blowing ? Math.sin(pt * 2.2) * 0.17 : 0.25
+  const gy = AXIS_Y + (blowing ? 0 : 0.1)
+  lab.place(gun, gx, gy, gz)
+  lab.place(trolley, gx, RAIL_Y - 0.08, RAIL_Z)
+  const a = new THREE.Vector3(gx, RAIL_Y - 0.13, RAIL_Z), b = new THREE.Vector3(gx, gy + 0.02, gz + 0.2)
+  const dir = b.clone().sub(a)
+  hose.scale.y = Math.max(0.01, dir.length())
+  const mid = a.clone().add(b).multiplyScalar(0.5)
+  lab.place(hose, mid.x, mid.y, mid.z)
+  hose.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize())
+  jet.speed = blowing ? 3 : 0
+  jet.opacity = blowing ? clamp(S.p0 / P_REF) * 0.8 : 0
+  shot.speed = blowing ? 0.9 : 0
+  shot.opacity = blowing ? clamp(j.k * (1 - S.faces[f]) * 1.5) : 0
+
+  // the block rolls in, is held while the cage turns it round, and rolls on to QC Gate 1
+  let bx = 0, alpha = 1
+  if (name === 'roll in') { bx = lerp(-1.8, 0, e); alpha = smoothstep(0, 0.25, u) }
+  else if (name === 'roll out') { bx = lerp(0, 1.8, e); alpha = 1 - smoothstep(0.75, 1, u) }
+  else if (name === 'next') alpha = 0
+  const inCage = !['roll in', 'roll out', 'next'].includes(name)
+  lab.place(block, bx, AXIS_Y, 0)
+  block.rotation.x = inCage ? ang : 0
+  // transparent only while fading, so the solid block sorts properly
+  const fading = alpha < 0.999
+  if (blockMat.transparent !== fading) { blockMat.transparent = fading; blockMat.needsUpdate = true }
+  blockMat.opacity = alpha
+  if (name === 'roll in' || name === 'roll out') rollers.forEach((r) => { r.rotation.y += dt * 9 })
+  clampBar.position.y = BLOCK[1] / 2 + 0.015 + (name === 'clamp' ? 1 - e : name === 'unclamp' ? e : inCage ? 0 : 1) * 0.1
+  lampOn.emissiveIntensity = blowing ? 3 : 0.3
+
+  if (u >= 1) { if (name === 'next') S.faces = [0, 0, 0, 0]; next() }
+  const say = blowing ? `blowing face ${f + 1}` : name.startsWith('index') ? `indexing a quarter turn` : name
+  lab.setHero(S.removed * 100, {
+    state: lab.broken ? `air down to ${fmt(S.p0 / 1e5 - 1, 1)} bar · ${say}` : say,
+    sub: `${fmt(gap.value)} mm · jet ${fmt(S.u)} m/s at the shot · drag ${fmt(S.ratio, 1)}x the wedge · ${fmt(S.Q)} L/min`,
+    bad: lab.broken || (blowing && S.ratio < 1),
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'Air drops', run() {}, reset() {} })
+lab.how(
+  'The block sits in a cage the operator turns a quarter at a time with the red index lever, so every face comes round to the front, and on each face he sweeps an air gun over the passages. The jet leaves the 2.5 mm nozzle at the speed of sound and slows as it spreads, about as 1 / distance, so the drag it puts on a grain of shot falls as 1 / distance². A grain wedged in a passage only comes free once that drag beats its hold, about 20 times its own weight, and the more it beats it the faster it comes. Hold the nozzle close and a face clears in a second or two; pull it back past about 85 mm, or let the air drop to 2 bar, and the shot stays put. Simplified: one grain size, one hold, and the jet aimed square into the passage.',
+  [
+    'u_e = 313 m/s (choked)    d = 2.5 mm',
+    'u(x) = 6.2 u_e d / x · sqrt((p0 - 1 bar) / 6 bar)',
+    'F = 1/2 rho u^2 C_d (pi d_s^2 / 4)   d_s = 0.84 mm',
+    'F_hold = 20 m_s g',
+    'k = k0 (F / F_hold - 1)   k0 = 0.8 /s',
+    'm_dot = C_d A p0 sqrt(k / (R T0)) 0.579',
+  ],
+)
+lab.autoFilm({ runBeat: 'It blows the block clean.', runSub: 'A quarter turn, a sweep of air, four faces.', breakBeat: 'The air drops.', breakSub: 'The jet no longer beats the wedge; the shot stays in.', sliderTo: 0.3 })
+// review hooks: __final.phase, __final.go('blow 1')
+window.__final = {
+  get phase() { return CYCLE[step][0] },
+  go(name) { step = CYCLE.findIndex((c) => c[0] === name); pt = 0 },
+}
+lab.start()
+</script>
+</body>
+</html>

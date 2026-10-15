@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Junbiki Sequenced Staging · Machine Skill</title>
+<meta name="description" content="Station Junbiki of the BC finishing line: a traversing lift takes each oiled block to the lane of its delivery lot and pushes it into a sloped gravity flow rack, where it rolls down to queue for the truck. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "Junbiki: OK blocks are staged in delivery order and go out to the truck"
+// From the user's Blender layout (1 unit = 0.1 m): a three-level gravity flow rack about 6 m wide and 5.9 m deep,
+// lanes 0.5 m apart running away from the line with a fall of about 2 % (the block drops 0.12 m over 5.8 m); the
+// infeed from the Spray Booth runs alongside the rack; a lift on a floor track along the rack front takes the
+// block on its carriage, travels sideways to the lane (x -77 to -94 in Blender), raises it 1.5 m to the top level
+// and puts it into the lane, where it rolls down to the queue at the far end. Two geared motors: hoist on top,
+// travel at the bottom.
+// Parts: infeed conveyor, floor track, lift (base, two masts, top beam, hoist motor, travel motor, carriage with
+// rollers), rack (posts, level rails, cross beams, rollers, speed controllers, end stop), staged blocks.
+// Physics: a block on a sloped roller lane accelerates at a = g (sin t - C_rr cos t); speed-controller rollers
+// brake it towards v_c; it hits the queue at whatever speed it has left. Below the breakaway slope a stopped block
+// stays put. Hero: speed of the last block into its queue (m/s, safe below 0.5). Input: lane slope, %.
+// Break: the speed controllers are worn, so the block runs free down the lane.
+
+const lab = new Lab({
+  prompt: 'Junbiki: OK blocks staged in delivery order in a gravity flow rack, moving the way they do in the Blender layout',
+  no: 13, title: 'Junbiki', sub: 'sequenced staging',
+  size: 6.0,
+  view: { az: 132, el: 24, dist: 1.85, target: [0.1, 0.7, 2.3], fov: 30, frameX: -0.14 },
+  cut: { a: [1, 0, 0], b: [0, 1, 0], center: [0, 1.5, 3], reach: 0.8 },
+  pills: ['three.js', 'Gravity flow rack', 'Rolling resistance'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const ROLL_Y = 0.47                               // infeed and lift carriage roller top, down
+const RISE = 1.51                                 // lift travel to the top level
+const LEVELS = [ROLL_Y + RISE, ROLL_Y + RISE - 0.42, ROLL_Y + RISE - 0.84]   // roller tops at the lane entry
+const BLOCK = [0.475, 0.336, 0.371]
+const LX = [1.0, 0.5, 0, -0.5, -1.0, -1.5]        // lane centres shown (the rack goes on further)
+const Z0 = 0.55, LANE = 5.85                      // lane entry and length
+const PITCH = 0.5                                 // queue pitch: block length plus a gap
+const CAP = 6                                     // blocks in a delivery lot
+const HOME = 1.7                                  // infeed / lift home x
+const INFEED = [3.4, 0.33]                        // infeed conveyor, z from -> to (the block runs towards -z)
+
+// ------------------------------------------------------------------ materials
+const blue = MAT.paint({ color: [0.12, 0.25, 0.7], roughness: 0.35, clearcoat: 0.5 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const frameMat = MAT.paint({ color: [0.66, 0.55, 0.36], roughness: 0.55, clearcoat: 0.1 })
+const yellow = MAT.paint({ color: [0.92, 0.74, 0.1], roughness: 0.4, clearcoat: 0.3 })
+const whiteRoll = MAT.plastic({ color: [0.82, 0.82, 0.8] })
+const brakeMat = MAT.rubber()
+const blockMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.5 })
+
+// ------------------------------------------------------------------ the solver's state and input (labels below read them)
+const S = { n: LX.map(() => 0), loading: LX.map(() => 0), vHit: 0, E: 0, v: 0, stalls: 0, stallT: 0, lane: 0, phase: '', staged: 0 }
+const slope = lab.slider({ id: 'slope', label: 'Lane slope', min: 0.5, max: 4, value: 2, unit: '%', ends: ['0.5 %', '4 %'], digits: 1 })
+const theta = () => Math.atan(slope.value / 100)
+
+// ------------------------------------------------------------------ infeed conveyor from the Spray Booth, alongside the rack
+const infeedRollers = []
+for (const s of [-1, 1]) {
+  lab.mesh(GEO.rbox(0.04, 0.09, INFEED[0] - INFEED[1], 0.006), steelDark, { name: 'Infeed rail', pos: [HOME + s * 0.32, ROLL_Y - 0.035, (INFEED[0] + INFEED[1]) / 2], explode: [0.5, -0.2, 0], count: 1 })
+  for (const z of [INFEED[1] + 0.2, INFEED[0] - 0.2]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Infeed leg', pos: [HOME + s * 0.32, (ROLL_Y - 0.08) / 2, z], explode: [0.5, -0.2, 0], count: 1 })
+}
+for (let z = INFEED[1] + 0.05; z < INFEED[0] - 0.02; z += 0.07) infeedRollers.push(lab.mesh(GEO.disc(0.023, 0.6, 0.003, 24), steel, { name: 'Infeed roller', pos: [HOME, ROLL_Y - 0.023, z], rot: [0, 0, Math.PI / 2], explode: [0.5, -0.2, 0], count: 1 }))
+lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [HOME + 0.5, 0.2, 2.6], rot: [0, 0, Math.PI / 2], explode: [0.6, -0.2, 0], count: 1, label: 'From Spray Booth', at: [0.2, 0.3, 0.6] })
+
+// ------------------------------------------------------------------ the flow rack: posts in the world, each level a tilted group
+const RAILS = [...LX.map((x) => x + 0.25), LX[LX.length - 1] - 0.25]
+const POST_Z = [Z0 + 0.05, Z0 + 1.45, Z0 + 2.9, Z0 + 4.35, Z0 + LANE - 0.05]
+const posts = []
+// the rack has hundreds of rollers and staged blocks: instanced, with plain low-poly geometry
+const rollGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.44, 12, 1), brakeGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.44, 12, 1)
+const postGeo = GEO.rbox(0.05, 1, 0.05, 0.006)
+for (const x of RAILS) for (const z of POST_Z) posts.push({ m: lab.mesh(postGeo, frameMat, { name: 'Rack post', pos: [x, 0.5, z], explode: [0, 0, 0.6], count: 1 }), x, z })
+const levels = LEVELS.map((y, li) => {
+  const g = new THREE.Group(); g.position.set(0, y, Z0)
+  for (const x of RAILS) { const r = new THREE.Mesh(GEO.rbox(0.04, 0.07, LANE, 0.006), frameMat); r.position.set(x, 0.0, LANE / 2); g.add(r) }
+  for (const z of POST_Z) { const b = new THREE.Mesh(GEO.rbox(RAILS[0] - RAILS[RAILS.length - 1] + 0.05, 0.05, 0.05, 0.006), frameMat); b.position.set((RAILS[0] + RAILS[RAILS.length - 1]) / 2, -0.07, z - Z0); g.add(b) }
+  const stop = new THREE.Mesh(GEO.rbox(RAILS[0] - RAILS[RAILS.length - 1], 0.1, 0.03, 0.006), frameMat); stop.position.set((RAILS[0] + RAILS[RAILS.length - 1]) / 2, 0.04, LANE + 0.02); g.add(stop)
+  // rollers: one instanced mesh per level, the top level steel, the lower ones white plastic
+  const per = Math.floor((LANE - 0.06) / 0.12)
+  const rolls = new THREE.InstancedMesh(rollGeo, li === 0 ? steel : whiteRoll, LX.length * per)
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2), V = new THREE.Vector3(), ONE = new THREE.Vector3(1, 1, 1)
+  let i = 0
+  for (const x of LX) for (let k = 0; k < per; k++) rolls.setMatrixAt(i++, M.compose(V.set(x, -0.022, 0.06 + k * 0.12), Q, ONE))
+  g.add(rolls)
+  // speed controllers: a braking roller every 1.5 m in each lane (drawn on the top level, where the lift feeds)
+  if (li === 0) {
+    const brakes = new THREE.InstancedMesh(brakeGeo, brakeMat, LX.length * 3)
+    let j = 0
+    for (const x of LX) for (const s of [1.5, 3.0, 4.5]) brakes.setMatrixAt(j++, M.compose(V.set(x, -0.022, s), Q, ONE))
+    g.add(brakes)
+  }
+  lab.add(g, { name: li === 0 ? 'Flow rack, top level' : 'Flow rack level', explode: [0, 0.4 - li * 0.3, 0.6], count: 3 + RAILS.length, label: li === 0 ? 'Flow rack, 3 levels' : undefined, at: [-1.6, 0.1, LANE * 0.6], value: li === 0 ? () => `lanes ${S.n.join(' · ')} of ${CAP}` : undefined })
+  return g
+})
+const top = levels[0]
+
+// ------------------------------------------------------------------ staged blocks: instanced, children of their level (so they tilt with it)
+const blockGeo = GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015)
+const boreGeo = GEO.tube(0.044, 0.038, 0.012)
+const boreLow = new THREE.TorusGeometry(0.041, 0.004, 4, 16).rotateX(Math.PI / 2)
+function stagedSet(parent, max) {
+  const body = new THREE.InstancedMesh(blockGeo, blockMat, max), bores = new THREE.InstancedMesh(boreLow, steelDark, max * 4)
+  body.count = 0; bores.count = 0; parent.add(body); parent.add(bores)
+  return { body, bores }
+}
+const BLK_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)   // long axis along the lane
+const _M = new THREE.Matrix4(), _V = new THREE.Vector3(), _ONE = new THREE.Vector3(1, 1, 1)
+function fill(set, list) {
+  list.forEach(([x, s], i) => {
+    set.body.setMatrixAt(i, _M.compose(_V.set(x, BLOCK[1] / 2, s), BLK_Q, _ONE))
+    for (let b = 0; b < 4; b++) set.bores.setMatrixAt(i * 4 + b, _M.compose(_V.set(x, BLOCK[1] + 0.003, s - 0.165 + b * 0.11), BLK_Q, _ONE))
+  })
+  set.body.count = list.length; set.bores.count = list.length * 4
+  set.body.instanceMatrix.needsUpdate = true; set.bores.instanceMatrix.needsUpdate = true
+}
+const queueSlot = (i) => LANE - 0.24 - i * PITCH
+const stagedTop = stagedSet(top, LX.length * CAP)
+// the lower levels hold lots staged earlier
+for (let li = 1; li < 3; li++) fill(stagedSet(levels[li], 20), LX.flatMap((x, k) => Array.from({ length: (k * 3 + li * 2) % 5 }, (_, i) => [x, queueSlot(i)])))
+function refreshStaged() {
+  const list = []
+  LX.forEach((x, k) => { for (let i = 0; i < S.n[k]; i++) list.push([x, queueSlot(i)]) })
+  fill(stagedTop, list)
+}
+
+// ------------------------------------------------------------------ the traversing lift
+const track = { name: 'Floor track', explode: [0, -0.3, -0.5], count: 1 }
+for (const z of [-0.5, -0.26]) lab.mesh(GEO.rbox(LX[0] - LX[LX.length - 1] + 1.6, 0.03, 0.05, 0.006), steelDark, { ...track, pos: [(HOME + LX[LX.length - 1] - 0.2) / 2, 0.015, z] })
+const lift = new THREE.Group()
+const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); lift.add(mesh); return mesh }
+add(new THREE.Mesh(GEO.rbox(0.9, 0.12, 0.42, 0.01), yellow), 0, 0.09, -0.38)
+for (const s of [-1, 1]) add(new THREE.Mesh(GEO.rbox(0.08, 2.65, 0.1, 0.008), steelDark), s * 0.34, 0.15 + 1.325, -0.42)
+add(new THREE.Mesh(GEO.rbox(0.8, 0.12, 0.16, 0.01), yellow), 0, 2.86, -0.42)
+const hoist = add(new THREE.Mesh(GEO.disc(0.09, 0.32), blue), 0.12, 3.08, -0.42)
+add(new THREE.Mesh(GEO.rbox(0.22, 0.14, 0.18, 0.01), MAT.paint({ color: [0.3, 0.3, 0.32] })), -0.12, 2.99, -0.42)
+const travelMotor = add(new THREE.Mesh(GEO.disc(0.07, 0.2), blue), -0.3, 0.27, -0.6)
+travelMotor.rotation.x = Math.PI / 2
+lab.add(lift, { name: 'Traversing lift', explode: [0, 0, -0.8], count: 8, label: 'Traversing lift', at: [0, 3.2, -0.42], value: () => S.phase })
+// the carriage: a roller deck that runs up the masts
+const carriage = new THREE.Group()
+const deck = new THREE.Mesh(GEO.rbox(0.62, 0.06, 0.64, 0.01), yellow); deck.position.y = -0.08; carriage.add(deck)
+const carRollers = []
+for (let z = -0.28; z <= 0.29; z += 0.08) { const r = new THREE.Mesh(GEO.disc(0.022, 0.56, 0.003, 16), steel); r.rotation.z = Math.PI / 2; r.position.set(0, -0.022, z); carriage.add(r); carRollers.push(r) }
+for (const s of [-1, 1]) { const arm = new THREE.Mesh(GEO.rbox(0.04, 0.14, 0.7, 0.006), yellow); arm.position.set(s * 0.32, -0.05, -0.05); carriage.add(arm) }
+lab.add(carriage, { name: 'Lift carriage', explode: [0, 0.4, -0.8], count: 1 + carRollers.length + 2 })
+
+// ------------------------------------------------------------------ the moving blocks: one on the lift, one per lane rolling
+function blockGroup(mat) {
+  const g = new THREE.Group()
+  const inner = new THREE.Group(); inner.rotation.y = Math.PI / 2; g.add(inner)
+  inner.add(new THREE.Mesh(blockGeo, mat))
+  for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(boreGeo, steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); inner.add(b) }
+  return g
+}
+const liftMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.5 })
+const liftBlock = blockGroup(liftMat)
+lab.add(liftBlock, { name: 'BC block', explode: [0, 0.6, -0.6], count: 5, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => `lot for lane ${S.lane + 1}` })
+const rollers = LX.map((x, k) => {
+  const g = blockGroup(blockMat); g.visible = false
+  lab.add(g, { name: 'Rolling block', parent: top, explode: [0, 0.3, 0], count: 5, label: k === 2 ? 'Rolling' : undefined, at: [0, BLOCK[1] / 2, 0], value: k === 2 ? () => `${fmt(S.v, 2)} m/s` : undefined })
+  return { g, active: false, s: 0, v: 0, stuck: 0, pushed: false }
+})
+
+// ------------------------------------------------------------------ the solver: a block rolling down a sloped roller lane
+const G = 9.81
+const C_RR = 0.010                                // rolling resistance of a loaded steel roller lane
+const C_START = 0.015                             // breakaway: a stopped block needs more than this to start again
+const V_C = 0.3, K_B = 4                          // speed controller: brakes towards 0.3 m/s, 1/s
+const V0 = 0.25                                   // speed the carriage puts the block in with
+const MASS = 36                                   // kg, a machined BC block (assumed)
+const V_SAFE = 0.5                                // m/s, faster than this nicks the machined faces in the queue
+function accel(v) {
+  const t = theta()
+  return G * (Math.sin(t) - C_RR * Math.cos(t)) - (!lab.broken && v > V_C ? K_B * (v - V_C) : 0)
+}
+// the whole run on an empty lane, for the readout before any block has arrived
+function runTo(run) { let s = 0.24, v = V0; for (let i = 0; i < 20000 && s < run; i++) { v = Math.max(0, v + accel(v) / 240); s += v / 240; if (v === 0) return { v: 0, stalled: s } } return { v } }
+lab.hero({ label: 'Speed into the queue', unit: 'm/s', max: 1.2, digits: 2 })
+
+// the lot sequence: the order the delivery lots are made up in, lane by lane
+const SEQ = [2, 0, 4, 1, 3, 5, 2, 1, 4, 0, 3, 5]
+let seqI = 0
+const LIFT = { feed: 2.6, travel: 0, raise: 2.4, push: 1.4, back: 0, next: 0.3 }
+let phase = 'feed', pt = 0, lx = HOME, ly = ROLL_Y, waitPush = false
+const go = (p) => { phase = p; pt = 0 }
+S.lane = SEQ[0]
+S.n = [3, 1, 4, 2, 0, 3]
+refreshStaged()
+
+lab.onTick((dt) => {
+  pt += dt
+  const t = theta()
+  // posts follow the slope so the levels stay on them
+  for (const p of posts) { const h = LEVELS[0] - (p.z - Z0) * Math.tan(t) - 0.035; p.m.scale.y = h; lab.place(p.m, p.x, h / 2, p.z) }
+  levels.forEach((g) => { g.rotation.x = t })
+
+  // ---- the lift: feed, travel to the lane, raise, push in, come back down
+  const target = LX[S.lane]
+  const travelT = 0.6 + Math.abs(target - HOME) / 0.8
+  const dur = phase === 'travel' ? travelT : phase === 'back' ? Math.max(travelT, 2.0) : LIFT[phase]
+  const u = clamp(pt / dur), e = smoothstep(0, 1, u)
+  let bx = lx, by = ly + BLOCK[1] / 2, bz = 0, show = true, alpha = 1
+  if (phase === 'feed') { lx = HOME; ly = ROLL_Y; bx = HOME; by = ROLL_Y + BLOCK[1] / 2; bz = lerp(INFEED[0] - 0.3, 0, e); alpha = smoothstep(0, 0.2, u) }
+  else if (phase === 'travel') { lx = lerp(HOME, target, e); bx = lx }
+  else if (phase === 'raise') { ly = ROLL_Y + RISE * e; by = ly + BLOCK[1] / 2; bx = lx }
+  else if (phase === 'push') {
+    const busy = rollers[S.lane].active || S.loading[S.lane] > 0 || S.n[S.lane] >= CAP
+    if (pt <= dt + 1e-9) waitPush = busy
+    if (waitPush) { pt = 0; if (!busy) waitPush = false }
+    const ue = smoothstep(0, 1, clamp(pt / dur))
+    bz = lerp(0, Z0 + 0.24, ue); bx = lx; by = ly + BLOCK[1] / 2
+    if (!waitPush && pt >= dur) { const r = rollers[S.lane]; r.active = true; r.s = 0.24; r.v = V0; r.stuck = 0; r.pushed = false; r.g.visible = true; show = false }
+  } else if (phase === 'back') { lx = lerp(target, HOME, e); ly = ROLL_Y + RISE * (1 - e); show = false }
+  else if (phase === 'next') show = false
+  lab.place(lift, lx, 0, 0)
+  lab.place(carriage, lx, ly, 0)
+  lab.place(liftBlock, bx, by, bz)
+  liftBlock.visible = show
+  const fading = alpha < 0.999
+  if (liftMat.transparent !== fading) { liftMat.transparent = fading; liftMat.needsUpdate = true }
+  liftMat.opacity = alpha
+  if (phase === 'feed') infeedRollers.forEach((r) => { r.rotation.x -= dt * 9 })
+  if (phase === 'feed' || (phase === 'push' && !waitPush)) carRollers.forEach((r) => { r.rotation.x += (phase === 'push' ? -1 : 1) * dt * 9 })
+  hoist.rotation.y += phase === 'raise' || phase === 'back' ? dt * 20 : 0
+  if (pt >= dur) {
+    if (phase === 'feed') go('travel')
+    else if (phase === 'travel') go('raise')
+    else if (phase === 'raise') go('push')
+    else if (phase === 'push') { if (!waitPush) go('back') }
+    else if (phase === 'back') go('next')
+    else { seqI = (seqI + 1) % SEQ.length; S.lane = SEQ[seqI]; go('feed') }
+  }
+  S.phase = phase === 'feed' ? 'taking a block from the infeed' : phase === 'travel' ? `to lane ${S.lane + 1}` : phase === 'raise' ? 'raising to the top level' : phase === 'push' ? (waitPush ? `waiting: lane ${S.lane + 1} busy` : `into lane ${S.lane + 1}`) : 'back for the next one'
+
+  // ---- the lanes: each rolling block integrated in small steps
+  const h = 1 / 240, steps = Math.max(1, Math.round(dt / h))
+  S.v = 0
+  rollers.forEach((r, k) => {
+    if (S.loading[k] > 0) { S.loading[k] -= dt; if (S.loading[k] <= 0) { S.loading[k] = 0; S.n[k] = 0; refreshStaged() } }
+    if (!r.active) return
+    const tail = queueSlot(S.n[k])
+    for (let i = 0; i < steps; i++) {
+      if (r.pushed) { r.v = V_C; r.s += r.v * h }
+      else if (r.v > 0 || Math.sin(t) > C_START * Math.cos(t)) { r.v = Math.max(0, r.v + accel(r.v) * h); r.s += r.v * h; r.stuck = 0 }
+      else { r.stuck += h; if (r.stuck > 3) { r.pushed = true; S.stalls++; S.stallT = 8 } }
+      if (r.s >= tail) {
+        S.vHit = r.pushed ? 0 : r.v; S.E = 0.5 * MASS * S.vHit * S.vHit
+        r.active = false; r.g.visible = false; S.n[k]++; S.staged++
+        if (S.n[k] >= CAP) S.loading[k] = 2.5     // the lot is complete: it goes out to the truck
+        refreshStaged()
+        break
+      }
+    }
+    if (r.active) { lab.place(r.g, LX[k], BLOCK[1] / 2, r.s); S.v = Math.max(S.v, r.v) }
+  })
+  S.stallT = Math.max(0, S.stallT - dt)
+
+  const stuckNow = rollers.some((r) => r.active && !r.pushed && r.v === 0)
+  const empty = runTo(LANE - 0.24)
+  lab.setHero(S.staged ? S.vHit : empty.v, {
+    state: lab.broken ? `speed controllers worn · ${S.phase}` : stuckNow ? 'a block has stopped in its lane' : S.phase,
+    sub: `${fmt(slope.value, 1)} % slope · ${fmt(S.E, 1)} J into the queue · empty lane ${empty.stalled !== undefined ? `stalls after ${fmt(empty.stalled, 1)} m` : `${fmt(empty.v, 2)} m/s`} · safe below ${V_SAFE} m/s${S.stalls ? ` · ${S.stalls} pushed by hand` : ''}`,
+    bad: S.vHit > V_SAFE || stuckNow || S.stallT > 0 || empty.stalled !== undefined || empty.v > V_SAFE,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'Speed controllers worn', run() {}, reset() {} })
+lab.how(
+  'Junbiki stages the oiled blocks in the order the customer needs them. The lift takes each block off the infeed onto its carriage, travels along the front of the rack to the lane of the block\'s delivery lot, raises it 1.5 m to the top level and runs it into the lane. The lane falls about 2 % away from the lift, so the block rolls on its own to the back of the queue; when a lot of six is complete it goes out to the truck from the far end. Rolling down the slope the block gains speed at g (sin t - C_rr cos t), and over a long empty lane it would hit the queue at about 1 m/s, hard enough to nick machined faces. Braking rollers every 1.5 m hold it near 0.3 m/s. Too flat a lane and the rolling resistance wins: the block slows to a stop and, below the breakaway slope of 1.5 %, stays there until someone pushes it. Simplified: one block mass, steady rolling resistance, an ideal braking roller.',
+  [
+    'a = g (sin t - C_rr cos t) - k (v - v_c) when v > v_c',
+    'C_rr = 0.010,  breakaway 0.015,  v_c = 0.3 m/s,  k = 4 /s',
+    'v_in = 0.25 m/s from the carriage',
+    'E = 1/2 m v^2,  m = 36 kg (assumed)',
+    'safe into the queue: v < 0.5 m/s',
+  ],
+)
+lab.autoFilm({ runBeat: 'Each block to its lot.', runSub: 'Along the rack, up, and down the lane by gravity.', breakBeat: 'The brakes wear out.', breakSub: 'The block runs free and hits the queue hard.', sliderTo: 0.15 })
+// review hooks: __junbiki.phase, __junbiki.stats
+window.__junbiki = { get phase() { return phase }, get stats() { return { ...S, n: [...S.n] } } }
+lab.start()
+</script>
+</body>
+</html>

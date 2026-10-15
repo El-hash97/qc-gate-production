@@ -101,8 +101,17 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Spray Booth 3D/)).toHaveAttribute('src', '/stations/spray-3d.html');
   });
 
+  it('has a Junbiki card with its own figure and 3D machine', () => {
+    const junbiki = stationDetail('junbiki')!;
+    render(<StationCard detail={junbiki} theme="dark" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Junbiki/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/junbiki-dark.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Junbiki 3D/)).toHaveAttribute('src', '/stations/junbiki-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
-    expect(stationDetail('junbiki')).toBeNull();
+    expect(stationDetail('lineRepair')).toBeNull();
   });
 
   it('plays the interactive 3D machine under the figure and goes back to the picture', () => {

@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori to Spray Booth have cards so far.
+// Placeholder copy for review; Baritori to Junbiki have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -159,6 +159,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Film', value: '≥ 1.5 µm on every face' },
       { label: 'Spray time', value: 'About 3 s' },
       { label: 'Operator', value: 'None, automatic' },
+    ],
+  },
+  junbiki: {
+    title: 'Junbiki',
+    subtitle: 'Sequenced Staging',
+    image: { light: '/stations/junbiki-light.svg', dark: '/stations/junbiki-dark.svg' },
+    play: '/stations/junbiki-3d.html',
+    description: [
+      'The oiled block comes in from the Spray Booth alongside a three-level gravity flow rack and runs onto the carriage of a traversing lift.',
+      'The lift travels along the rack front to the lane of the block\'s delivery lot, raises it to the top level and runs it in. The lane falls gently, so the block rolls on its own past braking rollers to the back of the queue.',
+      'When a lot is complete it goes out from the far end of the lane onto the truck.',
+    ],
+    specs: [
+      { label: 'Rack', value: '3 levels, lanes 5.9 m' },
+      { label: 'Lane slope', value: 'About 2 %' },
+      { label: 'Into the queue', value: 'About 0.3 m/s' },
+      { label: 'Lift', value: '1.5 m up, travels to the lane' },
     ],
   },
 };

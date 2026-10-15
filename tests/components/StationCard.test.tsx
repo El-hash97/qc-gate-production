@@ -92,8 +92,17 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/QC Gate 2 3D/)).toHaveAttribute('src', '/stations/qc2-3d.html');
   });
 
+  it('has a Spray Booth card with its own figure and 3D machine', () => {
+    const spray = stationDetail('spray')!;
+    render(<StationCard detail={spray} theme="light" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Spray Booth/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/spray-light.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Spray Booth 3D/)).toHaveAttribute('src', '/stations/spray-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
-    expect(stationDetail('spray')).toBeNull();
+    expect(stationDetail('junbiki')).toBeNull();
   });
 
   it('plays the interactive 3D machine under the figure and goes back to the picture', () => {

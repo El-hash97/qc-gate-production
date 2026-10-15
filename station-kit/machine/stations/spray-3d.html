@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spray Booth Rust-preventive Oil · Machine Skill</title>
+<meta name="description" content="Station Spray Booth of the BC finishing line: the OK block turns the corner into the booth, stops under a spray portal and is coated on five faces with a thin film of rust-preventive oil before it rolls on to Junbiki. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "Spray Booth: the OK block is oiled against rust before it leaves the BC finishing line"
+// From the user's Blender layout (1 unit = 0.1 m): a booth housing about 5.9 x 3.1 x 3.1 m with a window in the
+// back wall; inside it the roller line from QC Gate 2 turns 90 degrees and runs out towards Junbiki; over the
+// outgoing line, 2.15 m past the corner, a steel portal frame about 0.7 x 0.95 m; a dark tank under it and a grey
+// unit beside it, read here as the oil tank (drip pan) and the pump.
+// Parts: incoming, curved and outgoing roller conveyors, gear motors, booth walls and window, spray portal
+// (posts, top frame, cross bars, two side spray bars), five nozzles, manifold pipe, pump, oil tank, the block.
+// Physics: the deposited film on a face grows as dh/dt = eta Q / A (Q: nozzle flow, eta: transfer efficiency, the
+// share of the spray that lands rather than drifting off as overspray, A: face area). Five nozzles, one per face
+// that can be reached (top, two long sides, two ends); the bottom rides on the rollers.
+// Hero: the thinnest film on the block, um, against a 1.5 um minimum. Input: spray time. Break: the top nozzle clogs.
+
+const lab = new Lab({
+  prompt: 'Spray Booth: rust-preventive oil on the OK block, moving the way it does in the Blender layout',
+  no: 12, title: 'Spray Booth', sub: 'rust-preventive oil',
+  size: 5.0,
+  view: { az: 34, el: 26, dist: 2.0, target: [-1.5, 0.5, 0.2], fov: 30, frameX: -0.1 },
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [-2.15, 0.8, 0.7], reach: 0.6 },
+  pills: ['three.js', 'Film build-up', 'Transfer efficiency'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const ROLL_Y = 0.47
+const BLOCK = [0.475, 0.336, 0.371]
+const AXIS_Y = ROLL_Y + BLOCK[1] / 2
+const CW = 0.3                                   // half the conveyor width
+const R = 0.7                                    // centre-line radius of the corner
+const C = [-R, 0]                                // corner centre (x, z)
+const IN_Z = [-2.3, 0]                           // incoming straight along +z at x = 0
+const OUT_X = [-R, -4.9]                         // outgoing straight along -x at z = R
+const PX = -2.15, PW = 0.35, PD = 0.42, PTOP = 1.25   // spray portal: centre x, half length, half depth, top
+const HOUSE = { x0: -5.3, x1: 0.65, z0: -1.95, z1: 1.14, h: 3.1 }
+
+// ------------------------------------------------------------------ materials
+const blue = MAT.paint({ color: [0.12, 0.25, 0.7], roughness: 0.35, clearcoat: 0.5 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const frameMat = MAT.paint({ color: [0.15, 0.16, 0.19], roughness: 0.5, clearcoat: 0.2 })
+const wallMat = MAT.paint({ color: [0.86, 0.79, 0.66], roughness: 0.7, clearcoat: 0 })
+const blockMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.58 })
+
+// ------------------------------------------------------------------ the solver's state and input (labels below read them)
+const S = { film: [0, 0, 0, 0, 0], min: 0, used: 0, over: 0, clog: 1, phase: '' }
+const time = lab.slider({ id: 'time', label: 'Spray time', min: 0.5, max: 6, value: 3, unit: 's', ends: ['0.5 s', '6 s'], digits: 1 })
+
+// ------------------------------------------------------------------ conveyors: in along +z, a 90 degree corner, out along -x
+const rollers = { in: [], turn: [], out: [] }
+const conv = { name: 'Conveyor rail', explode: [0, -0.2, 0], count: 1 }
+for (const s of [-1, 1]) {
+  lab.mesh(GEO.rbox(0.04, 0.09, IN_Z[1] - IN_Z[0], 0.006), steelDark, { ...conv, pos: [s * (CW + 0.02), ROLL_Y - 0.035, (IN_Z[0] + IN_Z[1]) / 2], explode: [0, -0.2, -0.4] })
+  lab.mesh(GEO.rbox(OUT_X[0] - OUT_X[1], 0.09, 0.04, 0.006), steelDark, { ...conv, pos: [(OUT_X[0] + OUT_X[1]) / 2, ROLL_Y - 0.035, R + s * (CW + 0.02)], explode: [-0.4, -0.2, 0] })
+  const arc = new THREE.Mesh(new THREE.TorusGeometry(R + s * (CW + 0.02), 0.022, 8, 40, Math.PI / 2), steelDark)
+  arc.rotation.x = Math.PI / 2; arc.position.set(C[0], ROLL_Y - 0.03, C[1])
+  lab.add(arc, { name: 'Corner rail', explode: [0.2, -0.2, 0.2], count: 1 })
+  for (const z of [IN_Z[0] + 0.15, -0.4]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [s * (CW + 0.02), (ROLL_Y - 0.08) / 2, z], explode: [0, -0.2, -0.4], count: 1 })
+  for (const x of [OUT_X[0] - 0.3, PX - 0.75, OUT_X[1] + 0.15]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [x, (ROLL_Y - 0.08) / 2, R + s * (CW + 0.02)], explode: [-0.4, -0.2, 0], count: 1 })
+}
+for (let z = IN_Z[0] + 0.05; z < IN_Z[1] - 0.02; z += 0.07) rollers.in.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [0, ROLL_Y - 0.023, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.2, -0.4], count: 1 }))
+for (let i = 0; i < 12; i++) {
+  const t = ((i + 0.5) / 12) * (Math.PI / 2)
+  rollers.turn.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Corner roller', pos: [C[0] + Math.cos(t) * R, ROLL_Y - 0.023, C[1] + Math.sin(t) * R], rot: [0, -t, Math.PI / 2], explode: [0.2, -0.2, 0.2], count: 1 }))
+}
+for (let x = OUT_X[0] - 0.05; x > OUT_X[1] + 0.02; x -= 0.07) rollers.out.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [x, ROLL_Y - 0.023, R], rot: [Math.PI / 2, 0, 0], explode: [-0.4, -0.2, 0], count: 1 }))
+lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [CW + 0.18, 0.2, -1.4], rot: [0, 0, Math.PI / 2], explode: [0.4, -0.2, -0.4], count: 1, label: 'From QC Gate 2', at: [0, 0.3, -0.6] })
+lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [-3.9, 0.2, R + CW + 0.18], rot: [Math.PI / 2, 0, 0], explode: [-0.4, -0.2, 0.3], count: 1, label: 'To Junbiki', at: [-0.7, 0.3, 0] })
+
+// ------------------------------------------------------------------ booth housing, cut away at the front, right and roof
+const H = HOUSE
+const wall = { name: 'Booth wall', explode: [0, 0, -0.8], count: 1 }
+// back wall, with the long window and an opening where the line comes in
+lab.mesh(GEO.rbox(-0.45 - H.x0, 0.9, 0.05, 0.01), wallMat, { ...wall, pos: [(H.x0 - 0.45) / 2, 0.45, H.z0] })
+lab.mesh(GEO.rbox(-0.45 - H.x0, 0.9, 0.05, 0.01), wallMat, { ...wall, pos: [(H.x0 - 0.45) / 2, H.h - 0.45, H.z0] })
+for (const x of [H.x0 + 0.4, -0.45 - 0.4]) lab.mesh(GEO.rbox(0.8, H.h - 1.8, 0.05, 0.01), wallMat, { ...wall, pos: [x, H.h / 2, H.z0] })
+lab.mesh(GEO.rbox(-0.45 - H.x0 - 1.6, H.h - 1.8, 0.02, 0.004), MAT.glass({ color: [0.85, 0.92, 1] }), { name: 'Booth window', pos: [(H.x0 - 0.45) / 2, H.h / 2, H.z0], explode: [0, 0, -0.8] })
+lab.mesh(GEO.rbox(0.9, H.h - 1.2, 0.05, 0.01), wallMat, { ...wall, pos: [0, 1.2 + (H.h - 1.2) / 2, H.z0] })
+lab.mesh(GEO.rbox(H.x1 - 0.45, H.h, 0.05, 0.01), wallMat, { ...wall, pos: [(H.x1 + 0.45) / 2, H.h / 2, H.z0] })
+// left wall, with the exit opening
+const exitZ = [R - 0.45, R + 0.45]
+lab.mesh(GEO.rbox(0.05, H.h, exitZ[0] - H.z0, 0.01), wallMat, { ...wall, explode: [-0.8, 0, 0], pos: [H.x0, H.h / 2, (H.z0 + exitZ[0]) / 2], label: 'Spray booth', at: [0, H.h / 2 + 0.1, 0] })
+lab.mesh(GEO.rbox(0.05, H.h, H.z1 - exitZ[1], 0.01), wallMat, { ...wall, explode: [-0.8, 0, 0], pos: [H.x0, H.h / 2, (H.z1 + exitZ[1]) / 2] })
+lab.mesh(GEO.rbox(0.05, H.h - 1.2, exitZ[1] - exitZ[0], 0.01), wallMat, { ...wall, explode: [-0.8, 0, 0], pos: [H.x0, 1.2 + (H.h - 1.2) / 2, R] })
+
+// ------------------------------------------------------------------ the solver's constants (the labels below read them)
+const Q_ML = 12                                  // mL/min per nozzle
+const ETA = 0.6                                  // transfer efficiency: the share of the spray that lands
+const H_MIN = 1.5                                // um, the minimum film the block must leave with
+
+// ------------------------------------------------------------------ the spray portal, nozzles, manifold, pump and oil tank
+const portal = { name: 'Spray portal', explode: [0, 0.6, 0.3], count: 1 }
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) lab.mesh(GEO.rbox(0.05, PTOP, 0.05, 0.008), frameMat, { ...portal, name: 'Portal post', pos: [PX + sx * PW, PTOP / 2, R + sz * PD] })
+for (const sz of [-1, 1]) lab.mesh(GEO.rbox(2 * PW + 0.05, 0.05, 0.05, 0.008), frameMat, { ...portal, name: 'Portal beam', pos: [PX, PTOP, R + sz * PD] })
+for (const sx of [-1, 0, 1]) lab.mesh(GEO.rbox(0.05, 0.05, 2 * PD, 0.008), frameMat, { ...portal, name: 'Portal cross beam', pos: [PX + sx * PW, PTOP, R], label: sx === 0 ? 'Spray portal' : undefined, at: [0, 0.08, 0] })
+for (const sz of [-1, 1]) lab.mesh(GEO.disc(0.014, 2 * PW, 0.002, 16), steel, { ...portal, name: 'Side spray bar', pos: [PX, AXIS_Y, R + sz * PD], rot: [0, 0, Math.PI / 2] })
+// the five nozzles: [position, the point it aims at] in the world, for the faces top, +z, -z, +x, -x
+const NOZ = [
+  [[PX, PTOP - 0.05, R], [PX, AXIS_Y + BLOCK[1] / 2, R]],
+  [[PX, AXIS_Y, R + PD - 0.02], [PX, AXIS_Y, R + BLOCK[2] / 2]],
+  [[PX, AXIS_Y, R - PD + 0.02], [PX, AXIS_Y, R - BLOCK[2] / 2]],
+  [[PX + PW, PTOP - 0.05, R], [PX + BLOCK[0] / 2, AXIS_Y, R]],
+  [[PX - PW, PTOP - 0.05, R], [PX - BLOCK[0] / 2, AXIS_Y, R]],
+]
+const nozzleMat = MAT.brass()
+NOZ.forEach(([p, q], i) => {
+  const n = new THREE.Mesh(GEO.disc(0.012, 0.05, 0.002, 16), nozzleMat)
+  n.position.set(...p)
+  n.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...p).sub(new THREE.Vector3(...q)).normalize())
+  lab.add(n, { name: 'Spray nozzle', explode: [0, 0.6, 0.3], count: 1, label: i === 0 ? 'Nozzles x 5' : undefined, at: [0, 0.06, 0], value: i === 0 ? () => `${fmt(Q_ML * S.clog)} mL/min on top` : undefined })
+})
+// pump behind the line, left of the portal; the manifold runs up, across and along to the portal's back beam
+const PUMP = [PX - 0.85, -0.05]
+lab.mesh(GEO.rbox(0.49, 0.74, 0.38, 0.02), MAT.paint({ color: [0.36, 0.37, 0.38], roughness: 0.5 }), { name: 'Pump unit', pos: [PUMP[0], 0.37, PUMP[1]], explode: [0, 0, -0.6], label: 'Pump', at: [0, 0.42, 0], value: () => `${fmt(S.used, 1)} mL a block` })
+lab.mesh(GEO.disc(0.07, 0.2), blue, { name: 'Pump motor', pos: [PUMP[0] - 0.1, 0.81, PUMP[1]], explode: [0, 0.2, -0.6] })
+const MX = PUMP[0] + 0.12, MY = PTOP + 0.037
+lab.mesh(GEO.disc(0.012, MY - 0.74, 0.002, 12), MAT.copper(), { name: 'Manifold pipe', pos: [MX, (MY + 0.74) / 2, PUMP[1]], explode: [0, 0.3, -0.5] })
+lab.mesh(GEO.disc(0.012, PX - PW - MX, 0.002, 12), MAT.copper(), { name: 'Manifold pipe', pos: [(MX + PX - PW) / 2, MY, PUMP[1]], rot: [0, 0, Math.PI / 2], explode: [0, 0.3, -0.5] })
+lab.mesh(GEO.disc(0.012, R - PD - PUMP[1], 0.002, 12), MAT.copper(), { name: 'Manifold pipe', pos: [PX - PW, MY, (PUMP[1] + R - PD) / 2], rot: [Math.PI / 2, 0, 0], explode: [0, 0.3, -0.5] })
+lab.mesh(GEO.rbox(2 * PW - 0.04, 0.36, 2 * CW - 0.02, 0.02), MAT.satin({ color: [0.06, 0.06, 0.065] }), { name: 'Oil tank', pos: [PX, 0.18, R], explode: [0, -0.4, 0.4], label: 'Oil tank', at: [0, 0.2, 0], value: () => `${fmt(S.over, 1)} mL back from each block` })
+lab.mesh(GEO.rbox(2 * PW - 0.1, 0.01, 2 * CW - 0.08, 0.004), MAT.fluid({ color: [0.45, 0.3, 0.08] }), { name: 'Oil', pos: [PX, 0.33, R], explode: [0, -0.4, 0.4] })
+
+// ------------------------------------------------------------------ the block, with a film of oil on each face that can show
+const block = new THREE.Group()
+block.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat))
+for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); block.add(b) }
+// local faces: top, +z, -z, +x, -x. Under the portal the block heads along -x (turned half round), so its local +z
+// faces the world's -z nozzle and its local +x the world's -x nozzle.
+const skinMats = [], E = 0.004
+const skins = [
+  [[BLOCK[0] - 0.02, 0.002, BLOCK[2] - 0.02], [0, BLOCK[1] / 2 + E, 0], 0],
+  [[BLOCK[0] - 0.02, BLOCK[1] - 0.02, 0.002], [0, 0, BLOCK[2] / 2 + E], 2],
+  [[BLOCK[0] - 0.02, BLOCK[1] - 0.02, 0.002], [0, 0, -BLOCK[2] / 2 - E], 1],
+  [[0.002, BLOCK[1] - 0.02, BLOCK[2] - 0.02], [BLOCK[0] / 2 + E, 0, 0], 4],
+  [[0.002, BLOCK[1] - 0.02, BLOCK[2] - 0.02], [-BLOCK[0] / 2 - E, 0, 0], 3],
+]
+for (const [size, pos, face] of skins) {
+  const m = MAT.fluid({ color: [0.32, 0.2, 0.04], transparent: true, opacity: 0, depthWrite: false })
+  const sk = new THREE.Mesh(GEO.rbox(...size, 0.001), m); sk.position.set(...pos); block.add(sk)
+  skinMats.push([m, face])
+}
+lab.add(block, { name: 'BC block', explode: [0, 0.6, 0.6], count: 10, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => ['spray', 'drip', 'roll out'].includes(S.phase) ? `thinnest film ${fmt(S.min, 1)} um` : 'bare, from QC Gate 2' })
+
+// ------------------------------------------------------------------ the mist: one spray cone per nozzle
+const mist = NOZ.map(([p, q]) => {
+  const pv = new THREE.Vector3(...p), qv = new THREE.Vector3(...q), dir = qv.clone().sub(pv)
+  const side = new THREE.Vector3(0, 1, 0).cross(dir)
+  if (side.lengthSq() < 1e-6) side.set(1, 0, 0); else side.normalize()
+  const up = dir.clone().cross(side).normalize()
+  const paths = []
+  for (const [a, b] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7]]) {
+    const end = qv.clone().addScaledVector(side, a * 0.13).addScaledVector(up, b * 0.1)
+    const mid = pv.clone().lerp(end, 0.5)
+    paths.push([pv.toArray(), mid.toArray(), end.toArray()])
+  }
+  return lab.flow({ paths, count: 70, length: 0.25, speed: 0, color: () => [0.95, 0.78, 0.4] })
+})
+
+// ------------------------------------------------------------------ the solver: film build-up from each nozzle
+const AREA = [BLOCK[0] * BLOCK[2], BLOCK[0] * BLOCK[1], BLOCK[0] * BLOCK[1], BLOCK[1] * BLOCK[2], BLOCK[1] * BLOCK[2]]
+const rateUm = (i, clog) => (ETA * (Q_ML * (i === 0 ? clog : 1) * 1e-6) / 60 / AREA[i]) * 1e6 // um per second
+const finalMin = (t, clog) => Math.min(...AREA.map((_, i) => rateUm(i, clog) * t))
+lab.hero({ label: 'Thinnest oil film', unit: 'um', max: 5, digits: 1 })
+
+// one cycle, shaped like the Blender path: in from QC Gate 2, round the corner, under the portal, sprayed, out
+const DUR = { 'roll in': 1.4, corner: 1.5, 'to portal': 1.3, spray: 3, drip: 0.8, 'roll out': 1.8, next: 0.4 }
+const ORDER = Object.keys(DUR)
+let phase = 'roll in', pt = 0
+const go = (p) => { phase = p; pt = 0; if (p === 'roll in') S.film = [0, 0, 0, 0, 0] }
+
+lab.onTick((dt) => {
+  pt += dt
+  const dur = phase === 'spray' ? time.value : DUR[phase]
+  const u = clamp(pt / dur)
+  const e = smoothstep(0, 1, u)
+  S.clog = approach(S.clog, lab.broken ? 0.2 : 1, 1.5, dt)
+  S.phase = phase
+
+  // the block's path: up the incoming line, round the corner (turning with it), along to the portal and out
+  let bx = 0, bz = 0, heading = -Math.PI / 2, alpha = 1
+  if (phase === 'roll in') { bz = lerp(IN_Z[0] + 0.2, 0, e); alpha = smoothstep(0, 0.25, u) }
+  else if (phase === 'corner') { const t = u * (Math.PI / 2); bx = C[0] + Math.cos(t) * R; bz = C[1] + Math.sin(t) * R; heading = -Math.PI / 2 - t }
+  else if (phase === 'to portal') { bx = lerp(-R, PX, e); bz = R; heading = -Math.PI }
+  else if (phase === 'spray' || phase === 'drip') { bx = PX; bz = R; heading = -Math.PI }
+  else if (phase === 'roll out') { bx = lerp(PX, OUT_X[1] + 0.3, e); bz = R; heading = -Math.PI; alpha = 1 - smoothstep(0.8, 1, u) }
+  else if (phase === 'next') alpha = 0
+  lab.place(block, bx, AXIS_Y, bz)
+  block.rotation.set(0, heading, 0)
+  const fading = alpha < 0.999
+  if (blockMat.transparent !== fading) { blockMat.transparent = fading; blockMat.needsUpdate = true }
+  blockMat.opacity = alpha
+
+  // spraying: each face's film grows at eta Q / A from its own nozzle
+  const spraying = phase === 'spray'
+  if (spraying) S.film = S.film.map((h, i) => h + rateUm(i, S.clog) * dt)
+  S.min = Math.min(...S.film)
+  for (const [m, face] of skinMats) m.opacity = clamp(S.film[face] / 3) * 0.4 * alpha
+  mist.forEach((f, i) => { f.speed = spraying ? 2.2 : 0; f.opacity = spraying ? 0.75 * (i === 0 ? S.clog : 1) : 0 })
+  S.used = ((4 + S.clog) * Q_ML * time.value) / 60
+  S.over = S.used * (1 - ETA)
+
+  if (phase === 'roll in') rollers.in.forEach((r) => { r.rotation.x += dt * 9 })
+  if (phase === 'corner') rollers.turn.forEach((r) => { r.rotation.y += dt * 9 })
+  if (phase === 'to portal' || phase === 'roll out') rollers.out.forEach((r) => { r.rotation.y += dt * 9 })
+
+  if (u >= 1) go(ORDER[(ORDER.indexOf(phase) + 1) % ORDER.length])
+  const live = ['spray', 'drip', 'roll out'].includes(phase)
+  const say = spraying ? 'spraying five faces' : phase === 'drip' ? 'dripping off over the tank' : phase === 'roll out' ? 'oiled: on to Junbiki' : phase
+  lab.setHero(live ? S.min : finalMin(time.value, S.clog), {
+    state: lab.broken ? `top nozzle clogged, ${fmt(S.clog * 100)} % flow · ${say}` : say,
+    sub: `${fmt(time.value, 1)} s spray · top ${fmt(rateUm(0, S.clog) * time.value, 1)} um, sides ${fmt(rateUm(1, 1) * time.value, 1)} um, ends ${fmt(rateUm(3, 1) * time.value, 1)} um · minimum ${H_MIN} um`,
+    bad: finalMin(time.value, S.clog) < H_MIN,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'Top nozzle clogs', run() {}, reset() {} })
+lab.how(
+  'The OK block comes in from QC Gate 2, turns the corner into the booth and stops under the spray portal. Five nozzles fed by the pump from the oil tank spray a fine mist of rust-preventive oil, one on each face they can reach: the top, the two long sides and the two ends; the bottom rides on the rollers. Only part of the spray lands, about 60 %; the rest drifts off as overspray and drips back into the tank under the rollers. What lands builds a film on each face at eta Q / A, so the bigger the face the slower its film grows: the top, the biggest face, ends up thinnest. The block must leave with at least 1.5 um everywhere, which at 12 mL/min a nozzle takes a little over 2 s. When the top nozzle clogs to a fifth of its flow, the sides still look wet but the top stays nearly bare and will rust on the way to the customer. Simplified: an even film on each face, one nozzle per face, no run-off.',
+  [
+    'dh/dt = eta Q / A',
+    'Q = 12 mL/min per nozzle,  eta = 0.6',
+    'A_top = 0.475 x 0.371 m,  A_side = 0.475 x 0.336 m,  A_end = 0.371 x 0.336 m',
+    'h_min = 1.5 um',
+    'oil a block = 5 Q t,  back to the tank = (1 - eta) 5 Q t',
+  ],
+)
+lab.autoFilm({ runBeat: 'It oils the block against rust.', runSub: 'Round the corner, under the portal, five faces sprayed.', breakBeat: 'The top nozzle clogs.', breakSub: 'The biggest face stays nearly bare.', sliderTo: 0.5 })
+// review hooks: __spray.phase, __spray.stats
+window.__spray = { get phase() { return phase }, get stats() { return { ...S } } }
+lab.start()
+</script>
+</body>
+</html>

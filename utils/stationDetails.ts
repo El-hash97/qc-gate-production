@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori to QC Gate 2 have cards so far.
+// Placeholder copy for review; Baritori to Spray Booth have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -142,6 +142,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'OK goes to', value: 'Spray Booth' },
       { label: 'Repair goes to', value: 'Line Repair' },
       { label: 'Operator', value: '1 inspector' },
+    ],
+  },
+  spray: {
+    title: 'Spray Booth',
+    subtitle: 'Rust-preventive Oil',
+    image: { light: '/stations/spray-light.svg', dark: '/stations/spray-dark.svg' },
+    play: '/stations/spray-3d.html',
+    description: [
+      'The OK block comes in from QC Gate 2, turns the corner inside the booth and stops under the spray portal.',
+      'Five nozzles fed by the pump mist rust-preventive oil onto the top, both long sides and both ends, so the bare machined iron leaves with a thin film on every face; the overspray drips back into the oil tank under the rollers.',
+      'The oiled block rolls out through the side of the booth to Junbiki.',
+    ],
+    specs: [
+      { label: 'Nozzles', value: '5, 12 mL/min each' },
+      { label: 'Film', value: '≥ 1.5 µm on every face' },
+      { label: 'Spray time', value: 'About 3 s' },
+      { label: 'Operator', value: 'None, automatic' },
     ],
   },
 };

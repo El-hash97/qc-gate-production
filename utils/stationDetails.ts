@@ -48,9 +48,9 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/hsb06-light.svg', dark: '/stations/hsb06-dark.svg' },
     play: '/stations/hsb06-3d.html',
     description: [
-      'The operator steers a pillar jib manipulator by its handwheel, grips the block on the loading stand and swings it in through the door onto the rotary table.',
-      'With the doors shut the table turns while two blast wheels throw steel shot into the pockets and core holes the first machine could not reach.',
-      'The doors open, the manipulator lifts the block back out and sets it on the roller conveyor towards Grinding.',
+      'The operator steers a pillar jib manipulator that takes the block from the loading stand in through the left door and sets it on the rotary table.',
+      'With both lift doors down, the table carries the block the long way round, past two blast wheels that throw steel shot into the pockets and core holes the first machine could not reach.',
+      'At the right door the manipulator lifts the block out onto the output stand, on its way to Grinding.',
     ],
     specs: [
       { label: 'Cycle time', value: '5.2 s' },

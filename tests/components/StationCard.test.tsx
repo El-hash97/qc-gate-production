@@ -29,6 +29,15 @@ describe('StationCard', () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 
+  it('has a Baritori card with its own figure and 3D machine', () => {
+    const baritori = stationDetail('baritori')!;
+    render(<StationCard detail={baritori} theme="dark" onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: /Baritori/ })).toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/baritori-dark.svg');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    expect(screen.getByTitle(/Baritori 3D/)).toHaveAttribute('src', '/stations/baritori-3d.html');
+  });
+
   it('has no card for stations without a detail yet', () => {
     expect(stationDetail('hanten')).toBeNull();
   });

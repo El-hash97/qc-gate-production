@@ -23,7 +23,8 @@ const IN = [-170, -30], OUTX = [30, 170];
 const CAGE = { x0: -17, x1: 17, z: 40, r: 22, t: 3 };
 const BLOCK = { w: 24, d: 19, h: 17 };
 const SIDE = { x: 78, y0: -140, y1: -CONV_Y - 4 }; // side transfer: rollers along x, running to -y
-const NGBOX = { x: 112, y: -128, w: 46, d: 40, r: 1.5 };
+const NGBOX = { x: 108, y: -136, w: 58, d: 48, r: 1.5 }; // open pallet box; rim just under the transfer
+const NG_PAL = 7, NG_RIM = 22, NG_T = 2;
 
 const P = k.fitProjection(
   [...k.boxCorners(PAD, -8, 0), [-46, 30, 96], [-30, 60, 70]],
@@ -109,13 +110,19 @@ function pusher() {
   return out.join("");
 }
 
-// the NG box: a steel bin with fork pockets, a rejected block lying in it
+// the NG box: a red pallet box, open on top, on a pallet with fork pockets, NG blocks lying in it.
+// Back walls first, then the floor and the blocks, then the front walls, so the recess reads.
 function ngBox() {
   const { x, y, w, d } = NGBOX;
-  const out = [S(slab({ x, y, w, d, r: 1.5 }, 0, 30, 3, 0.6), { tone: "lo", inner: L(k.sideSeam(NGBOX, 10, P, 3), { tone: "faint" }) })];
-  out.push(L(k.planOutline(k.insetPlan(NGBOX, 3), 30, P), { tone: "mid" }));
-  for (const dx of [8, w - 16]) out.push(L(k.pathOf([at([x + dx, y + d, 2]), at([x + dx + 8, y + d, 2]), at([x + dx + 8, y + d, 7]), at([x + dx, y + d, 7])], true), { tone: "mid" }));
-  out.push(S(slab({ x: x + 10, y: y + 10, w: 22, d: 17, r: 1 }, 22, 10, 2, 0.5), { tone: "mid" }));
+  const wall = (plan) => S(slab({ ...plan, r: 0.4 }, NG_PAL, NG_RIM - NG_PAL, 2, 0.3), { tone: "lo" });
+  const out = [S(slab({ x, y, w, d, r: 1 }, 0, NG_PAL, 2, 0.4), { tone: "mid" })];
+  const pocket = (a, b) => L(k.pathOf([at(a), at([...b.slice(0, 2), a[2]]), at(b), at([...a.slice(0, 2), b[2]])], true), { tone: "lo" });
+  for (const dx of [8, w - 22]) out.push(pocket([x + dx, y + d, 1.5], [x + dx + 14, y + d, 5]));
+  for (const dy of [7, d - 19]) out.push(pocket([x + w, y + dy, 1.5], [x + w, y + dy + 12, 5]));
+  out.push(wall({ x, y, w, d: NG_T }), wall({ x, y: y + NG_T, w: NG_T, d: d - NG_T }));
+  out.push(S(slab({ x: x + NG_T, y: y + NG_T, w: w - 2 * NG_T, d: d - 2 * NG_T, r: 0.3 }, NG_PAL, 1, 1, 0.2), { tone: "lo" }));
+  out.push(block(x + w - 17, y + 14, NG_PAL + 1), block(x + w - 17, y + 36, NG_PAL + 1));
+  out.push(wall({ x: x + w - NG_T, y: y + NG_T, w: NG_T, d: d - 2 * NG_T }), wall({ x, y: y + d - NG_T, w, d: NG_T }));
   return out.join("");
 }
 
@@ -206,9 +213,9 @@ function terminal() {
 
 const body = [
   floor(),
-  ngBox(),
   sideTransfer(),
   block(SIDE.x, -100, CONV_Z - 4),
+  ngBox(),
   conveyorBack(IN),
   block(-120),
   conveyorFront(IN),

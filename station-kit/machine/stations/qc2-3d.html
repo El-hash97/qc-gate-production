@@ -55,7 +55,8 @@ const RING_R = 0.38, RING_T = 0.04
 const IN = [-2.4, -0.42], OUT = [0.42, 2.6], CW = 0.3
 const SX = 1.2                                   // side transfer centre line (x)
 const SIDE_Y = ROLL_Y - 0.06, SIDE_Z = [-2.2, -CW - 0.06]
-const NG = { x: 2.05, z: -1.75, w: 0.9, d: 0.9, h: 0.75 }
+const NG = { x: 2.2, z: -1.75, w: 1.2, d: 1.1, h: 0.38 }  // the rim sits just under the transfer
+const PAL = 0.13, WT = 0.04, FLOOR_Y = PAL + 0.02 // pallet height, wall thickness, inside floor
 
 // ------------------------------------------------------------------ materials
 const blue = MAT.paint({ color: [0.12, 0.25, 0.7], roughness: 0.35, clearcoat: 0.5 })
@@ -113,7 +114,18 @@ lab.mesh(GEO.rbox(0.66, 0.16, 0.04, 0.006), steelDark, { name: 'Transfer stop', 
 const flap = new THREE.Group(); flap.position.set(SX + CW + 0.04, SIDE_Y - 0.01, NG.z)
 const flapPlate = new THREE.Mesh(GEO.rbox(0.5, 0.02, 0.5, 0.006), steelDark); flapPlate.position.x = 0.25; flap.add(flapPlate)
 lab.add(flap, { name: 'Tipping flap', explode: [0.3, 0, -0.3], count: 1 })
-lab.mesh(GEO.rbox(NG.w, NG.h, NG.d, 0.03), redPaint, { name: 'NG box', pos: [NG.x, NG.h / 2, NG.z], explode: [0.6, 0, -0.4], label: 'NG box', at: [0, NG.h / 2 + 0.05, 0], value: () => `${S.ng} NG this shift` })
+// the NG box: a red pallet box, open on top, on a pallet with fork pockets, with NG blocks already in it
+const ngOpt = (name, extra) => ({ name, explode: [0.6, 0, -0.4], count: 1, ...extra })
+for (const sz of [-1, 0, 1]) lab.mesh(GEO.rbox(NG.w, 0.02, 0.12, 0.004), redPaint, ngOpt('Pallet runner', { pos: [NG.x, 0.01, NG.z + sz * (NG.d / 2 - 0.06)] }))
+for (const sx of [-1, 0, 1]) for (const sz of [-1, 0, 1]) lab.mesh(GEO.rbox(0.14, PAL - 0.05, 0.12, 0.006), redPaint, ngOpt('Pallet block', { pos: [NG.x + sx * (NG.w / 2 - 0.07), 0.02 + (PAL - 0.05) / 2, NG.z + sz * (NG.d / 2 - 0.06)] }))
+lab.mesh(GEO.rbox(NG.w, 0.03, NG.d, 0.006), redPaint, ngOpt('Pallet deck', { pos: [NG.x, PAL - 0.015, NG.z] }))
+lab.mesh(GEO.rbox(NG.w - 2 * WT, 0.02, NG.d - 2 * WT, 0.004), redPaint, ngOpt('Box floor', { pos: [NG.x, PAL + 0.01, NG.z] }))
+const WH = NG.h - PAL
+for (const s of [-1, 1]) lab.mesh(GEO.rbox(WT, WH, NG.d, 0.008), redPaint, ngOpt('Box wall', { pos: [NG.x + s * (NG.w / 2 - WT / 2), PAL + WH / 2, NG.z] }))
+lab.mesh(GEO.rbox(NG.w - 2 * WT, WH, WT, 0.008), redPaint, ngOpt('Box wall', { pos: [NG.x, PAL + WH / 2, NG.z - NG.d / 2 + WT / 2] }))
+lab.mesh(GEO.rbox(NG.w - 2 * WT, WH, WT, 0.008), redPaint, ngOpt('Box wall', { pos: [NG.x, PAL + WH / 2, NG.z + NG.d / 2 - WT / 2], label: 'NG box', at: [0, WH / 2 + 0.05, 0], value: () => `${S.ng} NG this shift` }))
+const ngBlockMat = MAT.castIron({ color: [0.55, 0.55, 0.54], roughness: 0.6 })
+for (const z of [-0.25, 0.25]) lab.mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), ngBlockMat, ngOpt('NG block', { pos: [NG.x + 0.28, FLOOR_Y + BLOCK[1] / 2, NG.z + z] }))
 
 // ------------------------------------------------------------------ andon stack and the judgement terminal
 const AND = [-0.85, 0.7]
@@ -194,10 +206,11 @@ lab.onTick((dt) => {
     bz = lerp(-CW - 0.25, verdict === 'NG' ? NG.z : SIDE_Z[0] + 0.3, e)
     if (verdict === 'Repair') alpha = 1 - smoothstep(0.7, 1, u)
   } else if (phase === 'tip') {
-    bx = SX + smoothstep(0, 0.5, u) * 0.55 + smoothstep(0.5, 1, u) * 0.3
-    by = SIDE_Y + BLOCK[1] / 2 - smoothstep(0.4, 1, u) * 0.45
-    bz = NG.z; rz = -smoothstep(0.2, 0.8, u) * 1.1
-    alpha = 1 - smoothstep(0.85, 1, u)
+    // it slides off the flap, tilting, and drops flat onto the floor of the box beside the others
+    bx = SX + smoothstep(0, 0.6, u) * 0.73
+    by = lerp(SIDE_Y + BLOCK[1] / 2, FLOOR_Y + BLOCK[1] / 2, smoothstep(0.35, 0.8, u))
+    bz = NG.z; rz = -smoothstep(0.1, 0.45, u) * 0.6 * (1 - smoothstep(0.55, 0.8, u))
+    alpha = 1 - smoothstep(0.9, 1, u)
   } else if (phase === 'next') alpha = 0
   lab.place(block, bx, by, bz)
   block.rotation.set(rx, 0, rz)
@@ -214,7 +227,7 @@ lab.onTick((dt) => {
   const r0 = CW + 0.23, r1 = padZ + 0.02
   pushRod.scale.y = Math.max(0.01, r0 - r1); pushRod.rotation.x = Math.PI / 2
   lab.place(pushRod, SX, ROLL_Y + 0.17, (r0 + r1) / 2)
-  flap.rotation.z = phase === 'tip' ? -Math.sin(u * Math.PI) * 0.9 : 0
+  flap.rotation.z = phase === 'tip' ? -Math.sin(u * Math.PI) * 0.5 : 0
 
   // the verdict: the andon and the terminal's button light up, and the app records it
   const lit = ['verdict', 'roll on', 'push', 'transfer', 'tip'].includes(phase)

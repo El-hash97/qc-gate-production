@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Gate 2 Final Judgement · Machine Skill</title>
+<meta name="description" content="Station QC Gate 2 of the BC finishing line: each block turns in a cage for its last look and is judged OK, Repair or NG; OK runs on to the Spray Booth, Repair and NG leave on a side transfer. The shift's first-pass yield is shown with its 95% confidence interval. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "QC Gate 2: the final judgement of the BC finishing line, moving the way it does in the Blender layout"
+// Every block gets a last look and one of three judgements, which the inspector records in the QC Gate app:
+// OK goes on to the Spray Booth, Repair leaves on a side transfer for Line Repair, NG goes to the NG box.
+// Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): a turning cage of two rings 0.76 across
+// in the roller line (tops at 0.47), a side transfer off the back of the line with a pusher on the front,
+// the NG box beside it, the inspector at the front with an andon stack and a terminal.
+// Parts: cage (rings, tie bars, platform), bearing stands and rollers, in/out conveyors with gear motors,
+// pusher (frame, cylinder, rod, pad), side transfer (rails, legs, rollers, stop), tipping flap, NG box,
+// andon stack (pole, three lamps, cap), terminal (stand, tablet, screen, three buttons), the block.
+// Statistics: each block is defective with the true defect rate p (30 % of defects NG, 70 % Repair) and a
+// defect is caught with probability d. The shift's first-pass yield is OK / judged, given with its 95 %
+// Wilson interval, centre (p^ + z^2/2n)/(1 + z^2/n), half width z sqrt(p^(1-p^)/n + z^2/4n^2)/(1 + z^2/n).
+// Defects that are missed pass as OK: escapes.
+// Hero: first-pass yield, %. Input: true defect rate. Break: the inspector's catch rate drops from 98 % to 60 %.
+
+const lab = new Lab({
+  prompt: 'QC Gate 2: the final judgement of the BC line, moving the way it does in the Blender layout',
+  no: 11, title: 'QC Gate 2', sub: 'final judgement',
+  size: 5.0,
+  view: { az: 30, el: 22, dist: 1.6, target: [0.4, 0.7, -0.2], fov: 30 },
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0, 0.8, 0], reach: 0.6 },
+  pills: ['three.js', 'Wilson interval', 'First-pass yield'],
+})
+
+// ------------------------------------------------------------------ dimensions
+const ROLL_Y = 0.47
+const BLOCK = [0.475, 0.336, 0.371]
+const AXIS_Y = ROLL_Y + BLOCK[1] / 2
+const RING_R = 0.38, RING_T = 0.04
+const IN = [-2.4, -0.42], OUT = [0.42, 2.6], CW = 0.3
+const SX = 1.2                                   // side transfer centre line (x)
+const SIDE_Y = ROLL_Y - 0.06, SIDE_Z = [-2.2, -CW - 0.06]
+const NG = { x: 2.05, z: -1.75, w: 0.9, d: 0.9, h: 0.75 }
+
+// ------------------------------------------------------------------ materials
+const blue = MAT.paint({ color: [0.12, 0.25, 0.7], roughness: 0.35, clearcoat: 0.5 })
+const redPaint = MAT.paint({ color: [0.72, 0.1, 0.08], roughness: 0.45, clearcoat: 0.3 })
+const steel = MAT.steel()
+const steelDark = MAT.steelDark()
+const blockMat = MAT.castIron({ color: [0.62, 0.62, 0.61], roughness: 0.58 })
+
+// ------------------------------------------------------------------ the solver's state and input (labels below read them)
+const S = { n: 0, ok: 0, rep: 0, ng: 0, esc: 0, fpy: 1, lo: 0, hi: 1, verdict: '' }
+const rate = lab.slider({ id: 'rate', label: 'True defect rate', min: 0, max: 20, value: 6, unit: '%', ends: ['0 %', '20 %'], digits: 1 })
+
+// ------------------------------------------------------------------ conveyors
+const rollers = []
+for (const [x0, x1] of [IN, OUT]) {
+  for (const s of [-1, 1]) {
+    lab.mesh(GEO.rbox(x1 - x0, 0.09, 0.04, 0.006), steelDark, { name: 'Conveyor rail', pos: [(x0 + x1) / 2, ROLL_Y - 0.035, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+    for (const x of [x0 + 0.1, x1 - 0.1]) lab.mesh(GEO.rbox(0.04, ROLL_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [x, (ROLL_Y - 0.08) / 2, s * (CW + 0.02)], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 })
+  }
+  for (let x = x0 + 0.05; x < x1 - 0.03; x += 0.07) rollers.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Roller', pos: [x, ROLL_Y - 0.023, 0], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0], count: 1 }))
+  lab.mesh(GEO.disc(0.07, 0.22), blue, { name: 'Gear motor', pos: [x0 + 0.5, 0.2, CW + 0.18], rot: [Math.PI / 2, 0, 0], explode: [Math.sign(x0) * 0.4, -0.2, 0.3], count: 1, label: x0 > 0 ? 'OK: to Spray Booth' : undefined, at: [1.4, 0.4, 0] })
+}
+
+// ------------------------------------------------------------------ the turning cage
+lab.mesh(GEO.rbox(0.66, 0.06, 0.6, 0.01), steelDark, { name: 'Cage base', pos: [0, 0.03, 0], explode: [0, -0.3, 0] })
+const sup = []
+for (const sx of [-0.27, 0.27]) for (const sz of [-1, 1]) {
+  const a = (35 * Math.PI) / 180, d = RING_R + RING_T + 0.07
+  const y = AXIS_Y - Math.cos(a) * d, z = sz * Math.sin(a) * d
+  lab.mesh(GEO.rbox(0.08, y - 0.06, 0.1, 0.01), steelDark, { name: 'Bearing stand', pos: [sx, (y + 0.06) / 2, z], explode: [0, -0.3, sz * 0.3], count: 1 })
+  sup.push(lab.mesh(GEO.disc(0.07, 0.05), MAT.steel({ roughness: 0.25 }), { name: 'Support roller', pos: [sx, y, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.3, sz * 0.3], count: 1 }))
+}
+const cage = new THREE.Group(); cage.position.set(0, AXIS_Y, 0)
+for (const x of [-0.2, 0.2]) { const r = new THREE.Mesh(GEO.tube(RING_R + RING_T, RING_R, 0.05), MAT.steel({ roughness: 0.35 })); r.rotation.z = Math.PI / 2; r.position.x = x; cage.add(r) }
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + (i * Math.PI) / 2
+  const bar = new THREE.Mesh(GEO.disc(0.018, 0.44), steel); bar.rotation.z = Math.PI / 2; bar.position.set(0, Math.cos(a) * (RING_R - 0.02), Math.sin(a) * (RING_R - 0.02)); cage.add(bar)
+}
+for (const z of [-0.12, 0.12]) { const rail = new THREE.Mesh(GEO.rbox(0.44, 0.03, 0.04, 0.006), steelDark); rail.position.set(0, -BLOCK[1] / 2 - 0.015, z); cage.add(rail) }
+lab.add(cage, { name: 'Inspection cage', explode: [0, 0.5, 0.4], count: 8, label: 'Inspection cage', at: [0.2, RING_R + 0.1, 0] })
+
+// ------------------------------------------------------------------ pusher, side transfer, tipping flap, NG box
+lab.mesh(GEO.rbox(0.16, 0.66, 0.12, 0.01), steelDark, { name: 'Pusher frame', pos: [SX, 0.33, CW + 0.3], explode: [0, 0, 0.5] })
+lab.mesh(GEO.rbox(0.12, 0.12, 0.5, 0.02), steel, { name: 'Pusher cylinder', pos: [SX, ROLL_Y + 0.17, CW + 0.48], explode: [0, 0, 0.6] })
+const pushRod = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 16), MAT.chrome())
+lab.add(pushRod, { name: 'Pusher rod', explode: [0, 0, 0.6] })
+const pushPad = new THREE.Mesh(GEO.rbox(0.4, 0.2, 0.03, 0.01), steelDark)
+lab.add(pushPad, { name: 'Pusher pad', explode: [0, 0, 0.6], label: 'Pusher', at: [0, 0.14, 0] })
+for (const s of [-1, 1]) lab.mesh(GEO.rbox(0.04, 0.09, SIDE_Z[1] - SIDE_Z[0], 0.006), steelDark, { name: 'Transfer rail', pos: [SX + s * (CW + 0.02), SIDE_Y - 0.035, (SIDE_Z[0] + SIDE_Z[1]) / 2], explode: [0, -0.2, -0.4], count: 1 })
+for (const z of [SIDE_Z[0] + 0.15, SIDE_Z[1] - 0.15]) for (const s of [-1, 1]) lab.mesh(GEO.rbox(0.04, SIDE_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Transfer leg', pos: [SX + s * (CW + 0.02), (SIDE_Y - 0.08) / 2, z], explode: [0, -0.2, -0.4], count: 1 })
+const sideRollers = []
+for (let z = SIDE_Z[0] + 0.05; z < SIDE_Z[1] - 0.03; z += 0.07) sideRollers.push(lab.mesh(GEO.disc(0.023, 2 * CW, 0.003, 24), steel, { name: 'Transfer roller', pos: [SX, SIDE_Y - 0.023, z], rot: [0, 0, Math.PI / 2], explode: [0, -0.2, -0.4], count: 1 }))
+lab.mesh(GEO.rbox(0.66, 0.16, 0.04, 0.006), steelDark, { name: 'Transfer stop', pos: [SX, SIDE_Y, SIDE_Z[0] - 0.02], explode: [0, -0.2, -0.6], label: 'Repair: to Line Repair', at: [0, 0.12, 0] })
+// the tipping flap at the side of the transfer, over the NG box
+const flap = new THREE.Group(); flap.position.set(SX + CW + 0.04, SIDE_Y - 0.01, NG.z)
+const flapPlate = new THREE.Mesh(GEO.rbox(0.5, 0.02, 0.5, 0.006), steelDark); flapPlate.position.x = 0.25; flap.add(flapPlate)
+lab.add(flap, { name: 'Tipping flap', explode: [0.3, 0, -0.3], count: 1 })
+lab.mesh(GEO.rbox(NG.w, NG.h, NG.d, 0.03), redPaint, { name: 'NG box', pos: [NG.x, NG.h / 2, NG.z], explode: [0.6, 0, -0.4], label: 'NG box', at: [0, NG.h / 2 + 0.05, 0], value: () => `${S.ng} NG this shift` })
+
+// ------------------------------------------------------------------ andon stack and the judgement terminal
+const AND = [-0.85, 0.7]
+lab.mesh(GEO.rbox(0.18, 0.02, 0.18, 0.004), steelDark, { name: 'Andon foot', pos: [AND[0], 0.01, AND[1]], explode: [-0.3, 0, 0.4] })
+lab.mesh(GEO.disc(0.025, 1.6), steel, { name: 'Andon pole', pos: [AND[0], 0.8, AND[1]], explode: [-0.3, 0, 0.4] })
+const lampColors = [[0.1, 1, 0.3], [1, 0.75, 0.05], [1, 0.12, 0.08]]
+const lamps = lampColors.map((c, i) => {
+  const m = MAT.glow({ emissive: c, emissiveIntensity: 0.15 })
+  lab.mesh(GEO.disc(0.06, 0.1), m, { name: 'Andon lamp', pos: [AND[0], 1.66 + i * 0.105, AND[1]], explode: [-0.3, 0.2, 0.4], count: 1, label: i === 2 ? 'Andon' : undefined, at: [0, 0.1, 0] })
+  return m
+})
+lab.mesh(GEO.disc(0.065, 0.03), steelDark, { name: 'Andon cap', pos: [AND[0], 1.98, AND[1]], explode: [-0.3, 0.3, 0.4] })
+const TER = [-0.35, 1.05]
+lab.mesh(GEO.rbox(0.25, 0.02, 0.25, 0.004), steelDark, { name: 'Terminal foot', pos: [TER[0], 0.01, TER[1]], explode: [0, 0, 0.5] })
+lab.mesh(GEO.disc(0.025, 1.1), steel, { name: 'Terminal stand', pos: [TER[0], 0.55, TER[1]], explode: [0, 0, 0.5] })
+const tablet = new THREE.Group(); tablet.position.set(TER[0], 1.15, TER[1]); tablet.rotation.x = -0.75
+tablet.add(new THREE.Mesh(GEO.rbox(0.34, 0.24, 0.02, 0.01), MAT.plastic({ color: [0.08, 0.08, 0.09] })))
+const scr = new THREE.Mesh(GEO.rbox(0.3, 0.12, 0.004, 0.002), MAT.glow({ emissive: [0.85, 0.9, 1], emissiveIntensity: 0.6 })); scr.position.set(0, 0.04, 0.011); tablet.add(scr)
+const buttons = lampColors.map((c, i) => { const m = MAT.glow({ emissive: c, emissiveIntensity: 0.3 }); const b = new THREE.Mesh(GEO.disc(0.025, 0.01), m); b.rotation.x = Math.PI / 2; b.position.set(-0.08 + i * 0.08, -0.07, 0.014); tablet.add(b); return m })
+lab.add(tablet, { name: 'Judgement terminal', explode: [0, 0.2, 0.5], count: 5, label: 'QC Gate app', at: [0, 0.16, 0], value: () => `${S.ok} OK · ${S.rep} Repair · ${S.ng} NG` })
+
+// ------------------------------------------------------------------ the block
+const block = new THREE.Group()
+block.add(new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat))
+for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] / 2 + 0.003, 0); block.add(b) }
+lab.add(block, { name: 'BC block', explode: [0, 0.6, 0.6], count: 5, label: 'Block', at: [0, BLOCK[1] / 2, 0], value: () => S.verdict || 'being checked' })
+
+// ------------------------------------------------------------------ the statistics
+const Z95 = 1.96, NG_SHARE = 0.3, CATCH = 0.98, CATCH_BAD = 0.6
+// a seeded generator, so the shift plays out the same way every time; this seed gives a typical shift
+// (94.2 % OK after 240 blocks at 6 %, against 94.1 % expected) rather than an unlucky one
+let seed = 20261046
+const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+function judge() {
+  const p = rate.value / 100, d = lab.broken ? CATCH_BAD : CATCH
+  if (rnd() >= p) return 'OK'
+  if (rnd() < d) return rnd() < NG_SHARE ? 'NG' : 'Repair'
+  S.esc++ // a defect nobody caught: it goes on as OK
+  return 'OK'
+}
+function record(v) {
+  S.n++
+  if (v === 'OK') S.ok++; else if (v === 'Repair') S.rep++; else S.ng++
+  const n = S.n, ph = S.ok / n, z2 = Z95 * Z95
+  const c = (ph + z2 / (2 * n)) / (1 + z2 / n)
+  const h = (Z95 * Math.sqrt((ph * (1 - ph)) / n + z2 / (4 * n * n))) / (1 + z2 / n)
+  S.fpy = ph; S.lo = c - h; S.hi = c + h
+}
+// the shift so far: 240 blocks were judged before we started watching
+for (let i = 0; i < 240; i++) record(judge())
+
+lab.hero({ label: 'First-pass yield', unit: '%', max: 100, digits: 1 })
+
+// one cycle, shaped like the Blender animation: roll in, a full turn for the last look, the verdict, then the route
+const DUR = { 'roll in': 1.2, inspect: 2.4, verdict: 0.7, 'roll on': 1.4, push: 0.8, transfer: 1.4, tip: 0.9, next: 0.4 }
+let phase = 'roll in', pt = 0, verdict = 'OK'
+const go = (p) => { phase = p; pt = 0 }
+
+lab.onTick((dt) => {
+  pt += dt
+  const u = clamp(pt / DUR[phase])
+  const e = smoothstep(0, 1, u)
+
+  cage.rotation.x = phase === 'inspect' ? e * Math.PI * 2 : 0
+  sup.forEach((r) => { r.rotation.x = (-cage.rotation.x * (RING_R + RING_T)) / 0.07 })
+
+  // the block's path for this verdict
+  let bx = 0, by = AXIS_Y, bz = 0, alpha = 1, rx = 0, rz = 0
+  if (phase === 'roll in') { bx = lerp(-1.8, 0, e); alpha = smoothstep(0, 0.25, u) }
+  else if (phase === 'inspect') rx = cage.rotation.x
+  else if (phase === 'roll on') { bx = lerp(0, 2.2, e); alpha = 1 - smoothstep(0.75, 1, u) }
+  else if (phase === 'push') {
+    bx = lerp(0, SX, smoothstep(0, 0.5, u))
+    bz = lerp(0, -CW - 0.25, smoothstep(0.5, 1, u))
+    by = lerp(AXIS_Y, SIDE_Y + BLOCK[1] / 2, smoothstep(0.5, 1, u))
+  } else if (phase === 'transfer') {
+    bx = SX; by = SIDE_Y + BLOCK[1] / 2
+    bz = lerp(-CW - 0.25, verdict === 'NG' ? NG.z : SIDE_Z[0] + 0.3, e)
+    if (verdict === 'Repair') alpha = 1 - smoothstep(0.7, 1, u)
+  } else if (phase === 'tip') {
+    bx = SX + smoothstep(0, 0.5, u) * 0.55 + smoothstep(0.5, 1, u) * 0.3
+    by = SIDE_Y + BLOCK[1] / 2 - smoothstep(0.4, 1, u) * 0.45
+    bz = NG.z; rz = -smoothstep(0.2, 0.8, u) * 1.1
+    alpha = 1 - smoothstep(0.85, 1, u)
+  } else if (phase === 'next') alpha = 0
+  lab.place(block, bx, by, bz)
+  block.rotation.set(rx, 0, rz)
+  const fading = alpha < 0.999
+  if (blockMat.transparent !== fading) { blockMat.transparent = fading; blockMat.needsUpdate = true }
+  blockMat.opacity = alpha
+  if (phase === 'roll in' || phase === 'roll on') rollers.forEach((r) => { r.rotation.y += dt * 9 })
+  if (phase === 'transfer') sideRollers.forEach((r) => { r.rotation.x -= dt * 9 })
+
+  // pusher: it strokes out across the line as the block comes level with it, and back while the transfer runs
+  const reach = phase === 'push' ? smoothstep(0.45, 1, u) * 0.6 : phase === 'transfer' ? (1 - e) * 0.6 : 0
+  const padZ = CW + 0.08 - reach
+  lab.place(pushPad, SX, ROLL_Y + 0.17, padZ)
+  const r0 = CW + 0.23, r1 = padZ + 0.02
+  pushRod.scale.y = Math.max(0.01, r0 - r1); pushRod.rotation.x = Math.PI / 2
+  lab.place(pushRod, SX, ROLL_Y + 0.17, (r0 + r1) / 2)
+  flap.rotation.z = phase === 'tip' ? -Math.sin(u * Math.PI) * 0.9 : 0
+
+  // the verdict: the andon and the terminal's button light up, and the app records it
+  const lit = ['verdict', 'roll on', 'push', 'transfer', 'tip'].includes(phase)
+  const idx = verdict === 'OK' ? 0 : verdict === 'Repair' ? 1 : 2
+  lamps.forEach((m, i) => { m.emissiveIntensity = lit && i === idx ? 4 : 0.15 })
+  buttons.forEach((m, i) => { m.emissiveIntensity = lit && i === idx ? 3 : 0.3 })
+  S.verdict = lit ? verdict : ''
+
+  if (u >= 1) {
+    if (phase === 'roll in') go('inspect')
+    else if (phase === 'inspect') { verdict = judge(); record(verdict); go('verdict') }
+    else if (phase === 'verdict') go(verdict === 'OK' ? 'roll on' : 'push')
+    else if (phase === 'push') go('transfer')
+    else if (phase === 'transfer') go(verdict === 'NG' ? 'tip' : 'next')
+    else go(phase === 'next' ? 'roll in' : 'next')
+  }
+  const say = phase === 'inspect' ? 'last look' : lit ? (verdict === 'OK' ? 'OK: on to the Spray Booth' : verdict === 'Repair' ? 'Repair: off to Line Repair' : 'NG: into the NG box') : phase
+  lab.setHero(S.fpy * 100, {
+    state: lab.broken ? `catching only 60 % · ${say}` : say,
+    sub: `95 % interval ${fmt(S.lo * 100, 1)}–${fmt(S.hi * 100, 1)} % over ${S.n} blocks · ${S.ok} OK, ${S.rep} Repair, ${S.ng} NG · true yield ${fmt(100 - rate.value, 1)} %${S.esc ? ` · ${S.esc} escaped` : ''}`,
+    bad: lab.broken,
+  })
+})
+
+// ------------------------------------------------------------------ break, explain, film
+lab.breakIt({ label: 'Inspector misses defects', run() {}, reset() {} })
+lab.how(
+  'Each block turns once in the cage for its last look and gets one of three judgements, which the inspector records in the QC Gate app: OK runs straight on to the Spray Booth, Repair is pushed onto the side transfer for Line Repair, and NG rides the transfer to the flap that tips it into the NG box. The shift\'s first-pass yield is the share judged OK. With a few hundred blocks it is only an estimate of the true yield, so it carries a 95 % Wilson interval that narrows as the shift goes on. A defect has to be caught to be counted: when the inspector catches only 60 % of defects, the yield on the screen climbs above the true yield and the missed blocks escape as OK.',
+  [
+    'FPY = OK / judged',
+    'centre = (p + z^2/2n) / (1 + z^2/n)',
+    'half width = z sqrt(p(1-p)/n + z^2/4n^2) / (1 + z^2/n)',
+    'z = 1.96 (95 %)',
+    'P(defect) = p,  P(caught) = 0.98 (0.60 when missing),  NG share 30 %',
+  ],
+)
+lab.autoFilm({ runBeat: 'OK, Repair or NG.', runSub: 'A last look, a verdict, and the route it takes.', breakBeat: 'Defects slip past.', breakSub: 'The yield looks better than it is; the escapes go on as OK.', sliderTo: 0.5 })
+// review hooks: __qc2.phase, __qc2.stats
+window.__qc2 = { get phase() { return phase }, get stats() { return { ...S } } }
+lab.start()
+</script>
+</body>
+</html>

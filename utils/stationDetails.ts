@@ -6,7 +6,7 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; Baritori to QC Gate 1 have cards so far.
+// Placeholder copy for review; Baritori to QC Gate 2 have cards so far.
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -124,6 +124,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Light on the face', value: '≥ 1,000 lux' },
       { label: 'Faces', value: '4, a quarter turn each' },
       { label: 'Reference', value: 'Limit samples' },
+      { label: 'Operator', value: '1 inspector' },
+    ],
+  },
+  qc2: {
+    title: 'QC Gate 2',
+    subtitle: 'Final Judgement',
+    image: { light: '/stations/qc2-light.svg', dark: '/stations/qc2-dark.svg' },
+    play: '/stations/qc2-3d.html',
+    description: [
+      'Each block turns once in a cage in the line for its last look, and the inspector gives it one of three judgements, recorded in this QC Gate app.',
+      'OK blocks run straight on to the Spray Booth; a pusher sends Repair blocks onto a side transfer towards Line Repair, and NG blocks are tipped into the NG box. An andon stack shows each verdict.',
+      'The share judged OK is the shift\'s first-pass yield, the number the dashboard tracks.',
+    ],
+    specs: [
+      { label: 'Judgements', value: 'OK / Repair / NG' },
+      { label: 'OK goes to', value: 'Spray Booth' },
+      { label: 'Repair goes to', value: 'Line Repair' },
       { label: 'Operator', value: '1 inspector' },
     ],
   },

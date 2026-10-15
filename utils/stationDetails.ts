@@ -93,6 +93,23 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
       { label: 'Operator', value: 'None, automatic' },
     ],
   },
+  final: {
+    title: 'Final Proses',
+    subtitle: 'Touch-up & Air Blow-off',
+    image: { light: '/stations/final-light.svg', dark: '/stations/final-dark.svg' },
+    play: '/stations/final-3d.html',
+    description: [
+      'The block stops in a cage in the line, inside an open booth with a light on the back wall and a hose rail overhead.',
+      'The operator touches up edges with the tools from the green rack, then turns the block a quarter at a time with the red index lever and blows every face with an air gun, so no loose shot rides on to machining.',
+      'The loose shot drops through the grating into the tray, and the clean block rolls on to QC Gate 1.',
+    ],
+    specs: [
+      { label: 'Air', value: '6 bar, Ø2.5 mm nozzle' },
+      { label: 'Nozzle distance', value: 'Within about 85 mm' },
+      { label: 'Faces', value: '4, a quarter turn each' },
+      { label: 'Operator', value: '1 person' },
+    ],
+  },
 };
 
 export function stationDetail(id: string): StationDetail | null {

@@ -72,8 +72,10 @@ export const SHAFT_DEFECT_TYPES = [
   'Kataochi',
   'Guichi',
   'Yuzakai',
+  'Yuzakai Cope',
   'Ihada Area Barcode',
   'Dross',
+  'Dross Cope',
   'Yumoyou',
 ] as const;
 

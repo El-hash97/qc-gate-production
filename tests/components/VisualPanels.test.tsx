@@ -59,13 +59,14 @@ describe('VisualPanels', () => {
     expect(picked).toEqual(['hsb05']);
   });
 
-  it('gives guests the full view with no way to change it', () => {
+  it('shows guests the view set up while logged in, with no way to change it', () => {
     localStorage.setItem('visualisasi.panels', JSON.stringify({ modes: { paretoNg: 'hidden' }, allHidden: false }));
     render(<Harness readOnly data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    expect(panels()).toBe(8);
+    expect(panels()).toBe(7);
+    expect(screen.queryByLabelText('NG Pareto')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Display settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^(Hide|Collapse)/ })).toBeNull();
     fireEvent.keyDown(window, { key: 'h' });
-    expect(panels()).toBe(8);
+    expect(panels()).toBe(7);
   });
 });

@@ -28,7 +28,8 @@ type Mode = 'open' | 'folded' | 'hidden';
 
 const STORE = 'visualisasi.panels';
 
-// `readOnly` (guests): everything shows as designed and can't be changed.
+// `readOnly` (guests): the same view the logged-in user set up on this screen,
+// with no way to change it.
 export function usePanelModes(readOnly = false) {
   const [modes, setModes] = useState<Partial<Record<PanelId, Mode>>>({});
   const [allHidden, setAllHidden] = useState(false);
@@ -55,7 +56,7 @@ export function usePanelModes(readOnly = false) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const mode = (id: PanelId): Mode => (readOnly ? 'open' : allHidden ? 'hidden' : modes[id] ?? 'open');
+  const mode = (id: PanelId): Mode => (allHidden ? 'hidden' : modes[id] ?? 'open');
   const set = (id: PanelId, m: Mode) => save({ ...modes, [id]: m }, false);
   const setAll = (m: Mode) => save({ ...modes, ...Object.fromEntries(PANELS.map((p) => [p.id, m])) }, false);
   const shownPins = (): PinId[] => (mode('pins') === 'hidden' ? [] : PINS.map((p) => p.id));

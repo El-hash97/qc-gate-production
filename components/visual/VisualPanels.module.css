@@ -2,9 +2,9 @@
    between them still orbit the camera. */
 .overlay {
   --gap: 12px;
-  --side: 280px;
-  --top: 84px;
-  --bottom-h: 190px;
+  --side: 210px;
+  --top: 76px;
+  --bottom-h: 132px;
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -14,17 +14,29 @@
 
 .overlay > * { pointer-events: auto; }
 
-/* frosted glass */
+/* glassmorphism: a light tint and a soft blur, so the 3D line stays visible
+   behind every panel; a bright top edge sells the glass */
 .panel,
 .kpis,
-.menuButton,
+.menuButton {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--bg-card) 48%, transparent),
+    color-mix(in srgb, var(--bg-card) 28%, transparent)
+  );
+  backdrop-filter: blur(6px) saturate(1.3);
+  -webkit-backdrop-filter: blur(6px) saturate(1.3);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-top-color: color-mix(in srgb, var(--text-primary) 28%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--bg-primary) 70%, transparent);
+}
+
 .menu {
-  background: color-mix(in srgb, var(--bg-card) 90%, transparent);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
-  box-shadow: var(--shadow-card);
+  border-radius: 12px;
   color: var(--text-primary);
 }
 
@@ -33,18 +45,18 @@
   position: absolute;
   top: var(--gap);
   left: var(--gap);
-  right: 110px;
+  right: 96px;
   display: flex;
   align-items: stretch;
   gap: 4px;
-  padding: 8px 8px 8px 4px;
+  padding: 6px 6px 6px 2px;
 }
 
 .left,
 .right {
   position: absolute;
   top: var(--top);
-  bottom: calc(var(--bottom-h) + var(--gap) * 2);
+  bottom: var(--gap);
   width: var(--side);
   display: flex;
   flex-direction: column;
@@ -57,8 +69,8 @@
 
 .bottom {
   position: absolute;
-  left: var(--gap);
-  right: var(--gap);
+  left: calc(var(--side) + var(--gap) * 2);
+  right: calc(var(--side) + var(--gap) * 2);
   bottom: var(--gap);
   height: var(--bottom-h);
   display: grid;
@@ -76,7 +88,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  flex: 1 1 0;
+  /* as tall as its content; a long one (workflow) shrinks and scrolls */
+  flex: 0 1 auto;
   animation: enter 180ms ease-out;
 }
 
@@ -94,14 +107,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 10px 6px 14px;
+  padding: 7px 8px 4px 10px;
 }
 
 .title {
   flex: 1;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -125,17 +138,17 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 2px 14px 12px;
+  padding: 0 10px 8px;
 }
 
 .big {
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1.1;
 }
 
 .big small {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -159,21 +172,21 @@
 .kpi:first-child { border-left: 0; }
 
 .kpiLabel {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .kpiValue {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.2;
 }
 
 .kpiSub {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
@@ -187,7 +200,8 @@
 /* ---- progress ---- */
 .track {
   height: 8px;
-  margin: 10px 0 12px;
+  height: 6px;
+  margin: 6px 0 8px;
   border-radius: 99px;
   background: var(--border-color);
   overflow: hidden;
@@ -202,14 +216,14 @@
 
 .facts {
   display: grid;
-  gap: 6px;
+  gap: 3px;
   margin: 0;
 }
 
 .facts div {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .facts dt { color: var(--text-secondary); }
@@ -221,21 +235,21 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .step {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-primary) 40%, transparent);
+  gap: 6px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-primary) 22%, transparent);
   color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 11px;
   text-align: left;
   cursor: pointer;
 }
@@ -244,19 +258,19 @@
 
 .stepNo {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--accent-red);
   color: #fff;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   display: grid;
   place-items: center;
 }
 
 .stepName { flex: 1; font-weight: 600; }
-.stepCt { font-size: 12px; color: var(--text-secondary); }
+.stepCt { font-size: 10px; color: var(--text-secondary); }
 
 .dot {
   flex: none;
@@ -274,8 +288,8 @@
 .stack {
   display: flex;
   gap: 3px;
-  height: 14px;
-  margin: 12px 0;
+  height: 10px;
+  margin: 8px 0;
 }
 
 .stack span { border-radius: 4px; min-width: 0; }
@@ -285,8 +299,8 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 6px;
-  font-size: 13px;
+  gap: 3px;
+  font-size: 11px;
 }
 
 .legend li { display: flex; align-items: center; gap: 8px; }
@@ -316,14 +330,14 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 11px;
 }
 
 .bars li,
 .factors li {
   display: grid;
-  grid-template-columns: 96px 1fr 30px;
+  grid-template-columns: 76px 1fr 24px;
   align-items: center;
   gap: 8px;
 }
@@ -340,7 +354,7 @@
 }
 
 .barTrack {
-  height: 8px;
+  height: 6px;
   border-radius: 99px;
   background: var(--border-color);
   overflow: hidden;
@@ -351,7 +365,7 @@
 /* ---- hourly ---- */
 .hours {
   height: 100%;
-  min-height: 100px;
+  min-height: 60px;
   display: flex;
   align-items: stretch;
   gap: 4px;
@@ -403,8 +417,8 @@
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 
 /* ---- alerts ---- */
@@ -413,17 +427,17 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 6px;
-  font-size: 12px;
+  gap: 3px;
+  font-size: 11px;
 }
 
 .alerts li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-primary) 40%, transparent);
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-primary) 22%, transparent);
 }
 
 .alertIcon { flex: none; font-size: 11px; }
@@ -441,8 +455,8 @@
 }
 
 .menuButton {
-  height: 40px;
-  padding: 0 14px;
+  height: 34px;
+  padding: 0 12px;
   font: inherit;
   font-size: 13px;
   font-weight: 700;

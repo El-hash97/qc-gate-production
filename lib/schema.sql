@@ -223,6 +223,14 @@ BEGIN
   END IF;
 END $$;
 
+-- Shared display layout per page (which Overview panels / pins / tags show),
+-- so every screen follows the logged-in user's choice. See lib/displaySettings.ts.
+CREATE TABLE IF NOT EXISTS display_settings (
+  key       TEXT PRIMARY KEY,
+  value     JSONB NOT NULL DEFAULT '{}',
+  saved_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())
 ON CONFLICT (id) DO NOTHING;

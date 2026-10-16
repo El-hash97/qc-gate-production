@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { shouldPausePoll } from '@/hooks/useProductionState';
 import type { PanelData } from '@/utils/visualPanels';
 import { WORKFLOW_CARDS } from '@/utils/workflowCards';
 import { SEGMENTS, segmentSeconds, type StationId } from '@/utils/finishingFlow';
@@ -10,7 +12,6 @@ import styles from './VisualPanels.module.css';
 // Glass panels floating over the 3D line. Every panel can be folded (–) or
 // hidden (×). The settings menu has three switches — the panels, the 3D pins
 // and the station name tags — and H hides/shows all of it.
-// The choice is a per-screen preference, kept in localStorage.
 export const PANELS = [
   { id: 'kpi', title: 'KPI' },
   { id: 'progress', title: 'Production progress' },
@@ -26,24 +27,68 @@ export const PANELS = [
 type PanelId = (typeof PANELS)[number]['id'] | 'pins' | 'labels';
 type Mode = 'open' | 'folded' | 'hidden';
 
-const STORE = 'visualisasi.panels';
+type Modes = Partial<Record<PanelId, Mode>>;
 
-// `readOnly` (guests): the same view the logged-in user set up on this screen,
-// with no way to change it.
+// The layout is shared by every screen (database, /api/display-settings):
+// whatever the logged-in user hides here is hidden on the TVs too.
+const SETTINGS_KEY = ['displaySettings', 'overview'] as const;
+const SETTINGS_URL = '/api/display-settings/overview';
+const POLL_MS = 5000;
+// after a save, hold the poll so a lagging read can't bounce the toggle back
+const GRACE_MS = 3000;
+
+async function fetchModes(): Promise<Modes> {
+  const json = await (await fetch(SETTINGS_URL)).json();
+  if (!json.success) throw new Error(json.error ?? 'Failed to load display settings');
+  return json.data?.modes ?? {};
+}
+
+async function putModes(modes: Modes): Promise<void> {
+  const json = await (await fetch(SETTINGS_URL, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modes }),
+  })).json();
+  if (!json.success) throw new Error(json.error ?? 'Failed to save display settings');
+}
+
+// `readOnly` (guests): the layout the logged-in user set up, with no way to
+// change it. H (hide everything) is a per-screen, unsaved shortcut, so
+// pressing it on one screen never blanks the others.
 export function usePanelModes(readOnly = false) {
-  const [modes, setModes] = useState<Partial<Record<PanelId, Mode>>>({});
+  const queryClient = useQueryClient();
+  const pending = useIsMutating({ mutationKey: SETTINGS_KEY });
+  const [grace, setGrace] = useState(false);
+  const { data: modes = {} } = useQuery({
+    queryKey: SETTINGS_KEY,
+    queryFn: fetchModes,
+    refetchInterval: shouldPausePoll(pending, grace) ? false : POLL_MS,
+    refetchOnWindowFocus: false,
+  });
+  const mutation = useMutation({
+    mutationKey: SETTINGS_KEY,
+    mutationFn: putModes,
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey: SETTINGS_KEY });
+      const previous = queryClient.getQueryData<Modes>(SETTINGS_KEY);
+      queryClient.setQueryData(SETTINGS_KEY, next);
+      return { previous };
+    },
+    onError: (_err, _next, context) => {
+      if (context) queryClient.setQueryData(SETTINGS_KEY, context.previous);
+    },
+    onSuccess: () => {
+      setGrace(true);
+      setTimeout(() => {
+        setGrace(false);
+        queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      }, GRACE_MS);
+    },
+  });
   const [allHidden, setAllHidden] = useState(false);
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORE) ?? '{}');
-      setModes(saved.modes ?? {});
-      setAllHidden(!!saved.allHidden);
-    } catch { /* private window / blocked storage: everything shows */ }
-  }, []);
-  const save = (next: Partial<Record<PanelId, Mode>>, hidden: boolean) => {
-    setModes(next);
-    setAllHidden(hidden);
-    try { localStorage.setItem(STORE, JSON.stringify({ modes: next, allHidden: hidden })); } catch { /* ignore */ }
+  const save = (next: Modes) => {
+    setAllHidden(false);
+    mutation.mutate(next);
   };
   useEffect(() => {
     if (readOnly) return undefined;
@@ -51,14 +96,14 @@ export function usePanelModes(readOnly = false) {
       const el = event.target as HTMLElement | null;
       if (event.key.toLowerCase() !== 'h' || event.ctrlKey || event.metaKey || event.altKey) return;
       if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
-      save(modes, !allHidden);
+      setAllHidden((v) => !v);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [readOnly]);
   const mode = (id: PanelId): Mode => (allHidden ? 'hidden' : modes[id] ?? 'open');
-  const set = (id: PanelId, m: Mode) => save({ ...modes, [id]: m }, false);
-  const setAll = (m: Mode) => save({ ...modes, ...Object.fromEntries(PANELS.map((p) => [p.id, m])) }, false);
+  const set = (id: PanelId, m: Mode) => save({ ...modes, [id]: m });
+  const setAll = (m: Mode) => save({ ...modes, ...Object.fromEntries(PANELS.map((p) => [p.id, m])) });
   const shownPins = (): PinId[] => (mode('pins') === 'hidden' ? [] : PINS.map((p) => p.id));
   return { mode, set, setAll, allHidden, shownPins, readOnly };
 }

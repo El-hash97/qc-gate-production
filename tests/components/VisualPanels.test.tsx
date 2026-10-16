@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
 import type { PanelData } from '@/utils/visualPanels';
 
@@ -10,60 +11,86 @@ const data: PanelData = {
   topNg: [], topRepair: [{ label: 'Burry', count: 1 }], recent: [], lastStop: null,
 };
 type Props = Omit<Parameters<typeof VisualPanels>[0], 'panels'>;
-function Harness({ readOnly, ...props }: Props & { readOnly?: boolean }) {
+function Panels({ readOnly, ...props }: Props & { readOnly?: boolean }) {
   return <VisualPanels {...props} panels={usePanelModes(readOnly)} />;
 }
+// one screen = its own query cache, all screens share the fake database below
+function Screen(props: Props & { readOnly?: boolean }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={client}><Panels {...props} /></QueryClientProvider>;
+}
+const base = { data, running: true, busy: [], now: new Date(), onSelectStation: () => {} };
 const panels = () => document.querySelectorAll('section[data-panel]').length;
 
-describe('VisualPanels', () => {
-  beforeEach(() => localStorage.clear());
+// stands in for /api/display-settings/overview
+let saved: { modes: Record<string, string> };
+beforeEach(() => {
+  saved = { modes: {} };
+  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') saved = JSON.parse(String(init.body));
+    return new Response(JSON.stringify({ success: true, data: saved }));
+  }));
+});
+afterEach(() => vi.unstubAllGlobals());
 
-  it('shows every panel at first and hides / shows them all with H', () => {
-    render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    expect(panels()).toBe(8);
+describe('VisualPanels', () => {
+  it('shows every panel at first and hides / shows them all with H, on this screen only', async () => {
+    render(<Screen {...base} />);
+    await waitFor(() => expect(panels()).toBe(8));
     expect(screen.getByLabelText('KPI')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'h' });
     expect(panels()).toBe(0);
+    expect(saved.modes).toEqual({});
     fireEvent.keyDown(window, { key: 'h' });
     expect(panels()).toBe(8);
   });
 
-  it('hides one panel and remembers it for this screen', () => {
-    const { unmount } = render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+  it('saves a hidden panel to the database, so every screen follows', async () => {
+    const { unmount } = render(<Screen {...base} />);
+    await waitFor(() => expect(panels()).toBe(8));
     fireEvent.click(screen.getByRole('button', { name: 'Hide NG Pareto' }));
-    expect(panels()).toBe(7);
+    await waitFor(() => expect(panels()).toBe(7));
+    await waitFor(() => expect(saved.modes).toEqual({ paretoNg: 'hidden' }));
     unmount();
-    render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+    // another screen, a guest's
+    render(<Screen {...base} readOnly />);
+    await waitFor(() => expect(panels()).toBe(7));
     expect(screen.queryByLabelText('NG Pareto')).toBeNull();
+  });
+
+  it('turns all panels off and back on from the Panels switch', async () => {
+    saved = { modes: { paretoNg: 'hidden' } };
+    render(<Screen {...base} />);
+    await waitFor(() => expect(panels()).toBe(7));
     fireEvent.click(screen.getByRole('button', { name: 'Display settings' }));
     const panelSwitch = screen.getByRole('switch', { name: 'Panels' });
     fireEvent.click(panelSwitch); // some still showing → all off
-    expect(panels()).toBe(0);
+    await waitFor(() => expect(panels()).toBe(0));
     fireEvent.click(panelSwitch); // all back on, Pareto included
-    expect(panels()).toBe(8);
+    await waitFor(() => expect(panels()).toBe(8));
   });
 
-  it('has three switches: panels, 3D pins and station name tags', () => {
-    render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+  it('has three switches: panels, 3D pins and station tags', async () => {
+    render(<Screen {...base} />);
     fireEvent.click(screen.getByRole('button', { name: 'Display settings' }));
     expect(screen.getAllByRole('switch').map((s) => s.closest('label')!.textContent)).toEqual(['Panels', '3D pins', 'Station tags']);
     fireEvent.click(screen.getByRole('switch', { name: 'Station tags' }));
-    expect(screen.getByRole('switch', { name: 'Station tags' })).not.toBeChecked();
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Station tags' })).not.toBeChecked());
+    await waitFor(() => expect(saved.modes).toEqual({ labels: 'hidden' }));
     expect(panels()).toBe(8);
   });
 
   it('opens a station from its workflow row', () => {
     const picked: string[] = [];
-    render(<Harness data={data} running busy={[false, true]} now={new Date()} onSelectStation={(id) => picked.push(id)} />);
+    render(<Screen {...base} busy={[false, true]} onSelectStation={(id) => picked.push(id)} />);
     fireEvent.click(screen.getByRole('button', { name: /HSB05/ }));
     expect(picked).toEqual(['hsb05']);
   });
 
-  it('shows guests the view set up while logged in, with no way to change it', () => {
-    localStorage.setItem('visualisasi.panels', JSON.stringify({ modes: { paretoNg: 'hidden' }, allHidden: false }));
-    render(<Harness readOnly data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    expect(panels()).toBe(7);
-    expect(screen.queryByLabelText('NG Pareto')).toBeNull();
+  it('shows guests the shared layout, with no way to change it', async () => {
+    saved = { modes: { paretoNg: 'hidden' } };
+    render(<Screen {...base} readOnly />);
+    await waitFor(() => expect(panels()).toBe(7));
     expect(screen.queryByRole('button', { name: 'Display settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^(Hide|Collapse)/ })).toBeNull();
     fireEvent.keyDown(window, { key: 'h' });

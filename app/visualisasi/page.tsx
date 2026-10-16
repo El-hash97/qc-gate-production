@@ -47,7 +47,7 @@ export default function VisualisasiPage() {
     <div className={styles.page}>
       <div className={styles.stage}>
         <FinishingLine3D counts={counts} running={running} theme={theme} onSelectStation={setOpen}
-          onBusyChange={setBusy} focus={focus} pins={panelModes.mode('pins') !== 'hidden'} />
+          onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()} />
         {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} />}
         {!running && <div className={styles.overlay}>Produksi belum berjalan</div>}
         {detail && <StationCard detail={detail} theme={theme} onClose={() => setOpen(null)} />}

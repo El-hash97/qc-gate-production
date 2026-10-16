@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { PanelData } from '@/utils/visualPanels';
 import { WORKFLOW_CARDS } from '@/utils/workflowCards';
 import { SEGMENTS, segmentSeconds, type StationId } from '@/utils/finishingFlow';
+import { PINS, type PinId } from '@/utils/stationPinData';
 import styles from './VisualPanels.module.css';
 
 // Glass panels floating over the 3D line. Every panel can be folded (–) or
@@ -19,10 +20,11 @@ export const PANELS = [
   { id: 'hourly', title: 'Output per jam' },
   { id: 'health', title: 'Kesehatan line' },
   { id: 'alerts', title: 'Alert terbaru' },
-  // callouts on the 3D objects, drawn by FinishingLine3D
+  // master switch for the callouts on the 3D objects (FinishingLine3D draws them)
   { id: 'pins', title: 'Pin 3D' },
 ] as const;
-type PanelId = (typeof PANELS)[number]['id'];
+// a panel, or one 3D pin ("pin:hsb05")
+type PanelId = (typeof PANELS)[number]['id'] | `pin:${PinId}`;
 type Mode = 'open' | 'folded' | 'hidden';
 
 const STORE = 'visualisasi.panels';
@@ -55,7 +57,12 @@ export function usePanelModes() {
   const mode = (id: PanelId): Mode => (allHidden ? 'hidden' : modes[id] ?? 'open');
   const set = (id: PanelId, m: Mode) => save({ ...modes, [id]: m }, false);
   const setAll = (m: Mode) => save(Object.fromEntries(PANELS.map((p) => [p.id, m])), false);
-  return { mode, set, setAll, allHidden };
+  // pins that are on: the master switch and their own
+  const shownPins = (): PinId[] =>
+    mode('pins') === 'hidden' ? [] : PINS.filter((p) => mode(`pin:${p.id}`) !== 'hidden').map((p) => p.id);
+  const setAllPins = (m: Mode) =>
+    save({ ...modes, pins: m, ...Object.fromEntries(PINS.map((p) => [`pin:${p.id}`, m])) }, false);
+  return { mode, set, setAll, allHidden, shownPins, setAllPins };
 }
 export type PanelModes = ReturnType<typeof usePanelModes>;
 
@@ -94,10 +101,10 @@ interface Props {
 }
 
 export function VisualPanels({ data, running, busy, now, onSelectStation, panels }: Props) {
-  const { mode, set, setAll, allHidden } = panels;
+  const { mode, set, setAll, allHidden, setAllPins } = panels;
   const [menu, setMenu] = useState(false);
   const [paretoTab, setParetoTab] = useState<'ng' | 'repair'>('ng');
-  const p = (id: PanelId) => ({ id, title: PANELS.find((x) => x.id === id)!.title, mode: mode(id), onMode: (m: Mode) => set(id, m) });
+  const p = (id: (typeof PANELS)[number]['id']) => ({ id, title: PANELS.find((x) => x.id === id)!.title, mode: mode(id), onMode: (m: Mode) => set(id, m) });
   const d = data;
   const rows = paretoTab === 'ng' ? d.topNg : d.topRepair;
   const maxHour = Math.max(1, ...d.hourly.map((h) => Math.max(h.produced, h.plan)));
@@ -116,7 +123,8 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
         </button>
         {menu && (
           <div className={styles.menu} role="menu">
-            {PANELS.map(({ id, title }) => (
+            <div className={styles.menuHead}>Panel</div>
+            {PANELS.filter(({ id }) => id !== 'pins').map(({ id, title }) => (
               <label key={id} className={styles.menuItem}>
                 <input type="checkbox" checked={mode(id) !== 'hidden'}
                   onChange={(e) => set(id, e.target.checked ? 'open' : 'hidden')} />
@@ -126,6 +134,24 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
             <div className={styles.menuRow}>
               <button type="button" onClick={() => setAll('open')}>Tampilkan semua</button>
               <button type="button" onClick={() => setAll('hidden')}>Sembunyikan semua</button>
+            </div>
+            <label className={`${styles.menuItem} ${styles.menuHead}`}>
+              <input type="checkbox" checked={mode('pins') !== 'hidden'}
+                onChange={(e) => set('pins', e.target.checked ? 'open' : 'hidden')} />
+              Pin 3D
+            </label>
+            <div className={styles.pinGrid} data-off={mode('pins') === 'hidden' || undefined}>
+              {PINS.map(({ id, title }) => (
+                <label key={id} className={styles.menuItem}>
+                  <input type="checkbox" checked={mode(`pin:${id}`) !== 'hidden'} disabled={mode('pins') === 'hidden'}
+                    onChange={(e) => set(`pin:${id}`, e.target.checked ? 'open' : 'hidden')} />
+                  {title}
+                </label>
+              ))}
+            </div>
+            <div className={styles.menuRow}>
+              <button type="button" onClick={() => setAllPins('open')}>Semua pin</button>
+              <button type="button" onClick={() => setAllPins('hidden')}>Tanpa pin</button>
             </div>
             <div className={styles.hint}>Tekan H untuk sembunyikan / tampilkan semua</div>
           </div>

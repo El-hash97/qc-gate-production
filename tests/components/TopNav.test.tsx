@@ -40,13 +40,13 @@ describe('TopNav', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the logo and a centred title instead of nav links when logged out', () => {
+  it('shows guests the same header with only the read-only pages', () => {
     render(<TopNav />);
-    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Overview', 'Dashboard']);
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/overview');
     expect(screen.queryByRole('link', { name: 'Input' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'History' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Master Data' })).not.toBeInTheDocument();
-    expect(screen.getByAltText('Toyota')).toHaveAttribute('src', '/logo.png');
     expect(screen.getByText('QC Gate Production')).toBeInTheDocument();
   });
 
@@ -56,14 +56,14 @@ describe('TopNav', () => {
     expect(mockAuth.openLoginModal).toHaveBeenCalledTimes(1);
   });
 
-  it('renders links to all four routes once logged in', () => {
+  it('renders every page once logged in, Overview left of Dashboard', () => {
     mockAuth.authed = true;
     render(<TopNav />);
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Overview', 'Dashboard', 'Input', 'History', 'Master Data']);
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: 'Input' })).toHaveAttribute('href', '/input');
     expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', '/history');
     expect(screen.getByRole('link', { name: 'Master Data' })).toHaveAttribute('href', '/master-data');
-    expect(screen.queryByAltText('Toyota')).not.toBeInTheDocument();
   });
 
   it('marks the current route as active once logged in', () => {

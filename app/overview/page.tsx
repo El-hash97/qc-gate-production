@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import { getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import { isRunning, type Counts, type StationId } from '@/utils/finishingFlow';
 import { stationDetail } from '@/utils/stationDetails';
@@ -17,13 +18,15 @@ const FinishingLine3D = dynamic(() => import('@/components/visual/FinishingLine3
   loading: () => <div className={styles.loading}>Loading 3D…</div>,
 });
 
-export default function VisualisasiPage() {
+export default function OverviewPage() {
   const { state } = useProductionState();
   const { theme } = useTheme();
   const [open, setOpen] = useState<StationId | null>(null);
   const detail = open ? stationDetail(open) : null;
   const [busy, setBusy] = useState<boolean[]>([]);
-  const panelModes = usePanelModes();
+  // Guests read the same view, without the display settings.
+  const { authed } = useAuth();
+  const panelModes = usePanelModes(!authed);
   const [focus, setFocus] = useState<{ id: StationId; n: number }>();
   // minute tick for the ETA, the current hour and OEE's elapsed minutes
   const [now, setNow] = useState(() => new Date());

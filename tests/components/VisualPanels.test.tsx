@@ -10,8 +10,8 @@ const data: PanelData = {
   topNg: [], topRepair: [{ label: 'Burry', count: 1 }], recent: [], lastStop: null,
 };
 type Props = Omit<Parameters<typeof VisualPanels>[0], 'panels'>;
-function Harness(props: Props) {
-  return <VisualPanels {...props} panels={usePanelModes()} />;
+function Harness({ readOnly, ...props }: Props & { readOnly?: boolean }) {
+  return <VisualPanels {...props} panels={usePanelModes(readOnly)} />;
 }
 const panels = () => document.querySelectorAll('section[data-panel]').length;
 
@@ -57,5 +57,15 @@ describe('VisualPanels', () => {
     render(<Harness data={data} running busy={[false, true]} now={new Date()} onSelectStation={(id) => picked.push(id)} />);
     fireEvent.click(screen.getByRole('button', { name: /HSB05/ }));
     expect(picked).toEqual(['hsb05']);
+  });
+
+  it('gives guests the full view with no way to change it', () => {
+    localStorage.setItem('visualisasi.panels', JSON.stringify({ modes: { paretoNg: 'hidden' }, allHidden: false }));
+    render(<Harness readOnly data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+    expect(panels()).toBe(8);
+    expect(screen.queryByRole('button', { name: 'Display settings' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(Hide|Collapse)/ })).toBeNull();
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(panels()).toBe(8);
   });
 });

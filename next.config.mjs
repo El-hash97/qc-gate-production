@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The 3D line page was "Visualisasi" before it became Overview.
+  async redirects() {
+    return [{ source: '/visualisasi', destination: '/overview', permanent: true }];
+  },
   // @sparticuz/chromium ships a native/compressed Chromium binary — Next.js's
   // webpack bundler mishandles that, so it must be loaded via plain Node
   // `require` instead (see lib/pdfBrowser.ts, this app's server-rendered

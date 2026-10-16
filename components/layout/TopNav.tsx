@@ -10,12 +10,13 @@ import { LoginModal } from './LoginModal';
 import { SettingsModal } from './SettingsModal';
 import styles from './TopNav.module.css';
 
+// `guest`: also shown before login (read-only pages); the rest need a login.
 const LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/visualisasi', label: 'Visualisasi' },
-  { href: '/input', label: 'Input' },
-  { href: '/history', label: 'History' },
-  { href: '/master-data', label: 'Master Data' },
+  { href: '/overview', label: 'Overview', guest: true },
+  { href: '/dashboard', label: 'Dashboard', guest: true },
+  { href: '/input', label: 'Input', guest: false },
+  { href: '/history', label: 'History', guest: false },
+  { href: '/master-data', label: 'Master Data', guest: false },
 ] as const;
 
 function RealTimeClock() {
@@ -77,37 +78,22 @@ export function TopNav() {
 
   return (
     <header className={styles.header}>
-      {authed ? (
-        <>
-          <div className={styles.titleGroup}>
-            <div className={styles.title}>QC Gate Production</div>
-            <div className={styles.subtitle}>Block Cylinder Line Finishing — Monitoring System</div>
-          </div>
-          <nav className={styles.nav}>
-            {LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={pathname.startsWith(link.href) ? styles.linkActive : styles.link}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </>
-      ) : (
-        <>
-          <div className={styles.logoGroup}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- matches
-                the plain <img> convention already used for PicCard photos */}
-            <img className={styles.logo} src="/logo.png" alt="Toyota" />
-          </div>
-          <div className={`${styles.titleGroup} ${styles.titleGroupCenter}`}>
-            <div className={styles.title}>QC Gate Production</div>
-            <div className={styles.subtitle}>Block Cylinder Line Finishing — Monitoring System</div>
-          </div>
-        </>
-      )}
+      {/* Guests get the same header, with only the pages they may read. */}
+      <div className={styles.titleGroup}>
+        <div className={styles.title}>QC Gate Production</div>
+        <div className={styles.subtitle}>Block Cylinder Line Finishing — Monitoring System</div>
+      </div>
+      <nav className={styles.nav}>
+        {LINKS.filter((link) => authed || link.guest).map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={pathname.startsWith(link.href) ? styles.linkActive : styles.link}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
       <div className={styles.rightControls}>
         <button
           type="button"

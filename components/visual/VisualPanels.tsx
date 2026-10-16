@@ -28,7 +28,8 @@ type Mode = 'open' | 'folded' | 'hidden';
 
 const STORE = 'visualisasi.panels';
 
-export function usePanelModes() {
+// `readOnly` (guests): everything shows as designed and can't be changed.
+export function usePanelModes(readOnly = false) {
   const [modes, setModes] = useState<Partial<Record<PanelId, Mode>>>({});
   const [allHidden, setAllHidden] = useState(false);
   useEffect(() => {
@@ -44,6 +45,7 @@ export function usePanelModes() {
     try { localStorage.setItem(STORE, JSON.stringify({ modes: next, allHidden: hidden })); } catch { /* ignore */ }
   };
   useEffect(() => {
+    if (readOnly) return undefined;
     const onKey = (event: KeyboardEvent) => {
       const el = event.target as HTMLElement | null;
       if (event.key.toLowerCase() !== 'h' || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -53,16 +55,16 @@ export function usePanelModes() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const mode = (id: PanelId): Mode => (allHidden ? 'hidden' : modes[id] ?? 'open');
+  const mode = (id: PanelId): Mode => (readOnly ? 'open' : allHidden ? 'hidden' : modes[id] ?? 'open');
   const set = (id: PanelId, m: Mode) => save({ ...modes, [id]: m }, false);
   const setAll = (m: Mode) => save({ ...modes, ...Object.fromEntries(PANELS.map((p) => [p.id, m])) }, false);
   const shownPins = (): PinId[] => (mode('pins') === 'hidden' ? [] : PINS.map((p) => p.id));
-  return { mode, set, setAll, allHidden, shownPins };
+  return { mode, set, setAll, allHidden, shownPins, readOnly };
 }
 export type PanelModes = ReturnType<typeof usePanelModes>;
 
-function Panel({ id, title, mode, onMode, extra, children }: {
-  id: PanelId; title: string; mode: Mode; onMode: (m: Mode) => void; extra?: ReactNode; children: ReactNode;
+function Panel({ id, title, mode, onMode, readOnly, extra, children }: {
+  id: PanelId; title: string; mode: Mode; onMode: (m: Mode) => void; readOnly: boolean; extra?: ReactNode; children: ReactNode;
 }) {
   if (mode === 'hidden') return null;
   const folded = mode === 'folded';
@@ -71,10 +73,14 @@ function Panel({ id, title, mode, onMode, extra, children }: {
       <header className={styles.head}>
         <span className={styles.title}>{title}</span>
         {extra}
-        <button type="button" className={styles.icon} aria-label={folded ? `Expand ${title}` : `Collapse ${title}`}
-          onClick={() => onMode(folded ? 'open' : 'folded')}>{folded ? '+' : '–'}</button>
-        <button type="button" className={styles.icon} aria-label={`Hide ${title}`}
-          onClick={() => onMode('hidden')}>×</button>
+        {!readOnly && (
+          <>
+            <button type="button" className={styles.icon} aria-label={folded ? `Expand ${title}` : `Collapse ${title}`}
+              onClick={() => onMode(folded ? 'open' : 'folded')}>{folded ? '+' : '–'}</button>
+            <button type="button" className={styles.icon} aria-label={`Hide ${title}`}
+              onClick={() => onMode('hidden')}>×</button>
+          </>
+        )}
       </header>
       {!folded && <div className={styles.body}>{children}</div>}
     </section>
@@ -103,14 +109,14 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
     { label: 'Station tags', on: mode('labels') !== 'hidden', flip: (on: boolean) => set('labels', on ? 'open' : 'hidden') },
   ];
   const [menu, setMenu] = useState(false);
-  const p = (id: (typeof PANELS)[number]['id']) => ({ id, title: PANELS.find((x) => x.id === id)!.title, mode: mode(id), onMode: (m: Mode) => set(id, m) });
+  const p = (id: (typeof PANELS)[number]['id']) => ({ id, title: PANELS.find((x) => x.id === id)!.title, mode: mode(id), onMode: (m: Mode) => set(id, m), readOnly: panels.readOnly });
   const d = data;
   const maxHour = Math.max(1, ...d.hourly.map((h) => Math.max(h.produced, h.plan)));
   const current = d.hourly.find((h) => h.hour === d.currentHour);
 
   return (
     <div className={styles.overlay}>
-      <div className={styles.menuWrap}>
+      {!panels.readOnly && <div className={styles.menuWrap}>
         <button type="button" className={styles.menuButton} aria-expanded={menu} aria-label="Display settings"
           title="Display settings" data-hidden={allHidden || undefined} onClick={() => setMenu((v) => !v)}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"
@@ -131,7 +137,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
             <div className={styles.hint}>Press H to hide / show everything</div>
           </div>
         )}
-      </div>
+      </div>}
 
       {mode('kpi') !== 'hidden' && (
         <div className={styles.kpis} aria-label="KPI">
@@ -149,7 +155,9 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
               <span className={styles.kpiSub}>{sub}</span>
             </div>
           ))}
-          <button type="button" className={styles.icon} aria-label="Hide KPI" onClick={() => set('kpi', 'hidden')}>×</button>
+          {!panels.readOnly && (
+            <button type="button" className={styles.icon} aria-label="Hide KPI" onClick={() => set('kpi', 'hidden')}>×</button>
+          )}
         </div>
       )}
 

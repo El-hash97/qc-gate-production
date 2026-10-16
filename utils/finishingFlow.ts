@@ -1,6 +1,6 @@
 import TRACK from './finishingTrack.json';
 
-// Layout of the BC finishing line for /visualisasi, plus the pure outcome
+// Layout of the BC finishing line for /overview, plus the pure outcome
 // pickers. The 3D layout itself is the GLB exported from the user's Blender
 // file (scripts/export-finishing-glb.py); stations below are the waypoints
 // blocks travel through, read off that file in Blender coordinates.

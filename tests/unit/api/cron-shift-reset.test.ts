@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockReset = vi.fn();
-vi.mock('@/lib/reset', () => ({ resetProductionState: (...args: any[]) => mockReset(...args) }));
+vi.mock('@/lib/autoReset', () => ({ autoResetIfDue: (...args: any[]) => mockReset(...args) }));
 
 import { GET } from '@/app/api/cron/shift-reset/route';
 
@@ -25,8 +25,8 @@ describe('GET /api/cron/shift-reset', () => {
     expect(mockReset).not.toHaveBeenCalled();
   });
 
-  it('runs the reset when the bearer token matches CRON_SECRET', async () => {
-    mockReset.mockResolvedValueOnce({ ok1: 0 });
+  it('runs the once-per-changeover auto reset when the bearer token matches CRON_SECRET', async () => {
+    mockReset.mockResolvedValueOnce({ reset: true, state: { ok1: 0 } });
     const request = new NextRequest('http://localhost/api/cron/shift-reset', {
       headers: { authorization: 'Bearer test-secret' },
     });

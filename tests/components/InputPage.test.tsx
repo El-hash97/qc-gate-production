@@ -18,6 +18,7 @@ vi.mock('@/hooks/useProductionState', () => ({
   useProductionState: () => hookReturn,
 }));
 vi.mock('@/hooks/useHourlySnapshot', () => ({ useHourlySnapshot: () => {} }));
+vi.mock('@/hooks/useAutoReset', () => ({ useAutoReset: () => {} }));
 vi.mock('@/hooks/useReset', () => ({ useReset: () => ({ mutate: vi.fn() }) }));
 
 import InputPage from '@/app/input/page';

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useHourlySnapshot } from '@/hooks/useHourlySnapshot';
+import { useAutoReset } from '@/hooks/useAutoReset';
 import { useDraftValue } from '@/hooks/useDraftValue';
 import { useToast } from '@/components/ui/ToastProvider';
 import { CounterCard } from '@/components/production/CounterCard';
@@ -126,6 +127,7 @@ export default function InputPage() {
   const ready = !isLoading;
 
   useHourlySnapshot(current, updateState);
+  useAutoReset();
 
   useEffect(() => {
     // Auto-fill today's date, but only once the real server state has loaded

@@ -9,6 +9,7 @@ import { editEntryLog, type EntryLogEdit } from '@/utils/entryLogEdit';
 import { useDefectPhotoFlags } from '@/hooks/useDefectPhotos';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
 import { useAuth } from '@/hooks/useAuth';
+import { useAutoReset } from '@/hooks/useAutoReset';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -27,6 +28,8 @@ const EMPTY_STATE: ProductionState = {
 export default function DashboardPage() {
   const { state, isFetching, isError, updateState } = useProductionState();
   const { authed } = useAuth();
+  // The line's screen keeps the Dashboard open all shift, so it drives the 07:10 / 19:50 auto reset.
+  useAutoReset();
   const current = state ?? EMPTY_STATE;
 
   const [view, setView] = useState<DashboardView>('bc');

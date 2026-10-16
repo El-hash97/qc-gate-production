@@ -99,6 +99,7 @@ export async function resetProductionState(): Promise<ProductionState> {
           hourly_window = '{}'::jsonb,
           entry_logs = '[]'::jsonb, line_stops = '[]'::jsonb,
           pinned_hour = '',
+          last_reset_at = now(),
           saved_at = now()
         WHERE id = 1
       `,
@@ -116,6 +117,7 @@ export async function resetProductionState(): Promise<ProductionState> {
         hourly_target_bc = '{}'::jsonb, hourly_target_cam = '{}'::jsonb, hourly_target_crank = '{}'::jsonb,
         entry_logs = '[]'::jsonb, line_stops = '[]'::jsonb,
         pinned_hour = '',
+        last_reset_at = now(),
         saved_at = now()
       WHERE id = 1
     `;

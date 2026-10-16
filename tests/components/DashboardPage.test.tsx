@@ -26,6 +26,7 @@ vi.mock('@/hooks/useProductionState', () => ({
   }),
 }));
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
+vi.mock('@/hooks/useAutoReset', () => ({ useAutoReset: () => {} }));
 vi.mock('@/lib/chartSetup', () => ({}));
 vi.mock('@/hooks/useDefectPhotos', () => ({
   useDefectPhotoFlags: () => ({ hasPhoto: () => false }),

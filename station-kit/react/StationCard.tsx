@@ -56,7 +56,7 @@ export function StationCard({ detail, theme, onClose }: Props) {
           </div>
           {detail.play && (
             <button type="button" className={styles.play} onClick={() => setPlaying((p) => !p)}>
-              {playing ? '◼ Kembali ke gambar' : '▶ Play 3D'}
+              {playing ? '◼ Back to picture' : '▶ Play 3D'}
             </button>
           )}
         </div>
@@ -66,7 +66,7 @@ export function StationCard({ detail, theme, onClose }: Props) {
               <div className={styles.title}>{detail.title}</div>
               <div className={styles.subtitle}>{detail.subtitle}</div>
             </div>
-            <button type="button" className={styles.close} onClick={onClose} aria-label="Tutup">
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
               ×
             </button>
           </div>

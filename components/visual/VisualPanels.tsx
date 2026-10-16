@@ -13,13 +13,14 @@ import styles from './VisualPanels.module.css';
 // The choice is a per-screen preference, kept in localStorage.
 export const PANELS = [
   { id: 'kpi', title: 'KPI' },
-  { id: 'progress', title: 'Progress produksi' },
+  { id: 'progress', title: 'Production progress' },
   { id: 'workflow', title: 'Workflow' },
   { id: 'judgement', title: 'Judgement QC Gate 2' },
-  { id: 'pareto', title: 'Pareto' },
-  { id: 'hourly', title: 'Output per jam' },
-  { id: 'health', title: 'Kesehatan line' },
-  { id: 'alerts', title: 'Alert terbaru' },
+  { id: 'paretoNg', title: 'NG Pareto' },
+  { id: 'paretoRepair', title: 'Repair Pareto' },
+  { id: 'hourly', title: 'Hourly output' },
+  { id: 'health', title: 'Line health' },
+  { id: 'alerts', title: 'Latest alerts' },
 ] as const;
 // a panel, or one of the two 3D layers FinishingLine3D draws
 type PanelId = (typeof PANELS)[number]['id'] | 'pins' | 'labels';
@@ -70,9 +71,9 @@ function Panel({ id, title, mode, onMode, extra, children }: {
       <header className={styles.head}>
         <span className={styles.title}>{title}</span>
         {extra}
-        <button type="button" className={styles.icon} aria-label={folded ? `Buka ${title}` : `Lipat ${title}`}
+        <button type="button" className={styles.icon} aria-label={folded ? `Expand ${title}` : `Collapse ${title}`}
           onClick={() => onMode(folded ? 'open' : 'folded')}>{folded ? '+' : '–'}</button>
-        <button type="button" className={styles.icon} aria-label={`Sembunyikan ${title}`}
+        <button type="button" className={styles.icon} aria-label={`Hide ${title}`}
           onClick={() => onMode('hidden')}>×</button>
       </header>
       {!folded && <div className={styles.body}>{children}</div>}
@@ -81,8 +82,8 @@ function Panel({ id, title, mode, onMode, extra, children }: {
 }
 
 const pct = (n: number, total: number) => (total ? (n / total) * 100 : 0);
-const fmt = (n: number) => n.toLocaleString('id-ID');
-const clock = (d: Date) => d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+const fmt = (n: number) => n.toLocaleString('en-US');
+const clock = (d: Date) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 interface Props {
   data: PanelData;
@@ -97,23 +98,21 @@ interface Props {
 export function VisualPanels({ data, running, busy, now, onSelectStation, panels }: Props) {
   const { mode, set, setAll, allHidden } = panels;
   const toggles = [
-    { label: 'Panel', on: PANELS.some((x) => mode(x.id) !== 'hidden'), flip: (on: boolean) => setAll(on ? 'open' : 'hidden') },
-    { label: 'Pin 3D', on: mode('pins') !== 'hidden', flip: (on: boolean) => set('pins', on ? 'open' : 'hidden') },
-    { label: 'Identitas pos', on: mode('labels') !== 'hidden', flip: (on: boolean) => set('labels', on ? 'open' : 'hidden') },
+    { label: 'Panels', on: PANELS.some((x) => mode(x.id) !== 'hidden'), flip: (on: boolean) => setAll(on ? 'open' : 'hidden') },
+    { label: '3D pins', on: mode('pins') !== 'hidden', flip: (on: boolean) => set('pins', on ? 'open' : 'hidden') },
+    { label: 'Station tags', on: mode('labels') !== 'hidden', flip: (on: boolean) => set('labels', on ? 'open' : 'hidden') },
   ];
   const [menu, setMenu] = useState(false);
-  const [paretoTab, setParetoTab] = useState<'ng' | 'repair'>('ng');
   const p = (id: (typeof PANELS)[number]['id']) => ({ id, title: PANELS.find((x) => x.id === id)!.title, mode: mode(id), onMode: (m: Mode) => set(id, m) });
   const d = data;
-  const rows = paretoTab === 'ng' ? d.topNg : d.topRepair;
   const maxHour = Math.max(1, ...d.hourly.map((h) => Math.max(h.produced, h.plan)));
   const current = d.hourly.find((h) => h.hour === d.currentHour);
 
   return (
     <div className={styles.overlay}>
       <div className={styles.menuWrap}>
-        <button type="button" className={styles.menuButton} aria-expanded={menu} aria-label="Pengaturan panel"
-          title="Pengaturan panel" data-hidden={allHidden || undefined} onClick={() => setMenu((v) => !v)}>
+        <button type="button" className={styles.menuButton} aria-expanded={menu} aria-label="Display settings"
+          title="Display settings" data-hidden={allHidden || undefined} onClick={() => setMenu((v) => !v)}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"
             strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="3" />
@@ -129,7 +128,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
                 <span className={styles.switch} aria-hidden="true" />
               </label>
             ))}
-            <div className={styles.hint}>Tekan H untuk sembunyikan / tampilkan semua</div>
+            <div className={styles.hint}>Press H to hide / show everything</div>
           </div>
         )}
       </div>
@@ -150,18 +149,18 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
               <span className={styles.kpiSub}>{sub}</span>
             </div>
           ))}
-          <button type="button" className={styles.icon} aria-label="Sembunyikan KPI" onClick={() => set('kpi', 'hidden')}>×</button>
+          <button type="button" className={styles.icon} aria-label="Hide KPI" onClick={() => set('kpi', 'hidden')}>×</button>
         </div>
       )}
 
       <div className={styles.left}>
         <Panel {...p('progress')}>
-          <div className={styles.big}>{fmt(d.total)}<small> / {fmt(d.target)} unit</small></div>
+          <div className={styles.big}>{fmt(d.total)}<small> / {fmt(d.target)} units</small></div>
           <div className={styles.track}><span style={{ width: `${Math.min(d.achievement, 100)}%` }} /></div>
           <dl className={styles.facts}>
-            <div><dt>Sisa</dt><dd>{fmt(d.remaining)} unit</dd></div>
-            <div><dt>Perkiraan selesai</dt><dd>{d.etaMin === null ? '–' : clock(new Date(now.getTime() + d.etaMin * 60_000))}</dd></div>
-            <div><dt>Jam ini</dt><dd>{current ? `${current.produced} / ${current.plan}` : '–'}</dd></div>
+            <div><dt>Remaining</dt><dd>{fmt(d.remaining)} units</dd></div>
+            <div><dt>Estimated finish</dt><dd>{d.etaMin === null ? '–' : clock(new Date(now.getTime() + d.etaMin * 60_000))}</dd></div>
+            <div><dt>This hour</dt><dd>{current ? `${current.produced} / ${current.plan}` : '–'}</dd></div>
           </dl>
         </Panel>
         <Panel {...p('workflow')}>
@@ -186,7 +185,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
 
       <div className={styles.right}>
         <Panel {...p('judgement')}>
-          <div className={styles.big}>{fmt(d.total)}<small> diperiksa</small></div>
+          <div className={styles.big}>{fmt(d.total)}<small> inspected</small></div>
           <div className={styles.stack}>
             <span className={styles.okBg} style={{ flexGrow: d.ok }} />
             <span className={styles.repairBg} style={{ flexGrow: d.repair }} />
@@ -198,29 +197,23 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
             <li><i className={styles.ngBg} />NG<b>{fmt(d.ng)}</b><em>{pct(d.ng, d.total).toFixed(1)}%</em></li>
           </ul>
         </Panel>
-        <Panel {...p('pareto')} extra={(
-          <div className={styles.tabs} role="tablist">
-            {(['ng', 'repair'] as const).map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={paretoTab === t} onClick={() => setParetoTab(t)}>
-                {t === 'ng' ? 'NG' : 'Repair'}
-              </button>
-            ))}
-          </div>
-        )}>
-          {rows.length === 0 ? <div className={styles.empty}>Belum ada data</div> : (
-            <ul className={styles.bars}>
-              {rows.map((r) => (
-                <li key={r.label}>
-                  <span className={styles.barLabel} title={r.label}>{r.label}</span>
-                  <span className={styles.barTrack}>
-                    <span className={paretoTab === 'ng' ? styles.ngBg : styles.repairBg} style={{ width: `${pct(r.count, rows[0].count)}%` }} />
-                  </span>
-                  <b>{r.count}</b>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+        {([['paretoNg', d.topNg, styles.ngBg], ['paretoRepair', d.topRepair, styles.repairBg]] as const).map(([id, rows, bar]) => (
+          <Panel key={id} {...p(id)}>
+            {rows.length === 0 ? <div className={styles.empty}>No data yet</div> : (
+              <ul className={styles.bars}>
+                {rows.map((r) => (
+                  <li key={r.label}>
+                    <span className={styles.barLabel} title={r.label}>{r.label}</span>
+                    <span className={styles.barTrack}>
+                      <span className={bar} style={{ width: `${pct(r.count, rows[0].count)}%` }} />
+                    </span>
+                    <b>{r.count}</b>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        ))}
       </div>
 
       <div className={styles.bottom}>
@@ -252,11 +245,11 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
             </ul>
           </div>
           <div className={styles.kpiSub}>
-            Line stop: AV {d.stopMin.AV} mnt · PE {d.stopMin.PE} mnt · RQ {d.stopMin.RQ} mnt
+            Line stop: AV {d.stopMin.AV} min · PE {d.stopMin.PE} min · RQ {d.stopMin.RQ} min
           </div>
         </Panel>
         <Panel {...p('alerts')}>
-          {d.recent.length === 0 && !d.lastStop ? <div className={styles.empty}>Belum ada alert</div> : (
+          {d.recent.length === 0 && !d.lastStop ? <div className={styles.empty}>No alerts yet</div> : (
             <ul className={styles.alerts}>
               {d.lastStop && (
                 <li data-kind="stop">

@@ -23,7 +23,7 @@ describe('StationCard', () => {
   it('closes from the close button, Escape and a click on the backdrop', () => {
     const onClose = vi.fn();
     render(<StationCard detail={hsb05} theme="light" onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: /tutup/i }));
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
     fireEvent.keyDown(window, { key: 'Escape' });
     fireEvent.click(screen.getByTestId('station-card-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(3);
@@ -65,13 +65,13 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Hanten MC 3D/)).toHaveAttribute('src', '/stations/hanten-3d.html');
   });
 
-  it('has a Final Proses card with its own figure and 3D machine', () => {
+  it('has a Final Process card with its own figure and 3D machine', () => {
     const final = stationDetail('final')!;
     render(<StationCard detail={final} theme="dark" onClose={() => {}} />);
-    expect(screen.getByRole('dialog', { name: /Final Proses/ })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Final Process/ })).toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/final-dark.svg');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
-    expect(screen.getByTitle(/Final Proses 3D/)).toHaveAttribute('src', '/stations/final-3d.html');
+    expect(screen.getByTitle(/Final Process 3D/)).toHaveAttribute('src', '/stations/final-3d.html');
   });
 
   it('has a QC Gate 1 card with its own figure and 3D machine', () => {
@@ -128,7 +128,7 @@ describe('StationCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/HSB05 3D/)).toHaveAttribute('src', '/stations/hsb05-3d.html');
     expect(screen.queryByRole('img')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /gambar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /picture/i }));
     expect(screen.getByRole('img')).toBeInTheDocument();
   });
 

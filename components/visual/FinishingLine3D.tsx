@@ -508,7 +508,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
   if (noWebGL) {
     return (
       <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-        3D tidak didukung di perangkat ini
+        3D is not supported on this device
       </div>
     );
   }

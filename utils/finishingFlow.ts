@@ -44,12 +44,12 @@ export const STATIONS: readonly Station[] = [
   { id: 'hsb06', label: 'HSB06', pos: b(18, -118), labelY: 4.4 },
   { id: 'grinding', label: 'Grinding', pos: b(-31, -120), labelY: 3.2 },
   { id: 'hanten', label: 'Hanten MC', pos: b(6.5, -175), labelY: 2.6 },
-  { id: 'final', label: 'Final Proses', pos: b(6.5, -202), labelY: 2.9 },
+  { id: 'final', label: 'Final Process', pos: b(6.5, -202), labelY: 2.9 },
   { id: 'qc1', label: 'QC Gate 1', pos: b(6.5, -232), labelY: 2.6 },
   { id: 'qc2', label: 'QC Gate 2', pos: b(6.5, -263), labelY: 2.6 },
   { id: 'spray', label: 'Spray Booth', pos: b(-5, -295), labelY: 3.8 },
   { id: 'junbiki', label: 'Junbiki', pos: b(-89, -295), labelY: 3.2 },
-  { id: 'ngBox', label: 'Box Merah (NG)', pos: b(24, -283), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
+  { id: 'ngBox', label: 'Red Box (NG)', pos: b(24, -283), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
   // repair benches in the fenced area across the factory road
   { id: 'lineRepair', label: 'Line Repair', pos: b(164, -391), labelY: 2.6 },
 ];

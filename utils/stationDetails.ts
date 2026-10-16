@@ -84,7 +84,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     description: [
       'The block rolls in deck down under a mesh guard and stops inside a cage of two big rings that ride on support rollers.',
       'A clamp bar comes down on it and a geared motor turns the cage 180° about the line axis, so the deck face comes up for finishing; a holding brake keeps it there while the clamp lifts.',
-      'The block rolls out deck up on the conveyor towards Final Proses, and the empty cage turns back for the next one.',
+      'The block rolls out deck up on the conveyor towards Final Process, and the empty cage turns back for the next one.',
     ],
     specs: [
       { label: 'Turn', value: '180° in about 1.6 s' },
@@ -94,7 +94,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     ],
   },
   final: {
-    title: 'Final Proses',
+    title: 'Final Process',
     subtitle: 'Touch-up & Air Blow-off',
     image: { light: '/stations/final-light.svg', dark: '/stations/final-dark.svg' },
     play: '/stations/final-3d.html',

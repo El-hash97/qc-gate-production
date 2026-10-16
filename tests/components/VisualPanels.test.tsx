@@ -20,36 +20,36 @@ describe('VisualPanels', () => {
 
   it('shows every panel at first and hides / shows them all with H', () => {
     render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    expect(panels()).toBe(7);
+    expect(panels()).toBe(8);
     expect(screen.getByLabelText('KPI')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'h' });
     expect(panels()).toBe(0);
     fireEvent.keyDown(window, { key: 'h' });
-    expect(panels()).toBe(7);
+    expect(panels()).toBe(8);
   });
 
   it('hides one panel and remembers it for this screen', () => {
     const { unmount } = render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Sembunyikan Pareto' }));
-    expect(panels()).toBe(6);
+    fireEvent.click(screen.getByRole('button', { name: 'Hide NG Pareto' }));
+    expect(panels()).toBe(7);
     unmount();
     render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    expect(screen.queryByLabelText('Pareto')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Pengaturan panel' }));
-    const panelSwitch = screen.getByRole('switch', { name: 'Panel' });
+    expect(screen.queryByLabelText('NG Pareto')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Display settings' }));
+    const panelSwitch = screen.getByRole('switch', { name: 'Panels' });
     fireEvent.click(panelSwitch); // some still showing → all off
     expect(panels()).toBe(0);
     fireEvent.click(panelSwitch); // all back on, Pareto included
-    expect(panels()).toBe(7);
+    expect(panels()).toBe(8);
   });
 
   it('has three switches: panels, 3D pins and station name tags', () => {
     render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Pengaturan panel' }));
-    expect(screen.getAllByRole('switch').map((s) => s.closest('label')!.textContent)).toEqual(['Panel', 'Pin 3D', 'Identitas pos']);
-    fireEvent.click(screen.getByRole('switch', { name: 'Identitas pos' }));
-    expect(screen.getByRole('switch', { name: 'Identitas pos' })).not.toBeChecked();
-    expect(panels()).toBe(7);
+    fireEvent.click(screen.getByRole('button', { name: 'Display settings' }));
+    expect(screen.getAllByRole('switch').map((s) => s.closest('label')!.textContent)).toEqual(['Panels', '3D pins', 'Station tags']);
+    fireEvent.click(screen.getByRole('switch', { name: 'Station tags' }));
+    expect(screen.getByRole('switch', { name: 'Station tags' })).not.toBeChecked();
+    expect(panels()).toBe(8);
   });
 
   it('opens a station from its workflow row', () => {

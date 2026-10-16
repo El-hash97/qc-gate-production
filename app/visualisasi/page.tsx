@@ -14,7 +14,7 @@ import styles from './page.module.css';
 
 const FinishingLine3D = dynamic(() => import('@/components/visual/FinishingLine3D'), {
   ssr: false,
-  loading: () => <div className={styles.loading}>Memuat 3D…</div>,
+  loading: () => <div className={styles.loading}>Loading 3D…</div>,
 });
 
 export default function VisualisasiPage() {
@@ -50,7 +50,7 @@ export default function VisualisasiPage() {
           onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()}
           labels={panelModes.mode('labels') !== 'hidden'} />
         {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} />}
-        {!running && <div className={styles.overlay}>Produksi belum berjalan</div>}
+        {!running && <div className={styles.overlay}>Production has not started</div>}
         {detail && <StationCard detail={detail} theme={theme} onClose={() => setOpen(null)} />}
       </div>
     </div>

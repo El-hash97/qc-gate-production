@@ -179,6 +179,24 @@ describe('InputPage', () => {
     expect(saved.entryLogs.at(-1)).toMatchObject({ line: 3, flask: '1-6', die: 2 });
   });
 
+  it('files an "Other" defect typed in a different case under the existing spelling', async () => {
+    hookReturn = {
+      state: { ...stateMock, defectData: { 'Yuzakai Cope': 2 } },
+      updateState: updateStateMock,
+      isLoading: false,
+    };
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[0]);
+    await userEvent.click(screen.getByRole('option', { name: 'Other' }));
+    await userEvent.type(screen.getByLabelText('Defect Lainnya'), 'yuzakai cope');
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    const saved = updateStateMock.mock.calls[0][0];
+    expect(saved.defectData).toEqual({ 'Yuzakai Cope': 3 });
+    expect(saved.entryLogs.at(-1).type).toBe('Yuzakai Cope');
+  });
+
   it('shows no pinned-hour banner by default (real-time input)', () => {
     render(<ToastProvider><InputPage /></ToastProvider>);
     expect(screen.queryByText(/input diarahkan ke jam/i)).not.toBeInTheDocument();

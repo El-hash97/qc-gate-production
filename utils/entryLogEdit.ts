@@ -1,6 +1,7 @@
 import type { EntryLog, OverDimensiDetail, ProductionState } from '@/lib/types';
 import { lineGroup } from '@/lib/types';
 import { entryDie } from '@/utils/flask';
+import { canonicalType } from '@/utils/typeName';
 
 export interface EntryLogEdit {
   type: string;
@@ -28,13 +29,14 @@ export function editEntryLog(state: ProductionState, index: number, edit: EntryL
   const left = (data[old.type] ?? 0) - old.qty;
   if (left > 0) data[old.type] = left;
   else delete data[old.type];
-  data[edit.type] = (data[edit.type] ?? 0) + edit.qty;
+  const type = canonicalType(edit.type, Object.keys(data));
+  data[type] = (data[type] ?? 0) + edit.qty;
 
   const { die: _die, overDimensi: _od, ...base } = old;
   const die = entryDie(line, edit.flask, edit.die);
   const next: EntryLog = {
     ...base,
-    type: edit.type,
+    type,
     qty: edit.qty,
     lot: edit.lot,
     flask: edit.flask,

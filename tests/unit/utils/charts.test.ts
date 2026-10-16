@@ -42,6 +42,12 @@ describe('hourlySeries', () => {
 });
 
 describe('pareto', () => {
+  it('shows names that differ only in case as one bar', () => {
+    const { labels, counts } = pareto({ 'Yuzakai Cope': 8, 'Yuzakai cope': 31, Dross: 10 });
+    expect(labels).toEqual(['Yuzakai cope', 'Dross']);
+    expect(counts).toEqual([39, 10]);
+  });
+
   it('sorts desc and reports running cumulative percentage', () => {
     const { labels, counts, cumulativePct } = pareto({ A: 1, B: 6, C: 3 });
     expect(labels).toEqual(['B', 'C', 'A']);

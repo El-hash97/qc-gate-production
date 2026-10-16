@@ -2,6 +2,7 @@ import type { EntryLog, HourlySnapshot, ProductLine } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
 import { sortHourKeys } from '@/utils/hourOrder';
+import { mergeTypeVariants } from '@/utils/typeName';
 
 // Minimum category slots a bar chart / heatmap axis is laid out over. With only
 // 1-2 real categories the chart would otherwise draw a couple of oversized bars;
@@ -72,8 +73,9 @@ export interface Pareto {
   cumulativePct: number[];
 }
 
+// Names differing only in case/spacing (typed via "Other") count as one bar.
 export function pareto(data: Record<string, number>): Pareto {
-  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const sorted = Object.entries(mergeTypeVariants(data)).sort((a, b) => b[1] - a[1]);
   const total = sorted.reduce((sum, [, n]) => sum + n, 0);
   const result: Pareto = { labels: [], counts: [], cumulativePct: [] };
   let running = 0;

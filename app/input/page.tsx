@@ -19,6 +19,7 @@ import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
 import { entryDie, takenFlasks } from '@/utils/flask';
+import { canonicalType } from '@/utils/typeName';
 import {
   SHIFTS, SHIFT_TIMES, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
@@ -196,12 +197,14 @@ export default function InputPage() {
     return (lot: string) => takenFlasks(current.entryLogs, lot, line);
   }
 
-  function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
+  function handleSaveDefect(typedType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
     if (!defectTarget) return;
     const line = lineForTarget(defectTarget);
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'defectDataShaft' : 'defectData';
     const currentData = current[dataKey] ?? {};
+    // An "Other" name typed in a different case/spacing joins the existing type.
+    const defectType = canonicalType(typedType, [...defectTypesFor(defectTarget), ...Object.keys(currentData)]);
     const die = entryDie(line, flask);
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
@@ -216,7 +219,7 @@ export default function InputPage() {
   }
 
   function handleSaveRepair(
-    repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail,
+    typedType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail,
   ) {
     if (!repairTarget) return;
     const line = lineForTarget(repairTarget);
@@ -224,6 +227,7 @@ export default function InputPage() {
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'repairDataShaft' : 'repairData';
     const currentData = current[dataKey] ?? {};
+    const repairType = canonicalType(typedType, [...repairTypesFor(repairTarget), ...Object.keys(currentData)]);
     commit({
       [repairTarget]: (current[repairTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },

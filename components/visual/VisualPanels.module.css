@@ -1,9 +1,9 @@
 /* Overlay over the 3D stage: only the panels catch the pointer, the gaps
    between them still orbit the camera. */
 .overlay {
-  --gap: 12px;
+  --gap: 8px;
   --side: 210px;
-  --top: 96px;
+  --top: 86px;
   --bottom-h: 132px;
   position: absolute;
   inset: 0;

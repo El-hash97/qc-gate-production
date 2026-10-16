@@ -1,5 +1,5 @@
 .page {
-  padding: 24px 32px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -7,10 +7,11 @@
 
 .stage {
   position: relative;
-  height: calc(100vh - 130px);
+  /* fills the screen under the 79 px header, 6 px edge all round */
+  height: calc(100dvh - 79px - 12px);
   min-height: 360px;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--bg-secondary);
 }
@@ -32,6 +33,7 @@
   background: color-mix(in srgb, var(--bg-primary) 45%, transparent);
 }
 
-@media (max-width: 640px) {
-  .page { padding: 16px; }
+/* the header wraps onto two rows here */
+@media (max-width: 768px) {
+  .stage { height: calc(100dvh - 140px); }
 }

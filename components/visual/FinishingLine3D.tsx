@@ -15,7 +15,7 @@ import { activeRange } from '@/utils/animRange';
 import { stationDetail } from '@/utils/stationDetails';
 import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
 import { createWorkflowBoards } from './workflowBoards';
-import { createPins } from './stationPins';
+import { createPins, createTags } from './stationPins';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import type { Theme } from '@/hooks/useTheme';
 
@@ -93,6 +93,8 @@ interface Props {
   focus?: { id: StationId; n: number };
   // callout pins switched on (all of them when omitted)
   pins?: readonly PinId[];
+  // station name tags
+  labels?: boolean;
 }
 
 // Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
@@ -121,25 +123,6 @@ function makeBadge(color: string): { sprite: THREE.Sprite; set: (text: string) =
       texture.needsUpdate = true;
     },
   };
-}
-
-function makeLabel(text: string): THREE.Sprite {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
-  const g = canvas.getContext('2d')!;
-  g.fillStyle = 'rgba(15,17,23,0.82)';
-  g.fillRect(0, 0, 256, 64);
-  g.fillStyle = '#ffffff';
-  g.font = 'bold 30px sans-serif';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(text, 128, 32);
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }),
-  );
-  sprite.scale.set(3.2, 0.8, 1);
-  return sprite;
 }
 
 // Counterbalance forklift, forks pointing +x. Local origin = centre of the
@@ -266,7 +249,7 @@ function makeTruck(): THREE.Group {
   return g;
 }
 
-export default function FinishingLine3D({ counts, running, theme, onSelectStation, onBusyChange, focus, pins }: Props) {
+export default function FinishingLine3D({ counts, running, theme, onSelectStation, onBusyChange, focus, pins, labels = true }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const select = useRef(onSelectStation);
   select.current = onSelectStation;
@@ -275,8 +258,8 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
   const flyTo = useRef<(id: StationId) => void>(() => {});
   // Read by the render loop, so a 3 s poll updates these without rebuilding the scene.
   const shownPins = new Set<PinId>(pins ?? PINS.map((p) => p.id));
-  const live = useRef({ counts, running, pins: shownPins });
-  live.current = { counts, running, pins: shownPins };
+  const live = useRef({ counts, running, pins: shownPins, labels });
+  live.current = { counts, running, pins: shownPins, labels };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
   const [noWebGL, setNoWebGL] = useState(false);
 
@@ -385,7 +368,6 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       }
     });
 
-    const tags: THREE.Sprite[] = [];
     for (const s of STATIONS) {
       if (s.prop) {
         const [w, h, d] = s.prop.size;
@@ -393,40 +375,9 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
         mesh.position.set(s.pos[0], h / 2, s.pos[1]);
         scene.add(mesh);
       }
-      // a tag with a detail card gets a chevron and answers clicks
-      const clickable = stationDetail(s.id) !== null;
-      const label = makeLabel(clickable ? `${s.label} ›` : s.label);
-      label.position.set(s.pos[0], s.labelY, s.pos[1]);
-      if (clickable) {
-        label.userData.stationId = s.id;
-        tags.push(label);
-      }
-      scene.add(label);
     }
-
-    // Click a tag to open its card; a drag that orbits the camera is not a click.
-    const ray = new THREE.Raycaster();
-    const tagAt = (event: PointerEvent) => {
-      const box = renderer.domElement.getBoundingClientRect();
-      ray.setFromCamera(
-        new THREE.Vector2(((event.clientX - box.left) / box.width) * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1),
-        camera,
-      );
-      return ray.intersectObjects(tags, false)[0]?.object.userData.stationId as StationId | undefined;
-    };
-    let downAt: [number, number] | null = null;
-    const onDown = (event: PointerEvent) => { downAt = [event.clientX, event.clientY]; };
-    const onUp = (event: PointerEvent) => {
-      if (!downAt || Math.hypot(event.clientX - downAt[0], event.clientY - downAt[1]) > 5) return;
-      const id = tagAt(event);
-      if (id) select.current?.(id);
-    };
-    const onMove = (event: PointerEvent) => {
-      renderer.domElement.style.cursor = tagAt(event) ? 'pointer' : '';
-    };
-    renderer.domElement.addEventListener('pointerdown', onDown);
-    renderer.domElement.addEventListener('pointerup', onUp);
-    renderer.domElement.addEventListener('pointermove', onMove);
+    // Station name tags (glass, like the pins); one with a detail card opens it.
+    const nameTags = createTags(mount, STATIONS, (id) => stationDetail(id) !== null, (id) => select.current?.(id));
 
 
     // OK sits by Junbiki (where the truck loads), Repair by Line Repair, NG by the red box.
@@ -561,6 +512,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       camera.position.clamp(roomMin, roomMax);
       renderer.render(scene, camera);
       callouts.update(camera, sim, c, live.current.running, live.current.pins, ROOM.x0);
+      nameTags.update(camera, live.current.labels);
     };
     raf = requestAnimationFrame(frame);
 
@@ -569,9 +521,6 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       mixer?.stopAllAction();
       draco.dispose();
       cancelAnimationFrame(raf);
-      renderer.domElement.removeEventListener('pointerdown', onDown);
-      renderer.domElement.removeEventListener('pointerup', onUp);
-      renderer.domElement.removeEventListener('pointermove', onMove);
       ro.disconnect();
       controls.dispose();
       for (const m of meshes.values()) scene.remove(m);
@@ -585,6 +534,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       Object.values(blockMats).forEach((m) => m.dispose());
       renderer.dispose();
       callouts.dispose();
+      nameTags.dispose();
       mount.removeChild(renderer.domElement);
     };
   }, []);

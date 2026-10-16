@@ -36,7 +36,19 @@ describe('VisualPanels', () => {
     render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
     expect(screen.queryByLabelText('Pareto')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Pengaturan panel' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Tampilkan semua' }));
+    const panelSwitch = screen.getByRole('switch', { name: 'Panel' });
+    fireEvent.click(panelSwitch); // some still showing → all off
+    expect(panels()).toBe(0);
+    fireEvent.click(panelSwitch); // all back on, Pareto included
+    expect(panels()).toBe(7);
+  });
+
+  it('has three switches: panels, 3D pins and station name tags', () => {
+    render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pengaturan panel' }));
+    expect(screen.getAllByRole('switch').map((s) => s.closest('label')!.textContent)).toEqual(['Panel', 'Pin 3D', 'Identitas pos']);
+    fireEvent.click(screen.getByRole('switch', { name: 'Identitas pos' }));
+    expect(screen.getByRole('switch', { name: 'Identitas pos' })).not.toBeChecked();
     expect(panels()).toBe(7);
   });
 

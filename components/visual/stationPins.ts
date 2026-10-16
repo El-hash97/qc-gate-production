@@ -71,3 +71,47 @@ export function createPins(mount: HTMLElement) {
     dispose: () => layer.remove(),
   };
 }
+
+// Station name tags in the same glass style as the pins. A tag whose station
+// has a detail card gets a chevron and opens it on click.
+export function createTags(
+  mount: HTMLElement,
+  stations: readonly { id: StationId; label: string; pos: readonly [number, number]; labelY: number }[],
+  clickable: (id: StationId) => boolean,
+  onSelect: (id: StationId) => void,
+) {
+  const layer = document.createElement('div');
+  layer.className = styles.layer;
+  mount.appendChild(layer);
+  const tags = stations.map((s) => {
+    const el = document.createElement(clickable(s.id) ? 'button' : 'div');
+    el.className = styles.tag;
+    el.dataset.tag = s.id;
+    el.textContent = clickable(s.id) ? `${s.label} ›` : s.label;
+    if (el instanceof HTMLButtonElement) {
+      el.type = 'button';
+      el.addEventListener('click', () => onSelect(s.id));
+    }
+    layer.appendChild(el);
+    return { el, at: new THREE.Vector3(s.pos[0], s.labelY, s.pos[1]) };
+  });
+  const v = new THREE.Vector3();
+  return {
+    update(camera: THREE.Camera, visible: boolean) {
+      layer.style.display = visible ? '' : 'none';
+      if (!visible) return;
+      const w = layer.clientWidth;
+      const h = layer.clientHeight;
+      for (const t of tags) {
+        v.copy(t.at).project(camera);
+        if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) {
+          t.el.style.display = 'none';
+          continue;
+        }
+        t.el.style.display = '';
+        t.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -50%)`;
+      }
+    },
+    dispose: () => layer.remove(),
+  };
+}

@@ -85,6 +85,10 @@ interface Props {
   theme: Theme;
   // called when a station's name tag that has a detail card is clicked
   onSelectStation?: (id: StationId) => void;
+  // live "a block is in this station segment" flags, reported when they change
+  onBusyChange?: (busy: boolean[]) => void;
+  // fly the camera to this station; a new `n` flies again to the same one
+  focus?: { id: StationId; n: number };
 }
 
 // Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
@@ -258,10 +262,13 @@ function makeTruck(): THREE.Group {
   return g;
 }
 
-export default function FinishingLine3D({ counts, running, theme, onSelectStation }: Props) {
+export default function FinishingLine3D({ counts, running, theme, onSelectStation, onBusyChange, focus }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const select = useRef(onSelectStation);
   select.current = onSelectStation;
+  const busyChanged = useRef(onBusyChange);
+  busyChanged.current = onBusyChange;
+  const flyTo = useRef<(id: StationId) => void>(() => {});
   // Read by the render loop, so a 3 s poll updates these without rebuilding the scene.
   const live = useRef({ counts, running });
   live.current = { counts, running };
@@ -298,6 +305,17 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     // The camera (and what it orbits) never leaves the building.
     const roomMin = new THREE.Vector3(ROOM.x0 + 0.6, 1, ROOM.z0 + 0.6);
     const roomMax = new THREE.Vector3(ROOM.x1 - 0.6, ROOM.h - 0.5, ROOM.z1 - 0.6);
+    // Camera flight to a station: same viewing direction, 12 m out; grabbing
+    // the camera cancels it.
+    let fly: { target: THREE.Vector3; pos: THREE.Vector3 } | null = null;
+    flyTo.current = (id) => {
+      const s = STATIONS.find((st) => st.id === id);
+      if (!s) return;
+      const target = new THREE.Vector3(s.pos[0], 1, s.pos[1]);
+      const dir = camera.position.clone().sub(controls.target).normalize();
+      fly = { target, pos: target.clone().addScaledVector(dir, 12).clamp(roomMin, roomMax) };
+    };
+    controls.addEventListener('start', () => { fly = null; });
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
     const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -457,6 +475,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     resize();
 
     let sim = createSim();
+    let lastBusy = '';
     let last = performance.now();
     let raf = 0;
     // requestAnimationFrame already pauses in hidden tabs; the dt clamp
@@ -518,7 +537,18 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       }
       const busy = sim.segments.map((seg) => seg.busy !== null);
       boards.draw((card) => cardRows(card, c, live.current.running, busy), boardTheme);
+      const busyKey = busy.join();
+      if (busyKey !== lastBusy) {
+        lastBusy = busyKey;
+        busyChanged.current?.(busy);
+      }
 
+      if (fly) {
+        const k = 1 - Math.exp(-dt * 4);
+        controls.target.lerp(fly.target, k);
+        camera.position.lerp(fly.pos, k);
+        if (camera.position.distanceTo(fly.pos) < 0.05) fly = null;
+      }
       controls.update();
       controls.target.x = THREE.MathUtils.clamp(controls.target.x, roomMin.x, roomMax.x);
       controls.target.z = THREE.MathUtils.clamp(controls.target.z, roomMin.z, roomMax.z);
@@ -554,6 +584,10 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
   useEffect(() => {
     applyTheme.current(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (focus) flyTo.current(focus.id);
+  }, [focus]);
 
   if (noWebGL) {
     return (

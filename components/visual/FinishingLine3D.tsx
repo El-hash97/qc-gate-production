@@ -97,33 +97,6 @@ interface Props {
   labels?: boolean;
 }
 
-// Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
-function makeBadge(color: string): { sprite: THREE.Sprite; set: (text: string) => void } {
-  const canvas = document.createElement('canvas');
-  canvas.width = 384;
-  canvas.height = 80;
-  const g = canvas.getContext('2d')!;
-  const texture = new THREE.CanvasTexture(canvas);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
-  sprite.scale.set(4.8, 1, 1);
-  let current = '';
-  return {
-    sprite,
-    set(text) {
-      if (text === current) return;
-      current = text;
-      g.clearRect(0, 0, 384, 80);
-      g.fillStyle = color;
-      g.fillRect(0, 0, 384, 80);
-      g.fillStyle = '#ffffff';
-      g.font = 'bold 36px sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(text, 192, 42);
-      texture.needsUpdate = true;
-    },
-  };
-}
 
 // Counterbalance forklift, forks pointing +x. Local origin = centre of the
 // wheelbase at ground level. `carriage` slides up the mast (its y = fork top
@@ -380,16 +353,6 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     const nameTags = createTags(mount, STATIONS, (id) => stationDetail(id) !== null, (id) => select.current?.(id));
 
 
-    // OK sits by Junbiki (where the truck loads), Repair by Line Repair, NG by the red box.
-    const badges = (
-      [['ok', 'junbiki', '#16a34a'], ['repair', 'lineRepair', '#d97706'], ['ng', 'ngBox', '#dc2626']] as const
-    ).map(([key, id, color]) => {
-      const s = STATIONS.find((st) => st.id === id)!;
-      const badge = makeBadge(color);
-      badge.sprite.position.set(s.pos[0], s.labelY + 1, s.pos[1]);
-      scene.add(badge.sprite);
-      return { key, label: key === 'ok' ? 'OK' : key === 'repair' ? 'Repair' : 'NG', badge };
-    });
 
     const forklift = makeForklift();
     forklift.group.rotation.y = Math.PI; // parked facing the stub end
@@ -487,11 +450,6 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       truck.position.x = TRUCK_DOCK[0] + sim.truck.offset;
 
       const c = live.current.counts;
-      const total = c.ok + c.repair + c.ng;
-      for (const { key, label, badge } of badges) {
-        const pct = total ? ((c[key] / total) * 100).toFixed(1) : '0.0';
-        badge.set(`${label} ${c[key]} · ${pct}%`);
-      }
       const busy = sim.segments.map((seg) => seg.busy !== null);
       boards.draw((card) => cardRows(card, c, live.current.running, busy), boardTheme);
       const busyKey = busy.join();
@@ -512,7 +470,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       camera.position.clamp(roomMin, roomMax);
       renderer.render(scene, camera);
       callouts.update(camera, sim, c, live.current.running, live.current.pins, ROOM.x0);
-      nameTags.update(camera, live.current.labels);
+      nameTags.update(camera, live.current.labels, c);
     };
     raf = requestAnimationFrame(frame);
 

@@ -66,12 +66,34 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* station name tag: same glass, font and radius as the pin cards */
-.tag {
+/* station name tag: hangs from the station dot, just above the pin card */
+.tagPin {
   position: absolute;
   left: 0;
   top: 0;
-  padding: 4px 10px;
+  will-change: transform;
+}
+
+.tagPin .dot { --tone: var(--text-primary); }
+
+.tagStem {
+  position: absolute;
+  left: 0;
+  top: -92px;
+  width: 20px;
+  height: 87px;
+  border-left: 1.5px solid color-mix(in srgb, var(--text-primary) 70%, transparent);
+  border-top: 1.5px solid color-mix(in srgb, var(--text-primary) 70%, transparent);
+  border-top-left-radius: 6px;
+}
+
+/* the name tag, the count badge and the pin card share one glass look */
+.tag,
+.badge {
+  position: absolute;
+  left: 20px;
+  transform: translateY(-50%);
+  padding: 3px 10px;
   white-space: nowrap;
   background: linear-gradient(
     145deg,
@@ -89,8 +111,10 @@
   font: inherit;
   font-size: 12px;
   font-weight: 700;
-  will-change: transform;
+  font-variant-numeric: tabular-nums;
 }
+
+.tag { top: -92px; }
 
 button.tag {
   pointer-events: auto;
@@ -98,6 +122,38 @@ button.tag {
 }
 
 button.tag:hover { border-color: var(--accent-red); }
+
+/* OK / Repair / NG count above the tag: same glass, its own colour */
+.badge {
+  --tone: var(--accent-green);
+  top: -120px;
+  padding-left: 22px;
+  border-color: color-mix(in srgb, var(--tone) 55%, transparent);
+  color: var(--tone);
+}
+
+.badge::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 30%, transparent);
+}
+
+.badge[data-kind='repair'] { --tone: var(--accent-orange); }
+.badge[data-kind='ng'] { --tone: var(--accent-red); }
+
+/* name tags switched off: only the count badge stays */
+.tagPin[data-off] .dot,
+.tagPin[data-off] .tagStem,
+.tagPin[data-off] .tag { display: none; }
+
+.tagPin[data-off] .badge { top: -44px; }
 
 .label {
   font-size: 9px;

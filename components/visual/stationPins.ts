@@ -72,44 +72,72 @@ export function createPins(mount: HTMLElement) {
   };
 }
 
-// Station name tags in the same glass style as the pins. A tag whose station
-// has a detail card gets a chevron and opens it on click.
+// Station name tags in the same glass style as the pins, hung from the
+// station's dot on their own stem just above the pin card. A tag whose
+// station has a detail card gets a chevron and opens it on click. The OK /
+// Repair / NG counts sit above their station's tag, keeping their colour.
+const BADGES: Partial<Record<StationId, { key: keyof Counts; text: string }>> = {
+  junbiki: { key: 'ok', text: 'OK' },
+  lineRepair: { key: 'repair', text: 'Repair' },
+  ngBox: { key: 'ng', text: 'NG' },
+};
+
 export function createTags(
   mount: HTMLElement,
-  stations: readonly { id: StationId; label: string; pos: readonly [number, number]; labelY: number }[],
+  stations: readonly { id: StationId; label: string }[],
   clickable: (id: StationId) => boolean,
   onSelect: (id: StationId) => void,
 ) {
   const layer = document.createElement('div');
   layer.className = styles.layer;
   mount.appendChild(layer);
+  const add = (tag: string, cls: string, parent: HTMLElement) => {
+    const el = document.createElement(tag);
+    el.className = cls;
+    parent.appendChild(el);
+    return el;
+  };
   const tags = stations.map((s) => {
-    const el = document.createElement(clickable(s.id) ? 'button' : 'div');
-    el.className = styles.tag;
+    const el = add('div', styles.tagPin, layer);
     el.dataset.tag = s.id;
-    el.textContent = clickable(s.id) ? `${s.label} ›` : s.label;
-    if (el instanceof HTMLButtonElement) {
-      el.type = 'button';
-      el.addEventListener('click', () => onSelect(s.id));
+    add('span', styles.dot, el);
+    add('span', styles.tagStem, el);
+    const name = add(clickable(s.id) ? 'button' : 'div', styles.tag, el);
+    name.textContent = clickable(s.id) ? `${s.label} ›` : s.label;
+    if (name instanceof HTMLButtonElement) {
+      name.type = 'button';
+      name.addEventListener('click', () => onSelect(s.id));
     }
-    layer.appendChild(el);
-    return { el, at: new THREE.Vector3(s.pos[0], s.labelY, s.pos[1]) };
+    const b = BADGES[s.id];
+    const badge = b ? add('div', styles.badge, el) : null;
+    if (badge && b) badge.dataset.kind = b.key;
+    return { el, badge, b, text: '', at: new THREE.Vector3(...stationPinPos(s.id)) };
   });
   const v = new THREE.Vector3();
   return {
-    update(camera: THREE.Camera, visible: boolean) {
-      layer.style.display = visible ? '' : 'none';
-      if (!visible) return;
+    // `visible`: the name tags (the count badges always show)
+    update(camera: THREE.Camera, visible: boolean, counts: Counts) {
       const w = layer.clientWidth;
       const h = layer.clientHeight;
+      const total = counts.ok + counts.repair + counts.ng;
       for (const t of tags) {
+        if (!visible && !t.badge) {
+          t.el.style.display = 'none';
+          continue;
+        }
         v.copy(t.at).project(camera);
         if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) {
           t.el.style.display = 'none';
           continue;
         }
         t.el.style.display = '';
-        t.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -50%)`;
+        t.el.toggleAttribute('data-off', !visible);
+        t.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
+        if (t.badge && t.b) {
+          const n = counts[t.b.key];
+          const text = `${t.b.text} ${n} · ${(total ? (n / total) * 100 : 0).toFixed(1)}%`;
+          if (text !== t.text) t.badge.textContent = t.text = text;
+        }
       }
     },
     dispose: () => layer.remove(),

@@ -142,6 +142,11 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS cycle_time_bc INTEGER NOT NULL DEFA
 -- no "current hour" to redirect).
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS pinned_hour TEXT NOT NULL DEFAULT '';
 
+-- When the shift was last archived + reset (manual or auto at 07:10 / 19:50
+-- WIB, see lib/autoReset.ts). Defaults to now() so adding it never triggers an
+-- immediate reset of the running shift.
+ALTER TABLE production_state ADD COLUMN IF NOT EXISTS last_reset_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
 -- Day = 07:00–19:00, Night = 20:00–08:00. Drives which hourly rows are pre-generated.
 ALTER TABLE production_state ADD COLUMN IF NOT EXISTS shift_time TEXT NOT NULL DEFAULT '';
 ALTER TABLE history ADD COLUMN IF NOT EXISTS shift_time TEXT NOT NULL DEFAULT '';

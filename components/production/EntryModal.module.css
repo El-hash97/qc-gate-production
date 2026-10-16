@@ -215,6 +215,15 @@
   gap: 6px;
 }
 
+.cavityGrid2,
+.cavityGrid4 {
+  display: grid;
+  gap: 6px;
+}
+
+.cavityGrid2 { grid-template-columns: repeat(2, 1fr); }
+.cavityGrid4 { grid-template-columns: repeat(4, 1fr); }
+
 .flaskBox,
 .flaskBoxActive {
   min-width: 0;

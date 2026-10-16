@@ -35,6 +35,10 @@ export function toOverDimensiDetail(s: OverDimensiFormState): OverDimensiDetail 
   };
 }
 
+export function fromOverDimensiDetail(d: OverDimensiDetail): OverDimensiFormState {
+  return { dieMould: String(d.dieMould), crankCaseNo: d.crankCaseNo, slubWjNo: d.slubWjNo, position: d.position };
+}
+
 const DIE_OPTIONS = Array.from({ length: 10 }, (_, i) => String(i + 1));
 
 interface Props {

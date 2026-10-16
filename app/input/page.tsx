@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useHourlySnapshot } from '@/hooks/useHourlySnapshot';
+import { useAutoReset } from '@/hooks/useAutoReset';
 import { useDraftValue } from '@/hooks/useDraftValue';
 import { useToast } from '@/components/ui/ToastProvider';
 import { CounterCard } from '@/components/production/CounterCard';
@@ -17,7 +18,8 @@ import {
 import { DEFAULT_CYCLE_TIME_SEC } from '@/utils/oee';
 import { exportShiftToExcel } from '@/utils/excelExport';
 import { todayString } from '@/utils/date';
-import { takenFlasks } from '@/utils/flask';
+import { entryDie, takenFlasks } from '@/utils/flask';
+import { canonicalType } from '@/utils/typeName';
 import {
   SHIFTS, SHIFT_TIMES, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
 } from '@/utils/constants';
@@ -110,6 +112,11 @@ function usesFlaskBoxes(target: DefectTarget | RepairTarget | null): boolean {
   return target !== null && lineGroup(lineForTarget(target)) === 'bc';
 }
 
+// Line 3 is Camshaft: its cavity is picked via TR KAI + No. Die toggles.
+function isCamshaft(target: DefectTarget | RepairTarget | null): boolean {
+  return target !== null && lineForTarget(target) === 3;
+}
+
 export default function InputPage() {
   const { state, updateState, isLoading } = useProductionState();
   const { showToast } = useToast();
@@ -121,6 +128,7 @@ export default function InputPage() {
   const ready = !isLoading;
 
   useHourlySnapshot(current, updateState);
+  useAutoReset();
 
   useEffect(() => {
     // Auto-fill today's date, but only once the real server state has loaded
@@ -189,35 +197,43 @@ export default function InputPage() {
     return (lot: string) => takenFlasks(current.entryLogs, lot, line);
   }
 
-  function handleSaveDefect(defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
+  function handleSaveDefect(typedType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
     if (!defectTarget) return;
     const line = lineForTarget(defectTarget);
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'defectDataShaft' : 'defectData';
     const currentData = current[dataKey] ?? {};
+    // An "Other" name typed in a different case/spacing joins the existing type.
+    const defectType = canonicalType(typedType, [...defectTypesFor(defectTarget), ...Object.keys(currentData)]);
+    const die = entryDie(line, flask);
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [defectType]: (currentData[defectType] ?? 0) + qty },
-      entryLogs: [...current.entryLogs, { kind: 'defect', group, line, type: defectType, qty, lot, flask, ...(overDimensi ? { overDimensi } : {}) }],
+      entryLogs: [
+        ...current.entryLogs,
+        { kind: 'defect', group, line, type: defectType, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) },
+      ],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${defectType} ditambahkan`, 'error');
     setDefectTarget(null);
   }
 
   function handleSaveRepair(
-    repairType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail,
+    typedType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail,
   ) {
     if (!repairTarget) return;
     const line = lineForTarget(repairTarget);
+    const logDie = entryDie(line, flask, die);
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'repairDataShaft' : 'repairData';
     const currentData = current[dataKey] ?? {};
+    const repairType = canonicalType(typedType, [...repairTypesFor(repairTarget), ...Object.keys(currentData)]);
     commit({
       [repairTarget]: (current[repairTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
       entryLogs: [
         ...current.entryLogs,
-        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) },
+        { kind: 'repair', group, line, type: repairType, qty, lot, flask, ...(logDie ? { die: logDie } : {}), ...(overDimensi ? { overDimensi } : {}) },
       ],
     } as Partial<ProductionState>);
     showToast(`${qty}x ${repairType} ditambahkan`, 'warning');
@@ -459,6 +475,7 @@ export default function InputPage() {
         types={defectTypesFor(defectTarget)}
         flaskLabel={flaskLabelFor(defectTarget)}
         takenFlasks={takenFlasksFor(defectTarget)}
+        cavityPicker={isCamshaft(defectTarget)}
       />
       <RepairModal
         isOpen={repairTarget !== null}
@@ -467,6 +484,7 @@ export default function InputPage() {
         types={repairTypesFor(repairTarget)}
         flaskLabel={flaskLabelFor(repairTarget)}
         takenFlasks={takenFlasksFor(repairTarget)}
+        cavityPicker={isCamshaft(repairTarget)}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

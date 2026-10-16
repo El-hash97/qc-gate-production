@@ -252,6 +252,42 @@
   text-transform: uppercase;
 }
 
+/* Panel title with a small control on the right (Over Dimensi NG/Repair). */
+.panelTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.miniToggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: 99px;
+}
+
+.miniToggleButton,
+.miniToggleActive {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  cursor: pointer;
+  text-transform: none;
+}
+
+.miniToggleButton:hover { color: var(--text-primary); }
+
+.miniToggleActive {
+  background: var(--accent-red-soft, rgba(220, 38, 38, 0.1));
+  color: var(--accent-red);
+}
+
 /* Chart body: fills the panel; Chart.js reads this box for its canvas size. */
 .panelBody {
   position: relative;

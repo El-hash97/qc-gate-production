@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   hourlySeries, hourlyOeeSeries, pareto, flaskTypeMatrix, cavityTypeMatrix, expandCavities, lotDefectData, padLabels,
+  overDimensiByDie, overDimensiCombos,
 } from '@/utils/charts';
 import type { EntryLog } from '@/lib/types';
 
@@ -41,6 +42,12 @@ describe('hourlySeries', () => {
 });
 
 describe('pareto', () => {
+  it('shows names that differ only in case as one bar', () => {
+    const { labels, counts } = pareto({ 'Yuzakai Cope': 8, 'Yuzakai cope': 31, Dross: 10 });
+    expect(labels).toEqual(['Yuzakai cope', 'Dross']);
+    expect(counts).toEqual([39, 10]);
+  });
+
   it('sorts desc and reports running cumulative percentage', () => {
     const { labels, counts, cumulativePct } = pareto({ A: 1, B: 6, C: 3 });
     expect(labels).toEqual(['B', 'C', 'A']);
@@ -141,5 +148,36 @@ describe('lotDefectData', () => {
       { x: 'Dross', y: 65, flask: '4', qty: 1 },
     ]);
     expect(series[1].points).toEqual([{ x: 'Dross', y: 12, flask: '1-6', qty: 1 }]);
+  });
+});
+
+describe('overDimensiByDie', () => {
+  const od = (dieMould: 1 | 2 | 3) => ({ dieMould, crankCaseNo: '1', slubWjNo: '1', position: '1' });
+  const logs: EntryLog[] = [
+    { kind: 'defect', group: 'bc', line: 1, type: 'Over Dimensi', qty: 2, lot: 'L1', flask: '1', overDimensi: od(3) },
+    { kind: 'defect', group: 'bc', line: 2, type: 'Over Dimensi', qty: 1, lot: 'L2', flask: '2', overDimensi: od(3) },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Over Dimensi', qty: 1, lot: 'L3', flask: '3', overDimensi: od(1) },
+    { kind: 'repair', group: 'bc', line: 1, type: 'Over Dimensi', qty: 5, lot: 'L4', flask: '4', overDimensi: od(2) },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole', qty: 9, lot: 'L5', flask: '5' },
+  ];
+
+  it('sums qty per Die Mould for NG entries only, ignoring non-Over-Dimensi logs', () => {
+    expect(overDimensiByDie(logs, 'defect')).toEqual({ 'Die 3': 3, 'Die 1': 1 });
+  });
+
+  it('counts Repair entries separately', () => {
+    expect(overDimensiByDie(logs, 'repair')).toEqual({ 'Die 2': 5 });
+  });
+
+  it('lists each die combination (CC · Slub/Wj · F/R), most pcs first', () => {
+    const withCombo: EntryLog[] = [
+      ...logs,
+      { kind: 'defect', group: 'bc', line: 1, type: 'Over Dimensi', qty: 4, lot: 'L6', flask: '1',
+        overDimensi: { dieMould: 3, crankCaseNo: '2', slubWjNo: '1', position: '1' } },
+    ];
+    expect(overDimensiCombos(withCombo, 'defect')).toEqual({
+      'Die 3': ['CC 2 · Slub/Wj 1 · F/R 1: 4 pcs', 'CC 1 · Slub/Wj 1 · F/R 1: 3 pcs'],
+      'Die 1': ['CC 1 · Slub/Wj 1 · F/R 1: 1 pcs'],
+    });
   });
 });

@@ -1,135 +1,168 @@
 import { describe, it, expect } from 'vitest';
-import type ExcelJS from 'exceljs';
-import { buildShiftWorkbook, buildShiftFileName } from '@/utils/excelExport';
+import ExcelJS from 'exceljs';
+import { buildShiftWorkbook, buildShiftFileName, SHEET_NAME } from '@/utils/excelExport';
 import type { ProductionState } from '@/lib/types';
 
 const state: ProductionState = {
-  date: '5 Agustus 2026', shift: 'Shift Red', shiftTime: 'day', operator: 'Budi', pic: 'suryo', target: 300,
+  date: '2026-08-05', shift: 'Shift Red', shiftTime: 'day', operator: 'Budi', pic: 'suryo', target: 300,
   targetBc: 200, targetCam: 60, targetCrank: 40,
   ok1: 100, repair1: 5, ng1: 3, ok2: 80, repair2: 4, ng2: 2,
   ok3: 40, repair3: 2, ng3: 1, ok4: 20, repair4: 1, ng4: 0,
   defectData: { 'Gas Hole Cope': 5 }, repairData: {}, hourlyData: {},
   defectDataShaft: {}, repairDataShaft: {}, hourlyDataShaft: {},
   hourlyDataBc1: { '07:00': { ok: 50, repair: 2, ng: 1 } },
-  hourlyDataBc2: { '07:00': { ok: 40, repair: 1, ng: 1 } },
-  hourlyDataCam: { '23:00': { ok: 20, repair: 1, ng: 0 }, '20:00': { ok: 20, repair: 1, ng: 1 } },
-  hourlyDataCrank: {},
-  hourlyTargetCam: { '20:00': 25, '23:00': 25 },
   entryLogs: [
-    { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 3, lot: 'L1', flask: 'F1' },
-    { kind: 'defect', group: 'bc', line: 2, type: 'Dross', qty: 2, lot: 'L2', flask: 'F2' },
-    { kind: 'defect', group: 'shaft', line: 3, type: 'Dross', qty: 1, lot: 'L3', flask: 'C1' },
-    { kind: 'repair', group: 'bc', line: 1, type: 'Finishing', qty: 5, lot: 'L1', flask: 'F1' },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 3, lot: 'L1', flask: '1' },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Dross', qty: 1, lot: 'L1', flask: '2' },
+    { kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 2, lot: 'L4', flask: '3',
+      overDimensi: { dieMould: 4, crankCaseNo: '1', slubWjNo: '2', position: '3' } },
+    { kind: 'repair', group: 'bc', line: 1, type: 'Mejashi Bore 1', qty: 5, lot: 'L1', flask: '4', die: 2 },
+    { kind: 'defect', group: 'bc', line: 2, type: 'Dross', qty: 2, lot: 'L2', flask: '2' },
+    { kind: 'defect', group: 'shaft', line: 3, type: 'Dross', qty: 1, lot: 'L3', flask: '1-1' },
   ],
-  lineStops: [{ start: '07:10', end: '07:20', problem: 'Ganti tooling', category: 'AV', countermeasure: 'Stok tool' }],
+  lineStops: [{ start: '07:10', end: '07:40', problem: 'Ganti tooling', category: 'AV', countermeasure: 'Stok tool' }],
   savedAt: '',
 };
 
-function sheetOf(workbook: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
-  const ws = workbook.getWorksheet(name);
-  expect(ws).toBeDefined();
-  return ws!;
+const DATE = new Date(Date.UTC(2026, 7, 5));
+
+type TableModel = { name: string; ref?: string; tableRef?: string; rows: unknown[][]; columns: { name: string; filterButton?: boolean }[] };
+
+function model(workbook: ExcelJS.Workbook, name: string): TableModel {
+  const table = workbook.getWorksheet(SHEET_NAME)!.getTable(name);
+  expect(table).toBeDefined();
+  return (table as unknown as { table: TableModel }).table;
 }
 
-function findRow(ws: ExcelJS.Worksheet, firstCell: string): ExcelJS.Row {
-  let found: ExcelJS.Row | undefined;
-  ws.eachRow((row) => {
-    if (row.getCell(1).value === firstCell) found = row;
-  });
-  expect(found).toBeDefined();
-  return found!;
-}
-
-function values(row: ExcelJS.Row): unknown[] {
-  const out: unknown[] = [];
-  row.eachCell({ includeEmpty: true }, (cell) => { out.push(cell.value); });
-  return out;
-}
-
-describe('buildShiftWorkbook sheets', () => {
-  it('creates one sheet per product plus summary, line stop, and entry log', () => {
+describe('buildShiftWorkbook', () => {
+  it('puts everything on a single sheet', () => {
     const workbook = buildShiftWorkbook(state);
-    expect(workbook.worksheets.map((ws) => ws.name)).toEqual([
-      'Ringkasan', 'BC 1TR', 'BC 2TR', 'Camshaft', 'Crankshaft', 'Line Stop', 'Entry Log',
+    expect(workbook.worksheets.map((ws) => ws.name)).toEqual([SHEET_NAME]);
+  });
+
+  it('creates a named table per dataset, with per-product tables for each line', () => {
+    const ws = buildShiftWorkbook(state).getWorksheet(SHEET_NAME)!;
+    const names = ws.getTables().map((t) => (t as unknown as { table: TableModel }).table.name);
+    expect(names).toEqual([
+      'Ringkasan',
+      'Produksi_BC1TR', 'EntryLog_BC1TR',
+      'Produksi_BC2TR', 'EntryLog_BC2TR',
+      'Produksi_Camshaft', 'EntryLog_Camshaft',
+      'Produksi_Crankshaft', 'EntryLog_Crankshaft',
+      'EntryLog_Semua',
+      'LineStop',
     ]);
   });
 
-  it('centers every cell and bolds the headline', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'Ringkasan');
-    expect(ws.getRow(1).font).toMatchObject({ bold: true });
-    ws.eachRow((row) => row.eachCell((cell) => {
-      expect(cell.alignment).toMatchObject({ horizontal: 'center', vertical: 'middle' });
-    }));
+  it('summarises per target group with real numbers and fractional percentages', () => {
+    const rows = model(buildShiftWorkbook(state), 'Ringkasan').rows;
+    expect(rows[0]).toEqual([DATE, 'Shift Red', 'Day', 'BC 1TR + BC 2TR', 200, 180, 9, 5, 194, 180 / 194, 9 / 194, 5 / 194, 194 / 200]);
+    expect(rows.map((r) => r[3])).toEqual(['BC 1TR + BC 2TR', 'Camshaft', 'Crankshaft']);
   });
 
-  it('Ringkasan opens with a headline and ends with a correct TOTAL row', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'Ringkasan');
-    expect(ws.getCell('A1').value).toBe('Ringkasan Shift');
-    const total = values(ws.getRow(ws.rowCount));
-    // OK 240 + Repair 12 + NG 6 = 258 against target 300.
-    expect(total[0]).toBe('TOTAL');
-    expect(total.slice(2, 6)).toEqual([240, 12, 6, 258]);
+  it('gives every Produksi table the same columns so Power BI can append them', () => {
+    const workbook = buildShiftWorkbook(state);
+    const bc1 = model(workbook, 'Produksi_BC1TR');
+    expect(model(workbook, 'Produksi_Crankshaft').columns.map((c) => c.name)).toEqual(bc1.columns.map((c) => c.name));
+    expect(bc1.rows[0].slice(3, 9)).toEqual(['BC 1TR', null, 100, 5, 3, 108]);
+    expect(model(workbook, 'Produksi_Camshaft').rows[0][4]).toBe(60);
   });
 
-  it('each product sheet opens with its own headline and production counters', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'BC 1TR');
-    expect(String(ws.getCell('A1').value)).toContain('BC 1TR');
-    const produksi = findRow(ws, 'Produksi');
-    expect(values(ws.getRow(produksi.number + 2))).toEqual([100, 5, 3, 108, '93%', '5%', '3%']);
+  it('lists each entry with die and Over Dimensi detail in its own columns', () => {
+    const rows = model(buildShiftWorkbook(state), 'EntryLog_BC1TR').rows;
+    expect(rows).toHaveLength(4);
+    expect(rows[2].slice(3)).toEqual(['NG', 'Gas Hole Cope', 2, 'L4', '3', null, 4, '1', '2', '3']);
+    expect(rows[3].slice(3, 10)).toEqual(['Repair', 'Mejashi Bore 1', 5, 'L1', '4', 2, null]);
   });
 
-  it('Camshaft shows its target, actual, and achievement', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'Camshaft');
-    const target = findRow(ws, 'Target');
-    // 43 pcs against target 60 = 72%.
-    expect(values(ws.getRow(target.number + 1))).toEqual([60, 43, '72%']);
+  it('gives an empty dataset one blank row so the table still exists', () => {
+    const rows = model(buildShiftWorkbook(state), 'EntryLog_Crankshaft').rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].slice(0, 4)).toEqual([DATE, 'Shift Red', 'Crankshaft', null]);
   });
 
-  it('attributes defects per line from the entry logs, sorted biggest first', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'BC 1TR');
-    const defect = findRow(ws, 'Defect (NG)');
-    expect(values(ws.getRow(defect.number + 2))).toEqual(['Gas Hole Cope', 3]);
-    // The line-2 Dross must not leak into BC 1TR.
-    let body = '';
-    ws.eachRow((row) => { body += `${row.getCell(1).value ?? ''} `; });
-    expect(body).not.toContain('Dross');
+  it('writes line stops with its hour bucket, category code and duration in minutes', () => {
+    const rows = model(buildShiftWorkbook(state), 'LineStop').rows;
+    expect(rows[0]).toEqual([
+      DATE, 'Shift Red', 'Day', 'Budi', 'SURYO HADI WIHARJO',
+      '07:00', '07:10', '07:40', 'AV', 'Availability', 30, 'Ganti tooling', 'Stok tool',
+    ]);
   });
 
-  it('lists hourly rows in production order with a target column when known', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'Camshaft');
-    const hourly = findRow(ws, 'Hourly');
-    expect(values(ws.getRow(hourly.number + 1))).toEqual(['Jam', 'OK', 'Repair', 'NG', 'Total', 'Target']);
-    expect(values(ws.getRow(hourly.number + 2))).toEqual(['20:00', 20, 1, 1, 22, 25]);
-    expect(values(ws.getRow(hourly.number + 3))).toEqual(['23:00', 20, 1, 0, 21, 25]);
+  it('fills each product table header with that product colour', () => {
+    const workbook = buildShiftWorkbook(state);
+    const ws = workbook.getWorksheet(SHEET_NAME)!;
+    const t = model(workbook, 'Produksi_BC2TR');
+    const top = Number((t.tableRef ?? t.ref)!.match(/\d+/)![0]);
+    const fill = ws.getRow(top).getCell(1).fill as ExcelJS.FillPattern;
+    expect(fill.fgColor?.argb).toBe('FF3B82F6');
   });
 
-  it('Line Stop sheet spells out the category and countermeasure', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'Line Stop');
-    expect(values(ws.getRow(ws.rowCount))).toEqual(['07:10', '07:20', 'AV (Availability)', 'Ganti tooling', 'Stok tool']);
+  it('makes every table 13 columns wide with no filter arrows and centred header + body', () => {
+    const workbook = buildShiftWorkbook(state);
+    const ws = workbook.getWorksheet(SHEET_NAME)!;
+    for (const t of ws.getTables()) {
+      const m = (t as unknown as { table: TableModel }).table;
+      expect(m.columns).toHaveLength(13);
+      expect(m.columns.every((c) => !c.filterButton)).toBe(true);
+    }
+    const t = model(workbook, 'EntryLog_BC1TR');
+    const top = Number((t.tableRef ?? t.ref)!.match(/\d+/)![0]);
+    expect(ws.getRow(top).getCell(5).alignment?.horizontal).toBe('center');
+    expect(ws.getRow(top + 1).getCell(5).alignment?.horizontal).toBe('center');
   });
 
-  it('Entry Log sheet lists every log with its product', () => {
-    const ws = sheetOf(buildShiftWorkbook(state), 'Entry Log');
-    let body = '';
-    ws.eachRow((row) => { body += `${values(row).join('|')}\n`; });
-    expect(body).toContain('Defect (NG)|BC 1TR|Gas Hole Cope|3|L1|F1');
-    expect(body).toContain('Repair|BC 1TR|Finishing|5|L1|F1');
-  });
-
-  it('still creates every sheet with a placeholder when the shift is empty', () => {
-    const empty: ProductionState = {
-      ...state, targetBc: 0, targetCam: 0, targetCrank: 0,
-      ok1: 0, repair1: 0, ng1: 0, ok2: 0, repair2: 0, ng2: 0,
-      ok3: 0, repair3: 0, ng3: 0, ok4: 0, repair4: 0, ng4: 0,
-      defectData: {}, hourlyDataBc1: {}, hourlyDataBc2: {},
-      hourlyDataCam: {}, hourlyDataCrank: {}, entryLogs: [], lineStops: [],
+  it('lists every entry in EntryLog_Semua by product, NG before Repair, rows tinted per product', () => {
+    const mixed: ProductionState = {
+      ...state,
+      entryLogs: [
+        { kind: 'repair', group: 'shaft', line: 3, type: 'Bari', qty: 1, lot: 'C1', flask: '1-2' },
+        { kind: 'repair', group: 'bc', line: 2, type: 'Gomi', qty: 1, lot: 'B1', flask: '1' },
+        { kind: 'defect', group: 'bc', line: 2, type: 'Dross', qty: 2, lot: 'B2', flask: '2' },
+        { kind: 'defect', group: 'bc', line: 1, type: 'Crack', qty: 1, lot: 'A1', flask: '3' },
+      ],
     };
-    const workbook = buildShiftWorkbook(empty);
-    expect(workbook.worksheets).toHaveLength(7);
-    const ws = sheetOf(workbook, 'BC 2TR');
-    let body = '';
-    ws.eachRow((row) => { body += `${row.getCell(1).value ?? ''} `; });
-    expect(body).toContain('(Belum ada data)');
+    const workbook = buildShiftWorkbook(mixed);
+    const t = model(workbook, 'EntryLog_Semua');
+    expect(t.rows.map((r) => [r[2], r[3], r[4]])).toEqual([
+      ['BC 1TR', 'NG', 'Crack'],
+      ['BC 2TR', 'NG', 'Dross'],
+      ['BC 2TR', 'Repair', 'Gomi'],
+      ['Camshaft', 'Repair', 'Bari'],
+    ]);
+    const ws = workbook.getWorksheet(SHEET_NAME)!;
+    const top = Number((t.tableRef ?? t.ref)!.match(/\d+/)![0]);
+    const tint = (r: number) => (ws.getRow(top + r).getCell(1).fill as ExcelJS.FillPattern).fgColor?.argb;
+    expect([tint(1), tint(2), tint(4)]).toEqual(['FFFEE2E2', 'FFDBEAFE', 'FFFEF9C3']);
+  });
+
+  it('puts the shift info straight under the title, both inside one A:M outside border', () => {
+    const ws = buildShiftWorkbook(state).getWorksheet(SHEET_NAME)!;
+    const title = ws.getRow(1).getCell(1);
+    expect(title.border?.top).toBeDefined();
+    expect(title.border?.left).toBeDefined();
+    expect(title.border?.right).toBeDefined();
+
+    // Row 2 = Tanggal (no gap), label A:G right-aligned meeting value H:M left-aligned.
+    const first = ws.getRow(2);
+    expect(first.getCell(1).value).toBe('Tanggal');
+    expect(first.getCell(8).value).toEqual(DATE);
+    expect(first.getCell(1).alignment?.horizontal).toBe('right');
+    expect(first.getCell(8).alignment?.horizontal).toBe('left');
+    expect(first.getCell(1).border?.left).toBeDefined();
+    expect(first.getCell(8).border?.right).toBeDefined();
+
+    const last = ws.getRow(6); // Tanggal, Shift, Jam Shift, Operator, PIC
+    expect(last.getCell(1).value).toBe('PIC');
+    expect(last.getCell(1).border?.bottom).toBeDefined();
+    expect(last.getCell(8).border?.bottom).toBeDefined();
+  });
+
+  it('round-trips through a real .xlsx file with its tables intact', async () => {
+    const buffer = await buildShiftWorkbook(state).xlsx.writeBuffer();
+    const loaded = new ExcelJS.Workbook();
+    await loaded.xlsx.load(buffer as ArrayBuffer);
+    expect(loaded.getWorksheet(SHEET_NAME)!.getTables()).toHaveLength(11);
   });
 });
 

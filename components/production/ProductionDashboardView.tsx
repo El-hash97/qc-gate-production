@@ -30,6 +30,7 @@ import {
   hourlyOee, avMinutesByHour, peMinutesByHour, lineStopsByHour, shiftOee,
 } from '@/utils/oee';
 import { hoursForShiftTime } from '@/utils/shiftHours';
+import { overDimensiByDie, overDimensiCombos } from '@/utils/charts';
 import type { OeeBreakdown } from '@/utils/oee';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
@@ -82,6 +83,8 @@ export interface ProductionDashboardViewProps {
   // Manual hour-pin toggle — omitted (the default) hides the toggle, same
   // gate as onHourlyWindowChange (the live Dashboard passes it once logged in).
   onPinHour?: (hour: string) => void;
+  // Login only: ✎ per Lot/Flask Log row to correct an entry.
+  onEditLog?: (log: EntryLog) => void;
   // Defect-photo click-through — live-only (see useDefectPhotos), omitted
   // for a historical record since a photo isn't tied to a saved shift.
   hasPhoto?: (group: PhotoGroup, chartType: PhotoChartType, defectType: string) => boolean;
@@ -104,7 +107,7 @@ export interface ProductionDashboardViewProps {
 
 export function ProductionDashboardView({
   state, view, onViewChange, now,
-  onHourlyWindowChange, onPinHour, hasPhoto, onPhotoBarClick, connectionStatus,
+  onHourlyWindowChange, onPinHour, onEditLog, hasPhoto, onPhotoBarClick, connectionStatus,
   exportMode = 'print', downloadPdfUrl,
 }: ProductionDashboardViewProps) {
   const { theme, setTheme } = useTheme();
@@ -115,6 +118,8 @@ export function ProductionDashboardView({
   const { mappings: defectLineMappings } = useDefectLines();
 
   const isShaftLine = view === 'camshaft' || view === 'crankshaft';
+  const showOverDimensi = !isShaftLine && !hidden.has('overDimensi');
+  const [overDimensiKind, setOverDimensiKind] = useState<'defect' | 'repair'>('defect');
   // Defect photos are per product group + chart type + defect name — "Semua"
   // mixes 3 groups' data so it has no slot of its own; the Pareto bars aren't clickable there.
   const photoGroup: PhotoGroup | null = view === 'all' ? null : view;
@@ -533,11 +538,39 @@ export function ProductionDashboardView({
           </section>
         )}
 
-        {/* Last panel, alone on its row in every view — full width. */}
+        {/* Last row: the log, sharing it with the Over Dimensi Pareto in the BC
+            and All views (Over Dimensi is BC-only, so shaft views keep the log full). */}
         {!hidden.has('entryLog') && (
-          <section className={`${styles.panel} ${styles.spanFull} ${styles.hLog}`}>
+          <section className={`${styles.panel} ${showOverDimensi ? styles.spanHalf : styles.spanFull} ${styles.hLog}`}>
             <div className={styles.scrollBody}>
-              <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} />
+              <EntryLogList title={isShaftLine ? 'Lot / Cavity Log' : 'Lot / Flask Log'} logs={entryLogs} onEdit={onEditLog} />
+            </div>
+          </section>
+        )}
+
+        {showOverDimensi && (
+          <section className={`${styles.panel} ${hidden.has('entryLog') ? styles.spanFull : styles.spanHalf} ${styles.hLog}`}>
+            <div className={`${styles.panelTitle} ${styles.panelTitleRow}`}>
+              <span>Pareto Over Dimensi per Die</span>
+              <div className={styles.miniToggle} role="group" aria-label="Over Dimensi NG atau Repair">
+                {(['defect', 'repair'] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className={overDimensiKind === kind ? styles.miniToggleActive : styles.miniToggleButton}
+                    aria-pressed={overDimensiKind === kind}
+                    onClick={() => setOverDimensiKind(kind)}
+                  >
+                    {kind === 'defect' ? 'NG' : 'Repair'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.panelBody}>
+              <ParetoChart
+                data={overDimensiByDie(entryLogs, overDimensiKind)}
+                tooltipDetail={(die) => overDimensiCombos(entryLogs, overDimensiKind)[die] ?? []}
+              />
             </div>
           </section>
         )}

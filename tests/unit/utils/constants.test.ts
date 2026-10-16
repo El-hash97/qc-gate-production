@@ -21,9 +21,11 @@ describe('production constants', () => {
   });
 
   it('has the Camshaft/Crankshaft defect/repair/NG list', () => {
-    expect(SHAFT_DEFECT_TYPES).toHaveLength(14);
+    expect(SHAFT_DEFECT_TYPES).toHaveLength(16);
     expect(SHAFT_DEFECT_TYPES).toContain('Ireboshi');
     expect(SHAFT_DEFECT_TYPES).toContain('Ihada Area Barcode');
+    expect(SHAFT_DEFECT_TYPES).toContain('Yuzakai Cope');
+    expect(SHAFT_DEFECT_TYPES).toContain('Dross Cope');
     expect(SHAFT_REPAIR_TYPES).toEqual(SHAFT_DEFECT_TYPES);
   });
 

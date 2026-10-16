@@ -47,9 +47,10 @@ export interface EntryLog {
   qty: number;
   lot: string;
   flask: string;
-  // Die (mould) number 1-4 the piece came from. Only ever set for Mejashi
-  // Bore repairs (see DIE_NUMBER_REPAIR_TYPES in utils/constants.ts); every
-  // other entry, and every log written before this field existed, omits it.
+  // Die (mould) number the piece came from: 1-4 for Mejashi Bore repairs (see
+  // DIE_NUMBER_REPAIR_TYPES in utils/constants.ts), 1-2 for every Camshaft
+  // entry (from its cavity, see entryDie in utils/flask.ts). Other entries, and
+  // logs written before this was recorded, omit it.
   die?: 1 | 2 | 3 | 4;
   // Over Dimensi detail — only set when type === 'Over Dimensi' (BC 1TR/2TR).
   overDimensi?: OverDimensiDetail;

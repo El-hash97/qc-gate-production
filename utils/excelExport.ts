@@ -1,228 +1,291 @@
 import ExcelJS from 'exceljs';
-import type { EntryLog, HourlySnapshot, ProductionState, ProductLine } from '@/lib/types';
-import { PRODUCT_LINE_LABELS } from '@/lib/types';
+import type { EntryLog, ProductionState, ProductLine } from '@/lib/types';
+import { PRODUCT_LINE_COLOR, PRODUCT_LINE_LABELS } from '@/lib/types';
 import { findPic } from '@/utils/constants';
-import { sortHourKeys } from '@/utils/hourOrder';
-import {
-  getAchievementPercent, getGrandTotal, getNgTotal, getOkTotal, getRates, getRepairTotal,
-} from '@/utils/rates';
+import { lineStopMinutes, toMinutes } from '@/utils/lineStop';
+import { getGrandTotal, getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
+import type { RateScope } from '@/utils/rates';
 
-type Cell = string | number;
+type Cell = string | number | Date | null;
 
-// ExcelJS (unlike the SheetJS community edition) supports cell styling, so
-// every cell is center-aligned and headlines/headers are bold. Structure per
-// sheet stays the same: one merged headline, a meta block, then one table per
-// section separated by a blank row, plus fitted column widths.
+// One sheet, built for Power BI: every dataset is a named Excel Table
+// (Ringkasan, Produksi_BC1TR, EntryLog_BC1TR, …, LineStop) that Power BI's
+// Excel connector lists on its own. Every row carries Tanggal/Shift (+ Produk),
+// numbers stay numbers (percentages as fractions with a % format), and
+// per-product tables share one column layout so they append. Every table is
+// 13 columns wide so their edges line up; no filter arrows (Excel-only UI).
+export const SHEET_NAME = 'Laporan Shift';
+const TOYOTA_RED = 'B91C1C';
+const WHITE = 'FFFFFF';
+const DARK = '1F2937';
+const META_BG = 'FEF2F2';
+const WIDTH = 13;
 const CENTER: Partial<ExcelJS.Alignment> = { vertical: 'middle', horizontal: 'center', wrapText: true };
 
-function headline(ws: ExcelJS.Worksheet, text: string, spanCols: number): void {
+const LINES: ProductLine[] = [1, 2, 3, 4];
+
+function argb(hex: string): string {
+  return `FF${hex.replace('#', '').toUpperCase()}`;
+}
+
+// Yellow (Camshaft) needs dark text; the other fills read with white.
+function textOn(hex: string): string {
+  return hex.replace('#', '').toLowerCase() === 'eab308' ? DARK : WHITE;
+}
+
+// Table names: letters/digits/underscore only ("BC 1TR" -> "BC1TR").
+function tableKey(line: ProductLine): string {
+  return PRODUCT_LINE_LABELS[line].replace(/\s/g, '');
+}
+
+// "YYYY-MM-DD" becomes a real date cell so Power BI types the column as Date.
+function dateCell(date: string): Cell {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  return m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : (date || null);
+}
+
+function jamShift(state: ProductionState): string | null {
+  return state.shiftTime === 'day' ? 'Day' : state.shiftTime === 'night' ? 'Night' : null;
+}
+
+function picName(state: ProductionState): string | null {
+  return findPic(state.pic)?.name ?? (state.pic || null);
+}
+
+function rate(part: number, total: number): number {
+  return total > 0 ? part / total : 0;
+}
+
+interface Column {
+  name: string;
+  numFmt?: string;
+}
+
+const PCT = '0.0%';
+const DATE = 'yyyy-mm-dd';
+
+function fill(cell: ExcelJS.Cell, hex: string): void {
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(hex) } };
+  cell.font = { bold: true, color: { argb: argb(textOn(hex)) } };
+}
+
+// A coloured, centred title bar above a block of tables (outside every table).
+function titleBar(ws: ExcelJS.Worksheet, text: string, hex: string): void {
   const row = ws.addRow([text]);
-  row.font = { bold: true, size: 14 };
-  if (spanCols > 1) ws.mergeCells(row.number, 1, row.number, spanCols);
+  ws.mergeCells(row.number, 1, row.number, WIDTH);
+  fill(row.getCell(1), hex);
+  row.getCell(1).font = { bold: true, size: 13, color: { argb: argb(textOn(hex)) } };
+  row.getCell(1).alignment = CENTER;
+  row.height = 22;
 }
 
-function section(ws: ExcelJS.Worksheet, text: string): void {
-  ws.addRow([text]).font = { bold: true };
+// A named Excel Table at the next free row, header filled with `hex`, every
+// cell centred. An empty dataset still gets one blank row: Excel rejects a
+// header-only table, and the table name must exist every shift so a Power BI
+// query never breaks.
+function addTable(
+  ws: ExcelJS.Worksheet, name: string, hex: string, columns: Column[], rows: Cell[][], blankRow: Cell[],
+  rowFill?: (rowIndex: number) => string,
+): void {
+  const top = ws.lastRow ? ws.lastRow.number + 1 : 1;
+  const data = rows.length > 0 ? rows : [blankRow];
+  ws.addTable({
+    name,
+    ref: `A${top}`,
+    headerRow: true,
+    style: { theme: 'TableStyleLight1', showRowStripes: true },
+    columns: columns.map((c) => ({ name: c.name, filterButton: false })),
+    rows: data,
+  });
+  const header = ws.getRow(top);
+  header.height = 20;
+  columns.forEach((c, i) => {
+    fill(header.getCell(i + 1), hex);
+    header.getCell(i + 1).alignment = CENTER;
+    for (let r = 1; r <= data.length; r += 1) {
+      const cell = ws.getRow(top + r).getCell(i + 1);
+      cell.alignment = CENTER;
+      if (c.numFmt) cell.numFmt = c.numFmt;
+      if (rowFill && rows.length > 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(rowFill(r - 1)) } };
+      }
+    }
+  });
+  ws.addRow([]);
 }
 
-function header(ws: ExcelJS.Worksheet, cells: Cell[]): void {
-  ws.addRow(cells).font = { bold: true };
-}
-
-function finishSheet(ws: ExcelJS.Worksheet, widths: number[]): void {
-  ws.columns = widths.map((width) => ({ width }));
-  ws.eachRow((row) => row.eachCell((cell) => {
-    cell.alignment = CENTER;
-  }));
-}
+// Shift info straight under the title, spanning A:M like the tables: label
+// merged over A:G (right-aligned), value over H:M (left-aligned), so each pair
+// meets near the sheet's centre line. Title + info share one outside border.
+const META_LABEL: [number, number] = [1, 7];
+const META_VALUE: [number, number] = [8, WIDTH];
+const BOX_EDGE = { style: 'thin' as const, color: { argb: argb(TOYOTA_RED) } };
 
 function addMeta(ws: ExcelJS.Worksheet, state: ProductionState): void {
-  const pic = findPic(state.pic);
-  ws.addRow(['Tanggal', state.date || '—']);
-  ws.addRow(['Shift', state.shift]);
-  if (state.shiftTime === 'day' || state.shiftTime === 'night') {
-    ws.addRow(['Jam Shift', state.shiftTime === 'day' ? 'Day (07:00–19:00)' : 'Night (20:00–08:00)']);
-  }
-  ws.addRow(['Operator', state.operator || '—']);
-  ws.addRow(['PIC', pic?.name ?? state.pic ?? '—']);
-}
-
-function sortedEntries(map: Record<string, number> | undefined): [string, number][] {
-  return Object.entries(map ?? {}).sort((a, b) => b[1] - a[1]);
-}
-
-// Defect/repair per line read from the line-tagged entry logs (same source
-// the dashboard's per-product views use) — the stored defectData buckets are
-// per group (BC vs Shaft), so they can't be split per line.
-function bucketFromLogs(logs: EntryLog[], line: ProductLine, kind: 'defect' | 'repair'): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const log of logs) {
-    if (log.line === line && log.kind === kind) out[log.type] = (out[log.type] ?? 0) + log.qty;
-  }
-  return out;
-}
-
-function addCountTable(ws: ExcelJS.Worksheet, title: string, map: Record<string, number> | undefined, labelCol: string): void {
-  const entries = sortedEntries(map);
-  section(ws, title);
-  header(ws, [labelCol, 'Jumlah']);
-  if (entries.length === 0) {
-    ws.addRow(['(Belum ada data)', '']);
-  } else {
-    for (const [name, count] of entries) ws.addRow([name, count]);
-  }
-}
-
-function addHourlyTable(
-  ws: ExcelJS.Worksheet, hourly: Record<string, HourlySnapshot> | undefined, targetByHour?: Record<string, number>,
-): void {
-  const keys = sortHourKeys(Object.keys(hourly ?? {}));
-  const withTarget = targetByHour !== undefined;
-  section(ws, 'Hourly');
-  header(ws, withTarget ? ['Jam', 'OK', 'Repair', 'NG', 'Total', 'Target'] : ['Jam', 'OK', 'Repair', 'NG', 'Total']);
-  if (keys.length === 0) {
-    ws.addRow(withTarget ? ['(Belum ada data)', '', '', '', '', ''] : ['(Belum ada data)', '', '', '', '']);
-  } else {
-    for (const hour of keys) {
-      const snap = (hourly ?? {})[hour];
-      const row: Cell[] = [hour, snap.ok, snap.repair, snap.ng, snap.ok + snap.repair + snap.ng];
-      if (withTarget) row.push(targetByHour?.[hour] ?? '');
-      ws.addRow(row);
-    }
-  }
-}
-
-interface LineConfig {
-  line: ProductLine;
-  target?: number;
-  hourly?: Record<string, HourlySnapshot>;
-  hourlyTarget?: Record<string, number>;
-}
-
-function productSheet(workbook: ExcelJS.Workbook, state: ProductionState, config: LineConfig): void {
-  const { line, target, hourly, hourlyTarget } = config;
-  const label = PRODUCT_LINE_LABELS[line];
-  const ok = getOkTotal(state, line);
-  const repair = getRepairTotal(state, line);
-  const ng = getNgTotal(state, line);
-  const total = getGrandTotal(state, line);
-  const rates = getRates(state, line);
-
-  const ws = workbook.addWorksheet(label);
-  headline(ws, `Laporan Shift — ${label}`, 7);
-  ws.addRow([]);
-  addMeta(ws, state);
-  ws.addRow([]);
-  section(ws, 'Produksi');
-  header(ws, ['OK', 'Repair', 'NG', 'Total', 'OK%', 'Repair%', 'NG%']);
-  ws.addRow([ok, repair, ng, total, `${rates.okRate}%`, `${rates.repairRate}%`, `${rates.ngRate}%`]);
-  if (target !== undefined && target > 0) {
-    header(ws, ['Target', 'Tercapai', 'Achievement']);
-    ws.addRow([target, total, `${getAchievementPercent(state, target, line)}%`]);
-  }
-  ws.addRow([]);
-  addCountTable(ws, 'Defect (NG)', bucketFromLogs(state.entryLogs, line, 'defect'), 'Jenis Defect');
-  ws.addRow([]);
-  addCountTable(ws, 'Repair', bucketFromLogs(state.entryLogs, line, 'repair'), 'Jenis Repair');
-  ws.addRow([]);
-  addHourlyTable(ws, hourly, hourlyTarget);
-  finishSheet(ws, [22, 18, 14, 14, 14, 14, 14]);
-}
-
-function summarySheet(workbook: ExcelJS.Workbook, state: ProductionState): void {
-  const groups: { label: string; scope: 1 | 2 | 3 | 4 | 'bc' | undefined; target: number }[] = [
-    { label: 'BC 1TR + BC 2TR', scope: 'bc', target: state.targetBc ?? 0 },
-    { label: 'Camshaft', scope: 3, target: state.targetCam ?? 0 },
-    { label: 'Crankshaft', scope: 4, target: state.targetCrank ?? 0 },
+  const meta: [string, Cell][] = [
+    ['Tanggal', dateCell(state.date) ?? '—'],
+    ['Shift', state.shift],
+    ...(state.shiftTime === 'day' || state.shiftTime === 'night'
+      ? [['Jam Shift', state.shiftTime === 'day' ? 'Day (07:00–19:00)' : 'Night (20:00–08:00)'] as [string, Cell]]
+      : []),
+    ['Operator', state.operator || '—'],
+    ['PIC', picName(state) ?? '—'],
   ];
-  const ws = workbook.addWorksheet('Ringkasan');
-  headline(ws, 'Ringkasan Shift', 8);
+  const [labelFrom, labelTo] = META_LABEL;
+  const [valueFrom, valueTo] = META_VALUE;
+  meta.forEach(([label, value], i) => {
+    const row = ws.addRow([]);
+    row.height = 18;
+    row.getCell(labelFrom).value = label;
+    row.getCell(valueFrom).value = value;
+    ws.mergeCells(row.number, labelFrom, row.number, labelTo);
+    ws.mergeCells(row.number, valueFrom, row.number, valueTo);
+    // Styles go on each merged range's master cell (ExcelJS shares it across the range).
+    const rowEdges = i === meta.length - 1 ? { bottom: BOX_EDGE } : {};
+    for (const [col, side] of [[labelFrom, { left: BOX_EDGE }], [valueFrom, { right: BOX_EDGE }]] as const) {
+      const cell = row.getCell(col);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(META_BG) } };
+      cell.border = { ...rowEdges, ...side };
+    }
+    row.getCell(labelFrom).alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+    row.getCell(labelFrom).font = { bold: true };
+    row.getCell(valueFrom).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    if (value instanceof Date) row.getCell(valueFrom).numFmt = DATE;
+  });
   ws.addRow([]);
-  addMeta(ws, state);
-  ws.addRow(['Target Total', state.target]);
-  ws.addRow([]);
-  section(ws, 'Produksi per Produk');
-  header(ws, ['Produk', 'Target', 'OK', 'Repair', 'NG', 'Total', 'OK%', 'Achievement%']);
-  for (const group of groups) {
-    const ok = getOkTotal(state, group.scope);
-    const repair = getRepairTotal(state, group.scope);
-    const ng = getNgTotal(state, group.scope);
-    const total = getGrandTotal(state, group.scope);
-    const rates = getRates(state, group.scope);
-    ws.addRow([
-      group.label,
-      group.target > 0 ? group.target : '—',
-      ok, repair, ng, total,
-      `${rates.okRate}%`,
-      group.target > 0 ? `${getAchievementPercent(state, group.target, group.scope)}%` : '—',
-    ]);
-  }
-  const rates = getRates(state);
-  ws.addRow([
-    'TOTAL', state.target,
-    getOkTotal(state), getRepairTotal(state), getNgTotal(state), getGrandTotal(state),
-    `${rates.okRate}%`,
-    state.target > 0 ? `${getAchievementPercent(state, state.target)}%` : '—',
+}
+
+const SUMMARY_COLUMNS: Column[] = [
+  { name: 'Tanggal', numFmt: DATE }, { name: 'Shift' }, { name: 'Jam Shift' }, { name: 'Produk' }, { name: 'Target' },
+  { name: 'OK' }, { name: 'Repair' }, { name: 'NG' }, { name: 'Total' },
+  { name: 'OK %', numFmt: PCT }, { name: 'Repair %', numFmt: PCT }, { name: 'NG %', numFmt: PCT },
+  { name: 'Achievement %', numFmt: PCT },
+];
+
+function countsRow(state: ProductionState, label: string, scope: RateScope, target: number | null): Cell[] {
+  const ok = getOkTotal(state, scope);
+  const repair = getRepairTotal(state, scope);
+  const ng = getNgTotal(state, scope);
+  const total = getGrandTotal(state, scope);
+  return [
+    dateCell(state.date), state.shift, jamShift(state), label, target, ok, repair, ng, total,
+    rate(ok, total), rate(repair, total), rate(ng, total), target ? rate(total, target) : null,
+  ];
+}
+
+// Targets are set per group (BC 1TR + 2TR share one), so the summary is per group.
+function summaryTable(ws: ExcelJS.Worksheet, state: ProductionState): void {
+  titleBar(ws, 'Ringkasan per Produk', TOYOTA_RED);
+  addTable(ws, 'Ringkasan', TOYOTA_RED, SUMMARY_COLUMNS, [
+    countsRow(state, 'BC 1TR + BC 2TR', 'bc', state.targetBc || null),
+    countsRow(state, 'Camshaft', 3, state.targetCam || null),
+    countsRow(state, 'Crankshaft', 4, state.targetCrank || null),
+  ], []);
+}
+
+// One row per logged NG/Repair entry — the full detail. Per-type totals are a
+// simple Sum of Qty by Jenis in Power BI, so no separate tally table.
+const ENTRY_COLUMNS: Column[] = [
+  { name: 'Tanggal', numFmt: DATE }, { name: 'Shift' }, { name: 'Produk' },
+  { name: 'Kategori' }, { name: 'Jenis' }, { name: 'Qty' }, { name: 'Lot' }, { name: 'Flask / Cavity' },
+  { name: 'No. Die' }, { name: 'Die Mould' }, { name: 'Crank Case No.' }, { name: 'Slub/Wj No.' },
+  { name: 'Front/Rear No.' },
+];
+
+function kindLabel(kind: EntryLog['kind']): string {
+  return kind === 'defect' ? 'NG' : 'Repair';
+}
+
+// Light tint of each product's identity colour, for Entry Log row backgrounds.
+const PRODUCT_TINT: Record<ProductLine, string> = { 1: 'FEE2E2', 2: 'DBEAFE', 3: 'FEF9C3', 4: 'DCFCE7' };
+
+// Product first, then NG before Repair; input order kept within each group.
+// Legacy logs without a line are BC 1TR.
+function sortedLogs(logs: EntryLog[]): EntryLog[] {
+  return logs
+    .map((log, i) => ({ log, i }))
+    .sort((a, b) => (a.log.line ?? 1) - (b.log.line ?? 1)
+      || (a.log.kind === b.log.kind ? 0 : a.log.kind === 'defect' ? -1 : 1)
+      || a.i - b.i)
+    .map(({ log }) => log);
+}
+
+function entryRow(state: ProductionState, log: EntryLog): Cell[] {
+  const od = log.overDimensi;
+  return [
+    dateCell(state.date), state.shift, PRODUCT_LINE_LABELS[log.line ?? 1], kindLabel(log.kind), log.type, log.qty,
+    log.lot, log.flask, log.die ?? null, od?.dieMould ?? null,
+    od?.crankCaseNo ?? null, od?.slubWjNo ?? null, od?.position ?? null,
+  ];
+}
+
+function entryRows(state: ProductionState, line: ProductLine): Cell[][] {
+  return sortedLogs(state.entryLogs.filter((log) => (log.line ?? 1) === line)).map((log) => entryRow(state, log));
+}
+
+// Every product's entries in one table, rows tinted by product. Same rows as
+// the per-product EntryLog_* tables — use one or the other in Power BI, never
+// append both or NG/Repair counts double.
+function allEntriesTable(ws: ExcelJS.Worksheet, state: ProductionState): void {
+  const logs = sortedLogs(state.entryLogs);
+  titleBar(ws, 'Entry Log — Semua Produk', TOYOTA_RED);
+  addTable(ws, 'EntryLog_Semua', TOYOTA_RED, ENTRY_COLUMNS, logs.map((log) => entryRow(state, log)),
+    [dateCell(state.date), state.shift, ...Array(WIDTH - 2).fill(null)],
+    (i) => PRODUCT_TINT[logs[i].line ?? 1]);
+}
+
+function productBlock(ws: ExcelJS.Worksheet, state: ProductionState, line: ProductLine): void {
+  const label = PRODUCT_LINE_LABELS[line];
+  const key = tableKey(line);
+  const color = PRODUCT_LINE_COLOR[line];
+  const target = line === 3 ? state.targetCam || null : line === 4 ? state.targetCrank || null : null;
+
+  titleBar(ws, label, color);
+  addTable(ws, `Produksi_${key}`, color, SUMMARY_COLUMNS, [countsRow(state, label, line, target)], []);
+  addTable(ws, `EntryLog_${key}`, color, ENTRY_COLUMNS, entryRows(state, line),
+    [dateCell(state.date), state.shift, label, ...Array(WIDTH - 3).fill(null)], () => PRODUCT_TINT[line]);
+}
+
+const CATEGORY_LABEL: Record<string, string> = { AV: 'Availability', PE: 'Performance', RQ: 'Quality' };
+
+const LINE_STOP_COLUMNS: Column[] = [
+  { name: 'Tanggal', numFmt: DATE }, { name: 'Shift' }, { name: 'Jam Shift' }, { name: 'Operator' }, { name: 'PIC' },
+  { name: 'Jam' }, { name: 'Mulai' }, { name: 'Selesai' }, { name: 'Kode' }, { name: 'Kategori' },
+  { name: 'Durasi (menit)' }, { name: 'Item Problem' }, { name: 'Countermeasure' },
+];
+
+// The hour bucket a stop starts in ("07:10" -> "07:00"), matching the Hourly keys.
+function startHour(start: string): string | null {
+  const minutes = toMinutes(start);
+  return minutes === null ? null : `${String(Math.floor(minutes / 60)).padStart(2, '0')}:00`;
+}
+
+function lineStopTable(ws: ExcelJS.Worksheet, state: ProductionState): void {
+  const prefix: Cell[] = [dateCell(state.date), state.shift, jamShift(state), state.operator || null, picName(state)];
+  const rows: Cell[][] = (state.lineStops ?? []).map((stop) => [
+    ...prefix, startHour(stop.start), stop.start, stop.end, stop.category, CATEGORY_LABEL[stop.category] ?? stop.category,
+    lineStopMinutes(stop.start, stop.end), stop.problem, stop.countermeasure || null,
   ]);
-  finishSheet(ws, [22, 14, 12, 12, 12, 12, 12, 14]);
-}
-
-const CATEGORY_LABEL: Record<string, string> = { AV: 'AV (Availability)', PE: 'PE (Performance)', RQ: 'RQ (Quality)' };
-
-function lineStopSheet(workbook: ExcelJS.Workbook, state: ProductionState): void {
-  const stops = state.lineStops ?? [];
-  const ws = workbook.addWorksheet('Line Stop');
-  headline(ws, 'Line Stop', 5);
-  ws.addRow([]);
-  addMeta(ws, state);
-  ws.addRow([]);
-  section(ws, 'Daftar Line Stop');
-  header(ws, ['Mulai', 'Selesai', 'Kategori', 'Item Problem', 'Countermeasure']);
-  if (stops.length === 0) {
-    ws.addRow(['(Belum ada data)', '', '', '', '']);
-  } else {
-    for (const stop of stops) {
-      ws.addRow([stop.start, stop.end, CATEGORY_LABEL[stop.category] ?? stop.category, stop.problem, stop.countermeasure || '—']);
-    }
-  }
-  finishSheet(ws, [12, 12, 20, 36, 36]);
-}
-
-function entryLogSheet(workbook: ExcelJS.Workbook, state: ProductionState): void {
-  const ws = workbook.addWorksheet('Entry Log');
-  headline(ws, 'Entry Log (Lot / Flask)', 7);
-  ws.addRow([]);
-  addMeta(ws, state);
-  ws.addRow([]);
-  section(ws, 'Daftar Entry');
-  header(ws, ['Jenis', 'Produk', 'Tipe', 'Qty', 'Lot', 'Flask / Cavity', 'No. Die']);
-  if (state.entryLogs.length === 0) {
-    ws.addRow(['(Belum ada data)', '', '', '', '', '', '']);
-  } else {
-    for (const log of state.entryLogs) {
-      ws.addRow([
-        log.kind === 'defect' ? 'Defect (NG)' : 'Repair',
-        log.line ? PRODUCT_LINE_LABELS[log.line] : (log.group === 'shaft' ? 'Shaft' : 'BC'),
-        log.type, log.qty, log.lot, log.flask, log.die ?? '—',
-      ]);
-    }
-  }
-  finishSheet(ws, [14, 14, 28, 8, 16, 16, 10]);
+  titleBar(ws, 'Line Stop', TOYOTA_RED);
+  addTable(ws, 'LineStop', TOYOTA_RED, LINE_STOP_COLUMNS, rows, [...prefix, ...Array(WIDTH - prefix.length).fill(null)]);
 }
 
 export function buildShiftWorkbook(state: ProductionState): ExcelJS.Workbook {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'QC Gate';
-  summarySheet(workbook, state);
-  const lines: LineConfig[] = [
-    { line: 1, hourly: state.hourlyDataBc1 },
-    { line: 2, hourly: state.hourlyDataBc2 },
-    { line: 3, target: state.targetCam, hourly: state.hourlyDataCam, hourlyTarget: state.hourlyTargetCam },
-    { line: 4, target: state.targetCrank, hourly: state.hourlyDataCrank, hourlyTarget: state.hourlyTargetCrank },
-  ];
-  for (const config of lines) productSheet(workbook, state, config);
-  lineStopSheet(workbook, state);
-  entryLogSheet(workbook, state);
+  const ws = workbook.addWorksheet(SHEET_NAME, { views: [{ showGridLines: false }] });
+
+  titleBar(ws, 'Laporan Shift — QC Gate Production', TOYOTA_RED);
+  ws.getRow(1).getCell(1).font = { bold: true, size: 16, color: { argb: argb(WHITE) } };
+  ws.getRow(1).height = 28;
+  ws.getRow(1).getCell(1).border = { top: BOX_EDGE, left: BOX_EDGE, right: BOX_EDGE };
+  addMeta(ws, state);
+  summaryTable(ws, state);
+  for (const line of LINES) productBlock(ws, state, line);
+  allEntriesTable(ws, state);
+  lineStopTable(ws, state);
+
+  ws.columns = [12, 12, 13, 16, 24, 10, 14, 14, 10, 15, 15, 26, 26].map((width) => ({ width }));
   return workbook;
 }
 

@@ -183,3 +183,30 @@ describe('RepairModal flask boxes (Block Cylinder)', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 });
+
+describe('RepairModal editing an entry (initial)', () => {
+  it('prefills type, die, lot, flask and qty and saves them back unchanged', async () => {
+    const onSave = vi.fn();
+    render(
+      <RepairModal
+        isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} title="Edit Repair"
+        initial={{ type: 'Mejashi Bore 1', qty: 3, lot: 'L7', flask: 'F2', die: 2 }}
+      />,
+    );
+    expect(screen.getByText('Edit Repair')).toBeInTheDocument();
+    const dies = within(screen.getByRole('group', { name: 'Pilih No. Die' }));
+    expect(dies.getByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith('Mejashi Bore 1', 3, 'L7', 'F2', 2);
+  });
+
+  it('prefills a type typed via Other into the Repair Lainnya field', () => {
+    render(
+      <RepairModal
+        isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES}
+        initial={{ type: 'Gerinda ulang', qty: 1, lot: 'L1', flask: 'F1' }}
+      />,
+    );
+    expect(screen.getByLabelText('Repair Lainnya')).toHaveValue('Gerinda ulang');
+  });
+});

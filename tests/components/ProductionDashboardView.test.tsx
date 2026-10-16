@@ -212,3 +212,40 @@ describe('ProductionDashboardView hourly table', () => {
     expect(row).toBeInTheDocument();
   });
 });
+
+describe('ProductionDashboardView Over Dimensi Pareto', () => {
+  function renderView(view: 'bc' | 'all' | 'camshaft') {
+    render(
+      <ToastProvider>
+        <ProductionDashboardView state={state} view={view} onViewChange={() => {}} now={null} />
+      </ToastProvider>,
+    );
+  }
+
+  it('halves the Lot / Flask Log and puts the Over Dimensi Pareto beside it in the BC view', () => {
+    renderView('bc');
+    expect(screen.getByText('Lot / Flask Log').closest('section')!.className).toMatch(/spanHalf/);
+    expect(screen.getByText('Pareto Over Dimensi per Die').closest('section')!.className).toMatch(/spanHalf/);
+  });
+
+  it('shows the box in the All view too', () => {
+    renderView('all');
+    expect(screen.getByText('Pareto Over Dimensi per Die')).toBeInTheDocument();
+  });
+
+  it('keeps the shaft log full width with no Over Dimensi box', () => {
+    renderView('camshaft');
+    expect(screen.getByText('Lot / Cavity Log').closest('section')!.className).toMatch(/spanFull/);
+    expect(screen.queryByText('Pareto Over Dimensi per Die')).not.toBeInTheDocument();
+  });
+
+  it('toggles between NG and Repair', () => {
+    renderView('bc');
+    const ng = screen.getByRole('button', { name: 'NG' });
+    const repair = screen.getByRole('button', { name: 'Repair' });
+    expect(ng).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(repair);
+    expect(repair).toHaveAttribute('aria-pressed', 'true');
+    expect(ng).toHaveAttribute('aria-pressed', 'false');
+  });
+});

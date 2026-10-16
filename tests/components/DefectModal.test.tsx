@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DefectModal } from '@/components/production/DefectModal';
 import { DEFECT_TYPES } from '@/utils/constants';
@@ -137,5 +137,33 @@ describe('DefectModal flask boxes (Block Cylinder)', () => {
   it('does not wrap the boxes in a native <label> (would re-click the first box)', () => {
     render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} takenFlasks={taken} />);
     expect(screen.getByRole('button', { name: 'Flask 1' }).closest('label')).toBeNull();
+  });
+});
+
+describe('DefectModal editing an entry (initial)', () => {
+  it('prefills Over Dimensi detail and saves it back', async () => {
+    const onSave = vi.fn();
+    const od = { dieMould: 4 as const, crankCaseNo: '1', slubWjNo: '2', position: '3' };
+    render(
+      <DefectModal
+        isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES}
+        initial={{ type: 'Over Dimensi', qty: 1, lot: 'L1', flask: 'F1', overDimensi: od }}
+      />,
+    );
+    const dies = within(screen.getByRole('group', { name: 'Pilih No. Die Mould' }));
+    expect(dies.getByRole('button', { name: '4' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(onSave).toHaveBeenCalledWith('Over Dimensi', 1, 'L1', 'F1', od);
+  });
+
+  it('opens the Camshaft cavity picker on the logged TR KAI / die', () => {
+    render(
+      <DefectModal
+        isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} cavityPicker
+        initial={{ type: DEFECT_TYPES[0], qty: 1, lot: 'L1', flask: '2-6' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'TR KAI 2 - EX' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Cavity 2-6' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

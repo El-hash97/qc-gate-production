@@ -26,6 +26,7 @@ vi.mock('@/hooks/useProductionState', () => ({
   }),
 }));
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
+vi.mock('@/hooks/useAutoReset', () => ({ useAutoReset: () => {} }));
 vi.mock('@/lib/chartSetup', () => ({}));
 vi.mock('@/hooks/useDefectPhotos', () => ({
   useDefectPhotoFlags: () => ({ hasPhoto: () => false }),
@@ -253,4 +254,34 @@ describe('DashboardPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Camshaft' }));
     expect(screen.queryByRole('button', { name: /input manual ke jam/i })).not.toBeInTheDocument();
   });
+
+  describe('editing a Lot/Flask Log entry', () => {
+    it('hides the edit buttons when logged out', () => {
+      render(<ToastProvider><DashboardPage /></ToastProvider>);
+      expect(screen.queryByRole('button', { name: /^Edit Gas Hole Cope/ })).not.toBeInTheDocument();
+    });
+
+    it('opens the NG form prefilled and saves the corrected entry when logged in', async () => {
+      mockAuth.authed = true;
+      render(<ToastProvider><DashboardPage /></ToastProvider>);
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Gas Hole Cope Lot L1 / Flask F1' }));
+      expect(screen.getByText('Edit Defect (NG)')).toBeInTheDocument();
+      const lot = screen.getByLabelText('Nomor Lot');
+      expect(lot).toHaveValue('L1');
+      await userEvent.clear(lot);
+      await userEvent.type(lot, 'L9');
+      await userEvent.click(screen.getByRole('button', { name: 'Flask 2' }));
+      const qty = screen.getByRole('spinbutton');
+      await userEvent.clear(qty);
+      await userEvent.type(qty, '2');
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(updateStateMock).toHaveBeenCalledTimes(1);
+      const saved = updateStateMock.mock.calls[0][0];
+      expect(saved.entryLogs[0]).toEqual({ kind: 'defect', group: 'bc', line: 1, type: 'Gas Hole Cope', qty: 2, lot: 'L9', flask: '2' });
+      expect(saved.ng1).toBe(2);
+      expect(saved.defectData).toEqual({ 'Gas Hole Cope': 2 });
+      expect(screen.queryByText('Edit Defect (NG)')).not.toBeInTheDocument();
+    });
+  });
 });
+

@@ -2,6 +2,7 @@ import type { EntryLog, HourlySnapshot, ProductLine } from '@/lib/types';
 import type { OeeBreakdown } from '@/utils/oee';
 import { toPercent } from '@/utils/oee';
 import { sortHourKeys } from '@/utils/hourOrder';
+import { mergeTypeVariants } from '@/utils/typeName';
 
 // Minimum category slots a bar chart / heatmap axis is laid out over. With only
 // 1-2 real categories the chart would otherwise draw a couple of oversized bars;
@@ -72,8 +73,9 @@ export interface Pareto {
   cumulativePct: number[];
 }
 
+// Names differing only in case/spacing (typed via "Other") count as one bar.
 export function pareto(data: Record<string, number>): Pareto {
-  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const sorted = Object.entries(mergeTypeVariants(data)).sort((a, b) => b[1] - a[1]);
   const total = sorted.reduce((sum, [, n]) => sum + n, 0);
   const result: Pareto = { labels: [], counts: [], cumulativePct: [] };
   let running = 0;
@@ -235,4 +237,37 @@ export function lotDefectData(logs: EntryLog[]): LotDefectData {
       points: points.sort((p, q) => types.indexOf(p.x) - types.indexOf(q.x) || p.y - q.y),
     }));
   return { types, maxLot, series };
+}
+
+// --- Over Dimensi Pareto: pcs per Die Mould, for one entry kind (NG or Repair) ---
+// Only entries carrying Over Dimensi detail count; label is "Die N" so it reads
+// on the shared ParetoChart axis.
+export function overDimensiByDie(logs: EntryLog[], kind: EntryLog['kind']): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const log of logs) {
+    if (log.kind !== kind || !log.overDimensi) continue;
+    const key = `Die ${log.overDimensi.dieMould}`;
+    out[key] = (out[key] ?? 0) + log.qty;
+  }
+  return out;
+}
+
+// Tooltip detail for the Over Dimensi Pareto: per "Die N" label, the
+// CC · Slub/Wj · F/R combinations logged under it, most pcs first.
+export function overDimensiCombos(logs: EntryLog[], kind: EntryLog['kind']): Record<string, string[]> {
+  const byDie: Record<string, Record<string, number>> = {};
+  for (const log of logs) {
+    const od = log.overDimensi;
+    if (log.kind !== kind || !od) continue;
+    const combos = (byDie[`Die ${od.dieMould}`] ??= {});
+    const combo = `CC ${od.crankCaseNo} · Slub/Wj ${od.slubWjNo} · F/R ${od.position}`;
+    combos[combo] = (combos[combo] ?? 0) + log.qty;
+  }
+  const out: Record<string, string[]> = {};
+  for (const [die, combos] of Object.entries(byDie)) {
+    out[die] = Object.entries(combos)
+      .sort((a, b) => b[1] - a[1])
+      .map(([combo, qty]) => `${combo}: ${qty} pcs`);
+  }
+  return out;
 }

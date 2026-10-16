@@ -7,7 +7,8 @@ import { SEGMENTS, segmentSeconds, type StationId } from '@/utils/finishingFlow'
 import styles from './VisualPanels.module.css';
 
 // Glass panels floating over the 3D line. Every panel can be folded (–) or
-// hidden (×); the Panel menu brings them back and H hides/shows all of them.
+// hidden (×); the settings menu brings them back and H hides/shows all of them
+// (the 3D pins included).
 // The choice is a per-screen preference, kept in localStorage.
 export const PANELS = [
   { id: 'kpi', title: 'KPI' },
@@ -18,13 +19,15 @@ export const PANELS = [
   { id: 'hourly', title: 'Output per jam' },
   { id: 'health', title: 'Kesehatan line' },
   { id: 'alerts', title: 'Alert terbaru' },
+  // callouts on the 3D objects, drawn by FinishingLine3D
+  { id: 'pins', title: 'Pin 3D' },
 ] as const;
 type PanelId = (typeof PANELS)[number]['id'];
 type Mode = 'open' | 'folded' | 'hidden';
 
 const STORE = 'visualisasi.panels';
 
-function usePanelModes() {
+export function usePanelModes() {
   const [modes, setModes] = useState<Partial<Record<PanelId, Mode>>>({});
   const [allHidden, setAllHidden] = useState(false);
   useEffect(() => {
@@ -54,6 +57,7 @@ function usePanelModes() {
   const setAll = (m: Mode) => save(Object.fromEntries(PANELS.map((p) => [p.id, m])), false);
   return { mode, set, setAll, allHidden };
 }
+export type PanelModes = ReturnType<typeof usePanelModes>;
 
 function Panel({ id, title, mode, onMode, extra, children }: {
   id: PanelId; title: string; mode: Mode; onMode: (m: Mode) => void; extra?: ReactNode; children: ReactNode;
@@ -86,10 +90,11 @@ interface Props {
   busy: readonly boolean[];
   now: Date;
   onSelectStation: (id: StationId) => void;
+  panels: PanelModes;
 }
 
-export function VisualPanels({ data, running, busy, now, onSelectStation }: Props) {
-  const { mode, set, setAll, allHidden } = usePanelModes();
+export function VisualPanels({ data, running, busy, now, onSelectStation, panels }: Props) {
+  const { mode, set, setAll, allHidden } = panels;
   const [menu, setMenu] = useState(false);
   const [paretoTab, setParetoTab] = useState<'ng' | 'repair'>('ng');
   const p = (id: PanelId) => ({ id, title: PANELS.find((x) => x.id === id)!.title, mode: mode(id), onMode: (m: Mode) => set(id, m) });
@@ -101,8 +106,13 @@ export function VisualPanels({ data, running, busy, now, onSelectStation }: Prop
   return (
     <div className={styles.overlay}>
       <div className={styles.menuWrap}>
-        <button type="button" className={styles.menuButton} aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
-          Panel {allHidden ? '(tersembunyi)' : ''}
+        <button type="button" className={styles.menuButton} aria-expanded={menu} aria-label="Pengaturan panel"
+          title="Pengaturan panel" data-hidden={allHidden || undefined} onClick={() => setMenu((v) => !v)}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
         </button>
         {menu && (
           <div className={styles.menu} role="menu">

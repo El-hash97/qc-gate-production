@@ -1,0 +1,89 @@
+/* Pins live over the canvas, under the overlay panels, and never take clicks. */
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* origin = the anchor point on the object */
+.pin {
+  --tone: var(--accent-green);
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.pin[data-tone='warn'] { --tone: var(--accent-orange); }
+.pin[data-tone='bad'] { --tone: var(--accent-red); }
+.pin[data-tone='idle'] { --tone: var(--text-muted); }
+
+.dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 30%, transparent);
+}
+
+/* elbow: up from the dot, then right to the card */
+.stem {
+  position: absolute;
+  left: 0;
+  top: -44px;
+  width: 20px;
+  height: 39px;
+  border-left: 1.5px solid color-mix(in srgb, var(--text-primary) 70%, transparent);
+  border-top: 1.5px solid color-mix(in srgb, var(--text-primary) 70%, transparent);
+  border-top-left-radius: 6px;
+}
+
+.card {
+  position: absolute;
+  left: 20px;
+  top: -44px;
+  transform: translateY(-50%);
+  padding: 5px 10px 6px;
+  white-space: nowrap;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--bg-card) 55%, transparent),
+    color-mix(in srgb, var(--bg-card) 32%, transparent)
+  );
+  backdrop-filter: blur(6px) saturate(1.3);
+  -webkit-backdrop-filter: blur(6px) saturate(1.3);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-top-color: color-mix(in srgb, var(--text-primary) 28%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.value {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--tone);
+}
+
+.pin[data-tone='idle'] .value { color: var(--text-primary); }
+
+.sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+}

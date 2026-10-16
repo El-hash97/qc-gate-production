@@ -8,7 +8,7 @@ import { getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import { isRunning, type Counts, type StationId } from '@/utils/finishingFlow';
 import { stationDetail } from '@/utils/stationDetails';
 import { StationCard } from '@/station-kit/react/StationCard';
-import { VisualPanels } from '@/components/visual/VisualPanels';
+import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
 import { panelData } from '@/utils/visualPanels';
 import styles from './page.module.css';
 
@@ -23,6 +23,7 @@ export default function VisualisasiPage() {
   const [open, setOpen] = useState<StationId | null>(null);
   const detail = open ? stationDetail(open) : null;
   const [busy, setBusy] = useState<boolean[]>([]);
+  const panelModes = usePanelModes();
   const [focus, setFocus] = useState<{ id: StationId; n: number }>();
   // minute tick for the ETA, the current hour and OEE's elapsed minutes
   const [now, setNow] = useState(() => new Date());
@@ -46,8 +47,8 @@ export default function VisualisasiPage() {
     <div className={styles.page}>
       <div className={styles.stage}>
         <FinishingLine3D counts={counts} running={running} theme={theme} onSelectStation={setOpen}
-          onBusyChange={setBusy} focus={focus} />
-        {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} />}
+          onBusyChange={setBusy} focus={focus} pins={panelModes.mode('pins') !== 'hidden'} />
+        {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} />}
         {!running && <div className={styles.overlay}>Produksi belum berjalan</div>}
         {detail && <StationCard detail={detail} theme={theme} onClose={() => setOpen(null)} />}
       </div>

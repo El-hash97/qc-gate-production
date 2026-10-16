@@ -15,6 +15,7 @@ import { activeRange } from '@/utils/animRange';
 import { stationDetail } from '@/utils/stationDetails';
 import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
 import { createWorkflowBoards } from './workflowBoards';
+import { createPins } from './stationPins';
 import type { Theme } from '@/hooks/useTheme';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
@@ -89,6 +90,8 @@ interface Props {
   onBusyChange?: (busy: boolean[]) => void;
   // fly the camera to this station; a new `n` flies again to the same one
   focus?: { id: StationId; n: number };
+  // show the callout pins on the 3D objects
+  pins?: boolean;
 }
 
 // Count tag beside the OK / Repair / NG spots; redrawn only when the text changes.
@@ -262,7 +265,7 @@ function makeTruck(): THREE.Group {
   return g;
 }
 
-export default function FinishingLine3D({ counts, running, theme, onSelectStation, onBusyChange, focus }: Props) {
+export default function FinishingLine3D({ counts, running, theme, onSelectStation, onBusyChange, focus, pins = true }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const select = useRef(onSelectStation);
   select.current = onSelectStation;
@@ -270,8 +273,8 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
   busyChanged.current = onBusyChange;
   const flyTo = useRef<(id: StationId) => void>(() => {});
   // Read by the render loop, so a 3 s poll updates these without rebuilding the scene.
-  const live = useRef({ counts, running });
-  live.current = { counts, running };
+  const live = useRef({ counts, running, pins });
+  live.current = { counts, running, pins };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
   const [noWebGL, setNoWebGL] = useState(false);
 
@@ -473,6 +476,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     const ro = new ResizeObserver(resize);
     ro.observe(mount);
     resize();
+    const callouts = createPins(mount);
 
     let sim = createSim();
     let lastBusy = '';
@@ -554,6 +558,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       controls.target.z = THREE.MathUtils.clamp(controls.target.z, roomMin.z, roomMax.z);
       camera.position.clamp(roomMin, roomMax);
       renderer.render(scene, camera);
+      callouts.update(camera, sim, c, live.current.running, live.current.pins, ROOM.x0);
     };
     raf = requestAnimationFrame(frame);
 
@@ -577,6 +582,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       blockGeo.dispose();
       Object.values(blockMats).forEach((m) => m.dispose());
       renderer.dispose();
+      callouts.dispose();
       mount.removeChild(renderer.domElement);
     };
   }, []);

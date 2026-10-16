@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { VisualPanels } from '@/components/visual/VisualPanels';
+import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
 import type { PanelData } from '@/utils/visualPanels';
 
 const data: PanelData = {
@@ -9,13 +9,17 @@ const data: PanelData = {
   hourly: [{ hour: '07:00', produced: 10, plan: 72 }], currentHour: '07:00',
   topNg: [], topRepair: [{ label: 'Burry', count: 1 }], recent: [], lastStop: null,
 };
+type Props = Omit<Parameters<typeof VisualPanels>[0], 'panels'>;
+function Harness(props: Props) {
+  return <VisualPanels {...props} panels={usePanelModes()} />;
+}
 const panels = () => document.querySelectorAll('section[data-panel]').length;
 
 describe('VisualPanels', () => {
   beforeEach(() => localStorage.clear());
 
   it('shows every panel at first and hides / shows them all with H', () => {
-    render(<VisualPanels data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+    render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
     expect(panels()).toBe(7);
     expect(screen.getByLabelText('KPI')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'h' });
@@ -25,20 +29,20 @@ describe('VisualPanels', () => {
   });
 
   it('hides one panel and remembers it for this screen', () => {
-    const { unmount } = render(<VisualPanels data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+    const { unmount } = render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'Sembunyikan Pareto' }));
     expect(panels()).toBe(6);
     unmount();
-    render(<VisualPanels data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
+    render(<Harness data={data} running busy={[]} now={new Date()} onSelectStation={() => {}} />);
     expect(screen.queryByLabelText('Pareto')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /^Panel/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pengaturan panel' }));
     fireEvent.click(screen.getByRole('button', { name: 'Tampilkan semua' }));
     expect(panels()).toBe(7);
   });
 
   it('opens a station from its workflow row', () => {
     const picked: string[] = [];
-    render(<VisualPanels data={data} running busy={[false, true]} now={new Date()} onSelectStation={(id) => picked.push(id)} />);
+    render(<Harness data={data} running busy={[false, true]} now={new Date()} onSelectStation={(id) => picked.push(id)} />);
     fireEvent.click(screen.getByRole('button', { name: /HSB05/ }));
     expect(picked).toEqual(['hsb05']);
   });

@@ -3,6 +3,9 @@ import { getDisplaySettings, isDisplayKey, saveDisplaySettings } from '@/lib/dis
 
 // Polled by every screen showing the page, so it must never be cached.
 export const dynamic = 'force-dynamic';
+// The Neon driver talks over fetch(); Next caches fetch calls made from a
+// non-POST handler (the PUT's INSERT was answered from cache, never run).
+export const fetchCache = 'force-no-store';
 
 export async function GET(_request: NextRequest, { params }: { params: { key: string } }) {
   if (!isDisplayKey(params.key)) {

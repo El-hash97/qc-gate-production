@@ -3,7 +3,7 @@
 .overlay {
   --gap: 12px;
   --side: 210px;
-  --top: 76px;
+  --top: 96px;
   --bottom-h: 132px;
   position: absolute;
   inset: 0;
@@ -139,7 +139,11 @@
   min-height: 0;
   overflow: auto;
   padding: 0 10px 8px;
+  /* still scrolls (wheel / touch), just without a visible bar */
+  scrollbar-width: none;
 }
+
+.body::-webkit-scrollbar { display: none; }
 
 .big {
   font-size: 20px;

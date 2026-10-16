@@ -27,7 +27,7 @@ export const WORKFLOW_CARDS: readonly WorkflowCard[] = [
   { id: 'qc1', title: 'QC Gate 1', next: 'QC Gate 2',
     desc: 'Visual check of the outside faces against the limit samples for cracks and porosity.' },
   { id: 'qc2', title: 'QC Gate 2', next: 'Spray / Repair / NG',
-    desc: 'Final judgement: OK goes on to Spray Booth, Repair to Line Repair, NG to the red box.' },
+    desc: 'Final judgement: OK goes on to Spray Booth, Repair to Line Repair, NG to the red NG pallet.' },
   { id: 'spray', title: 'Spray Booth', next: 'Junbiki',
     desc: 'Rust-preventive oil is sprayed over the OK block before it leaves the line.' },
   { id: 'junbiki', title: 'Junbiki', next: 'Truck',

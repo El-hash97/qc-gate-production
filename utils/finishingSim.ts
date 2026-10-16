@@ -8,7 +8,7 @@
 // the next one is free, and Baritori only releases a block when it is empty.
 import {
   ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BACK, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_OUT,
-  FORKLIFT_SPEED, JUNBIKI_SEGMENT, NG_LINGER_S, QC2_SEGMENT, REPAIR_STUB, REPAIR_TIME_S, SEGMENTS,
+  FORKLIFT_SPEED, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT, REPAIR_STUB, REPAIR_TIME_S, SEGMENTS,
   TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
   pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
   type Counts, type Leg, type Outcome, type Quat, type Vec2,
@@ -49,6 +49,8 @@ export interface Sim {
     timer: number; load: number[]; forkY: number;
   };
   truck: { state: 'docked' | 'leaving' | 'returning'; offset: number; load: number };
+  // NG blocks put on the pallet so far (picks the next pallet spot)
+  ngPile: number;
 }
 
 // Block centre height on the conveyors (Blender block z ≈ 6.2 above a -5.6 floor).
@@ -84,6 +86,7 @@ export function createSim(): Sim {
       timer: 0, load: [], forkY: FORK_STUB_Y,
     },
     truck: { state: 'docked', offset: 0, load: 0 },
+    ngPile: 0,
   };
 }
 
@@ -265,15 +268,14 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
       break;
     case 'ng':
       if (travel(b, dt)) {
+        // onto the next spot of the NG pallet; a full pallet drops its oldest
         b.phase = 'binned';
-        b.timer = NG_LINGER_S;
+        b.slot = sim.ngPile++ % NG_PALLET_CAPACITY;
+        sim.blocks = sim.blocks.filter((o) => o === b || o.phase !== 'binned' || o.slot !== b.slot);
       }
       break;
     case 'toPallet':
       if (travel(b, dt)) b.phase = 'atPallet';
-      break;
-    case 'binned':
-      b.timer -= dt;
       break;
     default:
       break;
@@ -313,7 +315,14 @@ function layout(sim: Sim): void {
         TRUCK_DOCK[1] - 0.45 + Math.floor(b.slot / 5) * 0.9,
       ];
     } else if (b.phase === 'binned') {
-      b.pos = [ngX + ((b.id % 3) - 1) * 0.35, 0.8 + HALF, ngZ];
+      // 2 x 2 per layer on the pallet, square to it
+      const i = b.slot % 4;
+      b.pos = [
+        ngX + (i % 2 ? 0.25 : -0.25),
+        NG_PALLET_TOP + HALF + BLOCK * Math.floor(b.slot / 4),
+        ngZ + (i < 2 ? -0.2 : 0.2),
+      ];
+      b.quat = [0, 0, 0, 1];
     }
   }
 }
@@ -323,7 +332,6 @@ export function step(sim: Sim, dt: number, counts: Counts, rand: () => number = 
   stepTruck(sim, dt);
   stepForklift(sim, dt, counts, rand);
   for (const b of sim.blocks) stepBlock(sim, b, dt, counts, rand);
-  sim.blocks = sim.blocks.filter((b) => !(b.phase === 'binned' && b.timer <= 0));
   layout(sim);
 }
 

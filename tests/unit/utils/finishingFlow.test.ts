@@ -30,7 +30,7 @@ describe('finishing line layout', () => {
     expect(Math.hypot(...trackAt(733).quat)).toBeCloseTo(1, 5);
   });
 
-  it('routes NG from QC Gate 2 to the red box', () => {
+  it('routes NG from QC Gate 2 to the NG pallet', () => {
     expect(routePoints('ng')).toEqual([stationPos('qc2'), stationPos('ngBox')]);
   });
 });

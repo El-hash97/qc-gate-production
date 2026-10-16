@@ -24,8 +24,6 @@ export interface Station {
   pos: Vec2;
   // Height of the floating name tag.
   labelY: number;
-  // Drawn as a simple prop only where the Blender layout has no model.
-  prop?: { size: readonly [number, number, number]; color: number };
 }
 
 // GLB placement: Blender units are 10 cm, its floor sits at z = -5.6.
@@ -49,7 +47,8 @@ export const STATIONS: readonly Station[] = [
   { id: 'qc2', label: 'QC Gate 2', pos: b(6.5, -263), labelY: 2.6 },
   { id: 'spray', label: 'Spray Booth', pos: b(-5, -295), labelY: 3.8 },
   { id: 'junbiki', label: 'Junbiki', pos: b(-89, -295), labelY: 3.2 },
-  { id: 'ngBox', label: 'Red Box (NG)', pos: b(24, -283), labelY: 2, prop: { size: [1.2, 0.8, 1.2], color: 0xb91c1c } },
+  // red plastic pallet the NG blocks are stacked on (the renderer draws it)
+  { id: 'ngBox', label: 'NG Pallet', pos: b(24, -283), labelY: 2 },
   // repair benches in the fenced area across the factory road
   { id: 'lineRepair', label: 'Line Repair', pos: b(164, -391), labelY: 2.6 },
 ];
@@ -144,7 +143,10 @@ export const BLOCK_SIZE = [0.475, 0.336, 0.371] as const;
 export const BLOCK_SPEED = 1.2;
 export const FORKLIFT_SPEED = 2;
 export const REPAIR_TIME_S = 4;
-export const NG_LINGER_S = 3;
+// NG pallet: deck height, and how many blocks it shows (2 x 2 a layer, 3 layers);
+// past that the oldest block makes room for the newest.
+export const NG_PALLET_TOP = 0.15;
+export const NG_PALLET_CAPACITY = 12;
 export const TRUCK_SPEED = 10;
 export const TRUCK_AWAY_OFFSET = -40;
 export const TRUCK_CAPACITY = 10;

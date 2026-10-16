@@ -3,7 +3,7 @@ import {
   FORK_BENCH_Y, FORK_CARRY_Y, FORK_STUB_Y, RETURN_S, createSim, step, stepReturn, type Sim,
 } from '@/utils/finishingSim';
 import {
-  ANIM_FPS, FORKLIFT_HOME, JUNBIKI_SEGMENT, QC2_SEGMENT, REPAIR_DROP, SEGMENTS, TRUCK_CAPACITY,
+  ANIM_FPS, FORKLIFT_HOME, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT, REPAIR_DROP, SEGMENTS, TRUCK_CAPACITY,
   segmentSeconds, trackAt, type Counts,
 } from '@/utils/finishingFlow';
 
@@ -52,15 +52,22 @@ describe('finishing simulation', () => {
     }
   });
 
-  it('sends NG from QC Gate 2 to the red box, piles it, then removes it', () => {
+  it('sends NG from QC Gate 2 to the NG pallet and stacks it there, square and in its own spot', () => {
     const sim = createSim();
-    let binned = 0;
-    run(sim, MAIN_S + 10, { ok: 0, repair: 0, ng: 1 }, () => 0, (s) => {
-      binned = Math.max(binned, s.blocks.filter((b) => b.phase === 'binned').length);
+    let most = 0;
+    run(sim, MAIN_S + 400, { ok: 0, repair: 0, ng: 1 }, () => 0, (s) => {
+      most = Math.max(most, s.blocks.filter((b) => b.phase === 'binned').length);
     });
-    expect(binned).toBeGreaterThan(0);
-    run(sim, 20, { ok: 0, repair: 0, ng: 1 }, () => 0);
-    expect(sim.blocks.every((b) => b.color !== 'ng' || b.phase !== 'binned' || b.timer > 0)).toBe(true);
+    const onPallet = sim.blocks.filter((b) => b.phase === 'binned');
+    expect(onPallet.length).toBeGreaterThan(1);
+    // full pallet: the oldest makes room, never more than it holds
+    expect(most).toBeLessThanOrEqual(NG_PALLET_CAPACITY);
+    const spots = new Set(onPallet.map((b) => b.pos.join()));
+    expect(spots.size).toBe(onPallet.length);
+    for (const b of onPallet) {
+      expect(b.pos[1]).toBeGreaterThan(NG_PALLET_TOP);
+      expect(b.quat).toEqual([0, 0, 0, 1]);
+    }
   });
 
   it('takes a repair block by forklift to Line Repair and back, then onto the truck', () => {

@@ -15,7 +15,7 @@ export const PINS = [
   { id: 'spray', title: 'Spray Booth' },
   { id: 'junbiki', title: 'Junbiki' },
   { id: 'lineRepair', title: 'Line Repair' },
-  { id: 'ngBox', title: 'Red Box (NG)' },
+  { id: 'ngBox', title: 'NG Pallet' },
   { id: 'forklift', title: 'Forklift' },
   { id: 'truck', title: 'Truck' },
 ] as const;
@@ -27,7 +27,7 @@ export interface Readout { label: string; value: string; sub: string; tone: Tone
 // Height of each station pin's dot above the floor (on the machine, under its name tag).
 export const PIN_Y: Partial<Record<StationId, number>> = {
   baritori: 1.6, hsb05: 2.2, hsb06: 2.2, grinding: 1.8, hanten: 1.5, final: 1.5,
-  qc1: 1.4, qc2: 1.6, spray: 2.2, junbiki: 2, lineRepair: 1.2, ngBox: 0.9,
+  qc1: 1.4, qc2: 1.6, spray: 2.2, junbiki: 2, lineRepair: 1.2, ngBox: 0.6,
 };
 
 // Station → its segment on the Blender timeline (Hanten..QC Gate 1 share one).
@@ -81,7 +81,7 @@ export function pinReadouts(sim: Sim, counts: Counts, running: boolean): Record<
   out.spray = { label: 'Spray Booth', value: status(5), sub: `${counts.ok} OK blocks oiled`, tone: tone(5) };
   out.junbiki = { label: 'Junbiki OK', value: `${counts.ok}`, sub: `${pct(counts.ok).toFixed(1)}% of total`, tone: 'ok' };
   out.lineRepair = { label: 'Line Repair', value: `${counts.repair}`, sub: `${pct(counts.repair).toFixed(1)}% repair`, tone: counts.repair ? 'warn' : 'idle' };
-  out.ngBox = { label: 'Red Box NG', value: `${counts.ng}`, sub: `${ngPct.toFixed(1)}% NG`, tone: ngPct > NG_ALARM_PCT ? 'bad' : 'idle' };
+  out.ngBox = { label: 'NG Pallet', value: `${counts.ng}`, sub: `${ngPct.toFixed(1)}% NG`, tone: ngPct > NG_ALARM_PCT ? 'bad' : 'idle' };
   out.forklift = {
     label: 'Forklift repair',
     value: sim.forklift.load.length ? `${sim.forklift.load.length} block${sim.forklift.load.length > 1 ? 's' : ''}` : 'Empty',

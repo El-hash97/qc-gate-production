@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
-  BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
   ANIM_FPS, SEGMENTS, type Counts, type StationId,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
@@ -168,6 +168,27 @@ function makeForklift(): { group: THREE.Group; carriage: THREE.Group; wheels: TH
 
 // Box truck, cab facing -x, open rear doors facing +x. Local origin = centre of
 // the cargo floor footprint at ground level; cargo floor sits at TRUCK_BED_Y.
+// Red plastic pallet (1.2 x 1.0 m) the NG blocks are stacked on: slatted deck
+// on nine feet and three runners, deck top at NG_PALLET_TOP.
+function makePallet(): THREE.Group {
+  const g = new THREE.Group();
+  const red = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.8 });
+  const box = (size: [number, number, number], pos: [number, number, number], m: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), m);
+    mesh.position.set(...pos);
+    g.add(mesh);
+  };
+  const top = NG_PALLET_TOP;
+  // three runners on the floor, nine feet, five deck slats with gaps
+  for (const z of [-0.45, 0, 0.45]) box([1.2, 0.03, 0.1], [0, 0.015, z], dark);
+  for (const x of [-0.53, 0, 0.53]) {
+    for (const z of [-0.43, 0, 0.43]) box([0.14, top - 0.06, 0.14], [x, 0.03 + (top - 0.06) / 2, z], red);
+  }
+  for (let i = 0; i < 5; i++) box([1.2, 0.03, 0.16], [0, top - 0.015, -0.42 + i * 0.21], red);
+  return g;
+}
+
 function makeTruck(): THREE.Group {
   const g = new THREE.Group();
   const mat = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
@@ -341,14 +362,10 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       }
     });
 
-    for (const s of STATIONS) {
-      if (s.prop) {
-        const [w, h, d] = s.prop.size;
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: s.prop.color }));
-        mesh.position.set(s.pos[0], h / 2, s.pos[1]);
-        scene.add(mesh);
-      }
-    }
+    const ngPallet = makePallet();
+    const ngSpot = STATIONS.find((st) => st.id === 'ngBox')!.pos;
+    ngPallet.position.set(ngSpot[0], 0, ngSpot[1]);
+    scene.add(ngPallet);
     // Station name tags (glass, like the pins); one with a detail card opens it.
     const nameTags = createTags(mount, STATIONS, (id) => stationDetail(id) !== null, (id) => select.current?.(id));
 

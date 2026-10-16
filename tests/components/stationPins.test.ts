@@ -4,7 +4,7 @@ import { WORKFLOW_CARDS } from '@/utils/workflowCards';
 import { createSim } from '@/utils/finishingSim';
 
 describe('pinReadouts', () => {
-  it('has a pin for every station on the workflow, plus the red box and both vehicles', () => {
+  it('has a pin for every station on the workflow, plus the NG pallet and both vehicles', () => {
     const ids = PINS.map((p) => p.id);
     for (const card of WORKFLOW_CARDS) expect(ids).toContain(card.id);
     expect(ids).toEqual(expect.arrayContaining(['ngBox', 'forklift', 'truck']));

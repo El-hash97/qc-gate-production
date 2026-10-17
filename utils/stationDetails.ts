@@ -15,9 +15,9 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     live: '/stations/baritori-live.html',
     play: '/stations/baritori-3d.html',
     description: [
-      'The cast block sits on a cradle on the slide table, and a pusher cylinder drives the carriage through the timber portal while the guard plate drops behind it.',
-      'An air chisel hung on a spring balancer chips the casting flash off the parting line one face at a time, and the cradle turns the block a quarter turn between faces.',
-      'When all four faces are clean the guard lifts and the block rolls on along the conveyor to HSB05.',
+      'The raw block stands on a cradle on the carriage at the mouth of the deburring booth, and the carriage runs it in through the timber portal before the lift door drops behind it.',
+      'Inside, an air chisel on a gantry slide chips the casting flash off the parting line one face at a time, and the turntable turns the block a quarter turn between faces.',
+      'The door lifts, the carriage brings the block back out, a kicker tips it over onto the roller conveyor, and it turns away along the line to HSB05.',
     ],
     specs: [
       { label: 'Cycle time', value: '12.5 s' },

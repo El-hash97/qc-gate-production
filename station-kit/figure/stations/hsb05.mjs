@@ -27,11 +27,13 @@ const PAD = { x: -166, y: -92, w: 408, d: 334, r: 8 };
 const R = 86; // cabinet circumradius
 const AP = R * Math.cos(Math.PI / 8); // apothem: each door face sits at AP from the centre
 const BODY = [6, 92];
-const DOOR = { x0: -16, x1: 16, z0: 12, z1: 78, depth: 22 }; // posts 8 wide either side
-// each door sits 8.5 off its face centre, away from the other door, leaving room between them for the
+const DOOR = { x0: -16, x1: 16, z0: 12, z1: 78, depth: 22 }; // posts 6 wide either side
+// each door sits off its face centre, away from the other door (the in door right up to its face's left
+// corner), leaving room between them for the
 // control panel (centred PANEL_X across the in door's face)
-const SHIFT = 8.5;
-const PANEL_X = 24.2;
+const SHIFT_IN = 10.9;
+const SHIFT_OUT = 8.5;
+const PANEL_X = 22;
 const BEAM_Y = [70, 228];
 const BEAM_Z = 114; // underside of the bottom flange
 const TROLLEY_Y = 101;
@@ -190,11 +192,11 @@ function door() {
   out.push(L(Array.from({ length: 7 }, (_, i) => seg([x0 + 4 * (i + 1), back + 6, z1], [x0 + 4 * (i + 1), back + 6, z1 - 18])).join(""), { tone: "lo" }));
   out.push(L(k.pathOf([A([x0, AP, z0]), A([x1, AP, z0]), A([x1, AP, z1]), A([x0, AP, z1])], true), { tone: "mid" }));
   // posts and header, bolted to the cabinet face
-  for (const x of [x0 - 8, x1]) {
-    out.push(S(sl({ x, y: AP - 6, w: 8, d: 12, r: 0.8 }, 0, z1 + 12, 2, 0.5), { tone: "mid" }));
-    out.push(D([14, 30, 46, 62, 78].map((z) => A([x + 4, AP + 6, z])), { size: 0.45 }));
+  for (const x of [x0 - 6, x1]) {
+    out.push(S(sl({ x, y: AP - 6, w: 6, d: 12, r: 0.8 }, 0, z1 + 12, 2, 0.5), { tone: "mid" }));
+    out.push(D([14, 30, 46, 62, 78].map((z) => A([x + 3, AP + 6, z])), { size: 0.45 }));
   }
-  const header = { x: x0 - 8, y: AP - 6, w: x1 - x0 + 16, d: 12, r: 0.8 };
+  const header = { x: x0 - 6, y: AP - 6, w: x1 - x0 + 12, d: 12, r: 0.8 };
   out.push(S(sl(header, z1, 12, 2, 0.6), { tone: "mid", inner: L(sideSeam(header, z1 + 6, 2), { tone: "faint" }) }));
   return out.join("");
 }
@@ -340,9 +342,9 @@ function stand(part) {
 // the out side: the in side turned 45 degrees round the cabinet, so the two doors sit on neighbouring
 // faces; its door, the monorail leg and portal, the set-down stand with a blasted block on it. The leaf
 // between the two doors is left off on both sides (two leaves swung there would meet)
-const outSide = () => `<g transform="${k.translateAlong(P, [SHIFT * Math.SQRT1_2, -SHIFT * Math.SQRT1_2, 0])}">` + turned(-Math.PI / 4, () => [
+const outSide = () => `<g transform="${k.translateAlong(P, [SHIFT_OUT * Math.SQRT1_2, -SHIFT_OUT * Math.SQRT1_2, 0])}">` + turned(-Math.PI / 4, () => [
   door(),
-  leaf(DOOR.x1 + 8),
+  leaf(DOOR.x1 + 6),
   beam(),
   stand("back"),
   block(QUEUE, STAND.z),
@@ -354,14 +356,14 @@ const outSide = () => `<g transform="${k.translateAlong(P, [SHIFT * Math.SQRT1_2
 
 // the in side (+y, towards the viewer): door, the hoist carrying a block in, the pick stand with the next
 // raw block, and the tail of the conveyor from Baritori
-const inSide = () => `<g transform="${k.translateAlong(P, [-SHIFT, 0, 0])}">` + [
+const inSide = () => `<g transform="${k.translateAlong(P, [-SHIFT_IN, 0, 0])}">` + [
   door(),
   hanger(),
   hangerFront(),
   block(HANG, 37, { lit: true }),
   beam(),
   hoist(),
-  leaf(DOOR.x0 - 11),
+  leaf(DOOR.x0 - 9),
   conveyorRail(CONV.y0),
   rollers(),
   conveyorRail(CONV.y1),

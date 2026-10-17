@@ -3,8 +3,11 @@
 // blast cabinet with a round lid and two doors, like HSB06: the block goes in
 // through the left door and comes out through the right one, with the control
 // panel on the face between them. A monorail leg runs out through each door;
-// the hoist carries a BC block on a hanger from the in conveyor into the
-// chamber, and the blasted block leaves on the out conveyor.
+// the hoist picks the BC block off the stand at the end of the conveyor from
+// Baritori (cut short here), carries it on a hanger into the chamber, and sets
+// the blasted block down on the stand on the out side, where HSB06 takes it.
+// Seen the way the Baritori figure is, so the two pictures join: the conveyor
+// from Baritori comes in towards the viewer, the out side runs off to the right.
 //   node station-kit/figure/stations/hsb05.mjs [outDir]   →   <outDir>/hsb05-{light,dark}.svg
 //   (outDir defaults to public/stations, relative to where you run it)
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -14,7 +17,7 @@ import * as k from "../iso-kit.mjs";
 const OUT = resolve(process.argv[2] ?? "public/stations");
 mkdirSync(OUT, { recursive: true });
 const WIDTH = 600;
-const HEIGHT = 420;
+const HEIGHT = 440;
 
 // ---- world (z up, about 1 unit = 1 cm) -------------------------------------
 // The in door is on the +y face (left in the picture) and the out door on the +x face (right); the face
@@ -28,9 +31,10 @@ const DOOR = { x0: -21, x1: 21, z0: 12, z1: 78, depth: 22 };
 const BEAM_Y = [70, 228];
 const BEAM_Z = 114; // underside of the bottom flange
 const TROLLEY_Y = 101;
-const CONV = { y0: 120, y1: 214, z: 31 }; // roller tops at z
+const CONV = { y0: 160, y1: 240, z: 31 }; // the tail of the conveyor from Baritori, cut at the pad edge; roller tops at z
+const STAND = { y0: 116, y1: 154, z: 31 }; // pick (in) and set-down (out) stand under each monorail leg, top at z
 const HANG = { x: -12, y: 91.5, w: 24, d: 19, r: 1 }; // block on the hanger
-const QUEUE = { x: -12, y: 172, w: 24, d: 19, r: 1 }; // block on a conveyor
+const QUEUE = { x: -12, y: 126, w: 24, d: 19, r: 1 }; // block on a stand
 const BLOCK_H = 17;
 
 const octagon = (radius, cx = 0, cy = 0) =>
@@ -43,7 +47,11 @@ const P = k.fitProjection(
   [...k.boxCorners(PAD, -8, 0), [0, 0, 112], [-158, -84, 132], [-106, -28, 132], [-158, -28, 132], [0, BEAM_Y[1], BEAM_Z + 16], [BEAM_Y[1], 0, BEAM_Z + 16], [-34, BEAM_Y[1], BEAM_Z + 16], [BEAM_Y[1], 34, BEAM_Z + 16]],
   WIDTH,
   HEIGHT,
-  { pad: 26, azimuth: 58 },
+  // The Baritori figure's camera (kit azimuth -58, elevation 35, picture mirrored) brought into this frame:
+  // in Blender the in leg points from the cabinet at the Baritori pick stand (-37.6° in Baritori's world)
+  // and the out leg 90° round from it, a reflection of this frame turned by -37.6°; the reflection cancels
+  // Baritori's mirror and leaves azimuth 90 - (-58 - -37.6) = 110.4, unmirrored.
+  { pad: 26, azimuth: 110.4, elevation: 35 },
 );
 
 const at = (p) => k.iso(p, P);
@@ -272,66 +280,87 @@ function block(plan, z, { lit = false } = {}) {
   return out.join("");
 }
 
-// ---- roller conveyor ---------------------------------------------------------
-function conveyorBack() {
+// ---- the tail of the roller conveyor from Baritori, cut at the pad edge ------------------
+// one rail at a time, so the near one is drawn over the rollers and the far one under them
+function conveyorRail(x) {
   const { y0, y1, z } = CONV;
   const out = [];
-  for (const [x, y] of byDepth([[-20, y0 + 8], [-20, y1 - 8]], ([x, y]) => P3([x, y, 0]))) {
-    out.push(S(cyl(x, y, 4, 0, 1.4, 16), { tone: "mid" }));
-    out.push(S(sl({ x: x - 1.6, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
+  for (const y of [y0 + 10, y1 - 14]) {
+    out.push(S(cyl(x + 2, y, 4, 0, 1.4, 16), { tone: "mid" }));
+    out.push(S(sl({ x: x + 0.4, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
   }
-  out.push(S(sl({ x: -25, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
-  for (let y = y0 + 3; y < y1 - 3; y += 6.4) out.push(S(sl({ x: -21, y, w: 42, d: 4.4, r: 2.2 }, z - 4.4, 4.4, 6), { tone: "mid", crease: "none" }));
+  out.push(S(sl({ x, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
+  out.push(D(Array.from({ length: 12 }, (_, i) => A([x < 0 ? x : x + 4, y0 + 3 + i * 6.4 + 2.2, z - 3])), { size: 0.35, tone: "lo" }));
   return out.join("");
 }
 
-function conveyorFront() {
+function rollers() {
   const { y0, y1, z } = CONV;
   const out = [];
-  for (const [x, y] of byDepth([[20, y0 + 8], [20, y1 - 8]], ([x, y]) => P3([x, y, 0]))) {
-    out.push(S(cyl(x, y, 4, 0, 1.4, 16), { tone: "mid" }));
-    out.push(S(sl({ x: x - 1.6, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
-  }
-  out.push(S(sl({ x: 21, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
-  out.push(D(Array.from({ length: 14 }, (_, i) => A([25, y0 + 3 + i * 6.4 + 2.2, z - 3])), { size: 0.35, tone: "lo" }));
-  // end stop
-  out.push(S(sl({ x: -25, y: y1, w: 50, d: 4, r: 0.6 }, z - 7, 14, 2, 0.4), { tone: "mid" }));
+  for (let y = y1 - 7.4; y > y0; y -= 6.4) out.push(S(sl({ x: -21, y, w: 42, d: 4.4, r: 2.2 }, z - 4.4, 4.4, 6), { tone: "mid", crease: "none" }));
   return out.join("");
 }
 
-// the out side (+x): door, monorail leg and portal, the out conveyor with a blasted block on it
+// ---- stand under a monorail leg: the hanger's tines slip in between its two top bars -------------
+// `part` "back" is everything behind the block on it, "front" the near bar and its legs
+function stand(part) {
+  const { y0, y1, z } = STAND;
+  const out = [];
+  if (part === "back") {
+    out.push(S(sl({ x: -17, y: y0 - 2, w: 34, d: y1 - y0 + 4, r: 0.8 }, 0, 2, 2, 0.4), { tone: "mid" }));
+    out.push(D(k.corners({ x: -17, y: y0 - 2, w: 34, d: y1 - y0 + 4 }, 2.5).map(([x, y]) => A([x, y, 2])), { size: 0.4 }));
+    for (const y of [y0 + 1, y1 - 4]) out.push(S(sl({ x: 9, y, w: 3, d: 3, r: 0.4 }, 2, z - 5, 2, 0.3), { tone: "mid" }));
+    // cross bars at both ends, the far top bar, the stop the block sits against at the door end
+    for (const y of [y0, y1 - 3]) out.push(S(sl({ x: -13, y, w: 26, d: 3, r: 0.4 }, z - 6, 3, 2, 0.3), { tone: "mid" }));
+    out.push(S(sl({ x: 8, y: y0, w: 5, d: y1 - y0, r: 0.5 }, z - 3, 3, 2, 0.3), { tone: "mid" }));
+    out.push(S(sl({ x: -13, y: y0 - 3, w: 26, d: 3, r: 0.5 }, z - 3, 12, 2, 0.4), { tone: "mid" }));
+    out.push(D([-8, 8].map((x) => A([x, y0, z + 6])), { size: 0.45 }));
+  } else {
+    for (const y of [y0 + 1, y1 - 4]) out.push(S(sl({ x: -12, y, w: 3, d: 3, r: 0.4 }, 2, z - 5, 2, 0.3), { tone: "mid" }));
+    out.push(S(sl({ x: -13, y: y0, w: 5, d: y1 - y0, r: 0.5 }, z - 3, 3, 2, 0.3), { tone: "mid" }));
+    out.push(D([y0 + 6, y1 - 6].map((y) => A([-13, y, z - 1.5])), { size: 0.4 }));
+  }
+  return out.join("");
+}
+
+// the out side (+x, drawn through the mirror): monorail leg and portal running off behind the cabinet,
+// the set-down stand with a blasted block on it, the door (on the far side, mostly hidden)
 const outSide = () => mirrored(true, () => [
-  door(),
-  leaf(-32),
-  conveyorBack(),
-  block(QUEUE, CONV.z),
-  conveyorFront(),
+  portalColumn(34),
   portalColumn(-34),
   beam(),
-  leaf(29),
   portalTop(),
-  portalColumn(34),
+  stand("back"),
+  block(QUEUE, STAND.z),
+  stand("front"),
+  leaf(29),
+  leaf(-32),
+  door(),
 ].join(""));
 
-// the in side (+y): door, the in conveyor with the next raw block, the hoist carrying a block in
+// the in side (+y, towards the viewer): door, the hoist carrying a block in, the pick stand with the next
+// raw block, and the tail of the conveyor from Baritori
 const inSide = () => [
   door(),
-  leaf(-32),
-  conveyorBack(),
-  block(QUEUE, CONV.z),
-  conveyorFront(),
-  portalColumn(-34),
+  leaf(29),
   hanger(),
   hangerFront(),
   block(HANG, 37, { lit: true }),
   beam(),
   hoist(),
-  leaf(29),
-  portalTop(),
+  leaf(-32),
+  stand("back"),
+  block(QUEUE, STAND.z),
+  stand("front"),
+  conveyorRail(21),
+  rollers(),
+  conveyorRail(-25),
   portalColumn(34),
+  portalTop(),
+  portalColumn(-34),
 ].join("");
 
-const body = [floor(), collector(), cabinet(), outSide(), inSide()];
+const body = [floor(), outSide(), collector(), cabinet(), inSide()];
 
 const STYLE = `<style>
 .iso[data-theme="light"] .hsb-cav{fill:#cfcfcb}.iso[data-theme="light"] .hsb-cav-side{fill:#dadad6}.iso[data-theme="light"] .hsb-cav-floor{fill:#c4c4c0}
@@ -340,7 +369,7 @@ const STYLE = `<style>
 </style>`;
 
 const LABEL =
-  "Station HSB05, hanger shot blast: an octagonal blast cabinet with a round lid and two doors, with the control panel on the face between them. A monorail hoist carries a BC block on a C-hook hanger from the in conveyor through the left door into the chamber; after blasting it comes out through the right door onto the out conveyor towards HSB06.";
+  "Station HSB05, hanger shot blast: an octagonal blast cabinet with a round lid and two doors, with the control panel on the face between them. A monorail hoist picks the BC block on a C-hook hanger off the stand at the end of the conveyor from Baritori and carries it through the left door into the chamber; after blasting it comes out through the right door and is set down on the stand there for HSB06.";
 
 for (const theme of ["light", "dark"]) {
   const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });

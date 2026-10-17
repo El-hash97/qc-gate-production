@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Baritori Deburring · Machine Skill</title>
-<meta name="description" content="Station Baritori of the BC finishing line: a pusher carries the cast block through a timber portal, an air chisel on a spring balancer chips the casting flash off the parting line, and the block rolls on to HSB05. Built with the Machine Skill skill for Claude.">
+<meta name="description" content="Station Baritori of the BC finishing line: a carriage takes the cast block into a closed deburring booth through a timber portal, an air chisel on a gantry slide chips the casting flash off the parting line while a turntable turns the block between faces, then a kicker tips it onto a roller conveyor that turns away to HSB05. Built with the Machine Skill skill for Claude.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1524,47 +1524,59 @@ export default LabKit
 const { THREE, Lab, MAT, GEO, clamp, lerp, approach, fmt, smoothstep } = window.LabKit
 
 // ------------------------------------------------------------------ research (step 1)
-// "Baritori: the deburring station at the head of the BC finishing line, moving the way it does in the Blender layout"
+// "Baritori: the deburring station at the head of the BC finishing line, laid out and moving the way it
+// does in the Blender file (animasi/line finishing before improvement.blend)"
 // Baritori (バリ取り) removes the casting flash left on the parting line of the cast block before shot blast.
-// Dimensions (m), read off the user's Blender layout (1 unit = 0.1 m): timber portal posts 0.14 square,
-// 2.36 tall, 1.1 apart, with an air cylinder on the top beam lowering a guard plate; a slide table top at
-// 0.40 with two guide rails; a tie-rod pusher cylinder at the far end; roller conveyor top 0.40 towards HSB05;
-// push-button box beside the portal; yellow railing behind. BC block 0.475 x 0.336 x 0.371 (L x H x W), 36 kg.
-// Parts: table (top, legs, stretchers, rails, end stop, buffers), carriage (bearing blocks, plate, index
-// table, cradle, cheeks), block with its flash fin, pusher (caps, barrel, tie rods, bracket, stand, rod),
-// portal (posts, feet, guide strips, beam, brackets), lift cylinder, rod, cross bar, guard plate,
-// balancer arm, spring balancer, cable, air chisel, conveyor (rails, legs, rollers, stop), button box,
-// railing.
-// Physics: pusher force F = p A (bore 63 mm); chisel blow energy E = eta p A_h s (bore 19 mm, stroke 50 mm,
-// eta 0.45); blow rate f = 30 Hz sqrt(p / 6 bar); flash removed per blow l = E / (e a) with chipping energy
-// e = 3 J/mm3 for grey iron and fin section a = 3 x 1.5 mm; rate dL/dt = f l over a 1.69 m parting line;
-// free air Q = f A_h s (p + 1 atm) / 1 atm.
-// Hero: flash removed, %. Input: line pressure. Break: the supply hose bursts; line pressure bleeds off
-// as p e^(-t / tau), the chisel stops and the pusher stalls where it stands.
+// Layout read off the Blender objects (1 unit = 0.1 m), the same numbers as the isometric card figure
+// (station-kit/figure/stations/baritori.mjs), in its centimetre world turned to three.js like glTF:
+//   X = -x / 100, Y = z / 100, Z = y / 100.
+// Booth (Cube.017) 3.45 x 2.78 x 1.83 m, closed; its long side towards the camera is left off so the work
+// shows (what is inside the Blender box is our assumption). Timber portal (Cube.022/.032/.023) 2.26 m tall
+// on the booth face with a lift door (Cylinder.007) raised 1.0 m by an air cylinder on the beam
+// (Cylinder.005). Carriage on rails from the mouth outside the portal 2.28 m in to the work station;
+// a turntable and cradle carry the block standing (Cube.019, 0.37 x 0.34 x 0.48 m). Inside, an air chisel
+// on a gantry slide works the parting line of the face towards it. Roller conveyor (Cylinder.006) at right
+// angles to the carriage line, 2.9 m to the end stop where the HSB05 hoist picks the block up; a kicker at
+// the mouth tips the block over onto it. Push-button box on the booth face (Cube.030), low yellow rails.
+// Physics: carriage force F = p A (50 mm rodless cylinder); chisel blow energy E = eta p A_h s (bore 19 mm,
+// stroke 50 mm, eta 0.45); blow rate f = 30 Hz sqrt(p / 6 bar); flash removed per blow l = E / (e a) with
+// chipping energy e = 3 J/mm3 for grey iron and fin section a = 3 x 1.5 mm; free air Q = f A_h s (p + 1 atm) / 1 atm.
+// Hero: flash removed, %. Input: line pressure. Break: the supply hose bursts; line pressure bleeds off,
+// the chisel stops and the carriage stalls where it stands.
 
 const lab = new Lab({
-  prompt: 'Baritori: the deburring station of the BC line, moving the way it does in the Blender layout',
+  prompt: 'Baritori: the deburring booth of the BC line, moving the way it does in the Blender layout',
   no: 4, title: 'Baritori', sub: 'deburring',
-  size: 4.6,
-  view: { az: 32, el: 16, dist: 1.85, target: [0.15, 1.38, 0.1], fov: 30 },
-  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [0.4, 0.7, 0], reach: 0.6 },
+  size: 5.2,
+  view: { az: -148, el: 30, dist: 2.3, target: [1.6, 0.5, 2.55], fov: 30 }, // the card figure's camera: from the booth's end, left of the portal
+  cut: { a: [0, 0, 1], b: [0, 1, 0], center: [2.2, 0.9, 1.6], reach: 1.6 },
   pills: ['three.js', 'Pneumatics', 'Chipping'],
 })
 
-// ------------------------------------------------------------------ dimensions
-const TABLE_Y = 0.40                          // table top
-const TX0 = -1.28, TX1 = 0.98                 // table ends
-const RAIL_Z = [-0.18, 0.18]
-const LOAD_X = -0.30, WORK_X = 0.42           // carriage stations: under the portal, at the chisel
-const SEAT_Y = TABLE_Y + 0.13                 // block base on the cradle
-const BLOCK = [0.475, 0.336, 0.371]
-const PARTING = 0.22                          // flash fin height above the block base
-const POST_Z = 0.55, POST_H = 2.36
-const BEAM_Y = POST_H + 0.09
-const GUARD_UP = 1.31, GUARD_DOWN = 0.62      // guard plate centre heights
-const ROD_Y = 0.62                            // pusher axis
-const PUSH_X0 = -1.14                         // pusher bracket face (rod leaves here)
-const CONV_X0 = 1.04, CONV_X1 = 2.36, CONV_Y = 0.40
+// ------------------------------------------------------------------ dimensions (cm, the card figure's world)
+const W = (x, y, z) => [-x / 100, z / 100, y / 100]
+const BOOTH = { x: -393, y: 36, w: 345, d: 278, h: 183, wall: 4 }
+const FRONT_X = BOOTH.x + BOOTH.w          // -48: the portal face
+const FAR_Y = BOOTH.y + BOOTH.d - BOOTH.wall
+const OPEN = { y0: 103, y1: 197, z1: 120 }
+const POST_Y = [90, 197], POST = { x0: -48, x1: -35, h: 226 }, BEAM_Z = 226
+const DOOR = { x0: -46, x1: -42, y0: 104, y1: 196, z0: 14, h: 104, lift: 100 }
+const LIFT = { x: -41, y: 150 }
+const LINE_Y = 149, RAILS = [133, 161], RAIL_X = [-305, 40]
+const MOUTH_X = 8, WORK_X = -220
+const CART = { half: 30, y0: 121, y1: 177 }
+const SEAT_Z = 22
+const BLOCK = { A: 37, B: 34, H: 48, PART: 26 }
+const CONV = { x0: -24, x1: 40, y0: 178, y1: 470, z: 22 }
+const KICK = { x: MOUTH_X, y0: 100, y1: 122, z: 58, rest: 128 }
+const GANTRY = { x0: -305, x1: -140, y: 86, z: 150 }
+const RAILING_X = 56, RAILING_H = 28
+const BOX = { x: -48, y: 46, w: 12, d: 28 }
+const FACE_LEN = [BLOCK.A, BLOCK.B, BLOCK.A, BLOCK.B]
+const FACE_END = FACE_LEN.map((_, i) => FACE_LEN.slice(0, i + 1).reduce((s, l) => s + l, 0))
+const PERIM = FACE_END[3]
+const PARK = [WORK_X - 50, LINE_Y - BLOCK.A / 2 - 6, SEAT_Z + BLOCK.PART]
+const FEED_Y = GANTRY.y + 4
 
 // ------------------------------------------------------------------ materials
 const timber = MAT.paint({ color: [0.42, 0.24, 0.13], roughness: 0.78, clearcoat: 0.05 })
@@ -1572,6 +1584,7 @@ const timberDark = MAT.paint({ color: [0.33, 0.19, 0.1], roughness: 0.8, clearco
 const yellow = MAT.paint({ color: [0.86, 0.72, 0.1], roughness: 0.36, clearcoat: 0.5 })
 const grey = MAT.paint({ color: [0.62, 0.63, 0.62], roughness: 0.45, clearcoat: 0.3 })
 const beige = MAT.paint({ color: [0.78, 0.72, 0.6], roughness: 0.45, clearcoat: 0.25 })
+const floorPaint = MAT.paint({ color: [0.55, 0.56, 0.55], roughness: 0.7, clearcoat: 0.05 })
 const steel = MAT.steel()
 const steelDark = MAT.steelDark()
 const rubber = MAT.rubber()
@@ -1580,137 +1593,180 @@ blockMat.transparent = true
 const finMat = MAT.castIron({ color: [0.2, 0.17, 0.15], roughness: 0.9 })
 finMat.transparent = true
 
-// ------------------------------------------------------------------ slide table
-lab.mesh(GEO.rbox(TX1 - TX0, 0.06, 0.76, 0.01), grey, { name: 'Table top', pos: [(TX0 + TX1) / 2, TABLE_Y - 0.03, 0], explode: [0, -0.3, 0], label: 'Slide table', at: [0.7, 0.05, 0.38] })
-for (const x of [TX0 + 0.08, TX1 - 0.08]) for (const z of [-0.3, 0.3]) {
-  lab.mesh(GEO.rbox(0.06, TABLE_Y - 0.06, 0.06, 0.008), grey, { name: 'Table leg', pos: [x, (TABLE_Y - 0.06) / 2, z], explode: [0, -0.4, 0], count: 1 })
-  lab.mesh(GEO.rbox(0.1, 0.015, 0.1, 0.004), steelDark, { name: 'Foot plate', pos: [x, 0.008, z], explode: [0, -0.4, 0], count: 1 })
+// ------------------------------------------------------------------ helpers: boxes and cylinders from plans in cm
+const boxGeo = (w, d, h, r) => GEO.rbox(w / 100, h / 100, d / 100, r ?? Math.min(w, d, h) * 0.0008)
+// a box from a plan {x, y, w, d} standing at z with height h, added as its own part
+function box(plan, z, h, mat, o = {}) {
+  return lab.mesh(boxGeo(plan.w, plan.d, h, o.r), mat, { pos: W(plan.x + plan.w / 2, plan.y + plan.d / 2, z + h / 2), ...o })
 }
-for (const z of [-0.3, 0.3]) lab.mesh(GEO.rbox(TX1 - TX0 - 0.16, 0.04, 0.04, 0.006), grey, { name: 'Stretcher', pos: [(TX0 + TX1) / 2, 0.12, z], explode: [0, -0.4, 0], count: 1 })
-for (const z of RAIL_Z) lab.mesh(GEO.rbox(TX1 - TX0 - 0.12, 0.03, 0.04, 0.004), steel, { name: 'Guide rail', pos: [(TX0 + TX1) / 2, TABLE_Y + 0.015, z], explode: [0, -0.15, 0], count: 1 })
-lab.mesh(GEO.rbox(0.05, 0.1, 0.6, 0.008), steelDark, { name: 'End stop', pos: [TX1 - 0.055, TABLE_Y + 0.05, 0], explode: [0.3, -0.15, 0] })
-for (const z of RAIL_Z) lab.mesh(GEO.disc(0.025, 0.05), rubber, { name: 'Buffer', pos: [TX1 - 0.105, TABLE_Y + 0.065, z], rot: [0, 0, Math.PI / 2], explode: [0.3, -0.15, 0], count: 1 })
+// the same inside a group whose origin sits at `origin` (cm)
+function part(group, plan, z, h, mat, origin = [0, 0, 0], r) {
+  const m = new THREE.Mesh(boxGeo(plan.w, plan.d, h, r), mat)
+  m.position.set(...W(plan.x + plan.w / 2 - origin[0], plan.y + plan.d / 2 - origin[1], z + h / 2 - origin[2]))
+  group.add(m)
+  return m
+}
+const vcyl = (cx, cy, r, z, h, mat, o = {}) => lab.mesh(GEO.disc(r / 100, h / 100), mat, { pos: W(cx, cy, z + h / 2), ...o })
 
-// ------------------------------------------------------------------ carriage, index table, cradle, block with its flash
+// ------------------------------------------------------------------ floor pad
+box({ x: -410, y: 22, w: 490, d: 540 }, -8, 8, floorPaint, { name: 'Floor pad', explode: [0, -0.3, 0] })
+
+// ------------------------------------------------------------------ booth: far wall, end wall, roof, the frame where the near wall is off, front wall with its doorway
+{
+  const { x, y, w, d, h, wall } = BOOTH
+  box({ x, y: FAR_Y, w, d: wall }, 0, h, beige, { name: 'Booth wall', explode: [0, 0, 0.8], xray: 'shell', count: 1 })
+  box({ x, y, w: wall, d: d - wall }, 0, h, beige, { name: 'Booth wall', explode: [0.8, 0, 0], xray: 'shell', count: 1, label: 'Deburring booth', at: [0, 0.6, 0] })
+  box({ x: x + wall, y: y + wall, w: w - wall * 2, d: d - wall * 2 }, 0, 1, grey, { name: 'Booth floor plate', explode: [0, -0.2, 0] })
+  box({ x, y, w, d }, h - 4, 4, beige, { name: 'Booth roof', explode: [0, 1.2, 0], xray: 'shell' })
+  vcyl(x + 70, y + 200, 14, h, 22, steelDark, { name: 'Dust extraction stub', explode: [0, 1.4, 0] })
+  // the near long wall is drawn off: sill, corner posts and the roof edge stay
+  box({ x: x + wall, y, w: w - wall * 2, d: wall }, 0, 10, beige, { name: 'Sill', explode: [0, 0, -0.6] })
+  for (const px of [x, FRONT_X - wall]) box({ x: px, y, w: wall, d: wall }, 0, h - 4, beige, { name: 'Corner post', explode: [0, 0, -0.6], count: 1 })
+  box({ x, y, w, d: wall }, h - 12, 8, beige, { name: 'Roof edge', explode: [0, 1.2, -0.6] })
+  const fx = FRONT_X - wall
+  box({ x: fx, y: y + wall, w: wall, d: OPEN.y0 - y - wall }, 0, h, beige, { name: 'Front wall', explode: [-0.5, 0, 0], count: 1 })
+  box({ x: fx, y: OPEN.y0, w: wall, d: OPEN.y1 - OPEN.y0 }, OPEN.z1, h - OPEN.z1, beige, { name: 'Lintel', explode: [-0.5, 0.3, 0] })
+  box({ x: fx, y: OPEN.y1, w: wall, d: FAR_Y - OPEN.y1 }, 0, h, beige, { name: 'Front wall', explode: [-0.5, 0, 0], count: 1 })
+}
+
+// ------------------------------------------------------------------ timber portal, lift cylinder, push-button box
+for (const y of POST_Y) {
+  box({ x: POST.x0 - 2, y: y - 3, w: POST.x1 - POST.x0 + 4, d: 19 }, 0, 3, steelDark, { name: 'Post foot', explode: [-0.6, 0, 0], count: 1 })
+  box({ x: POST.x0, y, w: POST.x1 - POST.x0, d: 13 }, 3, POST.h - 3, timber, { name: 'Timber post', explode: [-0.6, 0, 0], count: 1, label: y < 150 ? 'Portal' : undefined, at: [0, 0.4, 0] })
+  const gy = y < 150 ? y + 13 : y - 3
+  box({ x: DOOR.x0 - 1, y: gy, w: 6, d: 3 }, 12, 210, steelDark, { name: 'Door guide', explode: [-0.6, 0, 0], count: 1 })
+}
+box({ x: POST.x0 - 2, y: POST_Y[0] - 6, w: POST.x1 - POST.x0 + 4, d: POST_Y[1] - POST_Y[0] + 25 }, BEAM_Z, 13, timberDark, { name: 'Top beam', explode: [-0.6, 0.6, 0] })
+box({ x: LIFT.x - 11, y: LIFT.y - 11, w: 22, d: 22 }, BEAM_Z + 13, 3, steelDark, { name: 'Cylinder flange', explode: [-0.6, 0.9, 0] })
+for (const z of [BEAM_Z + 16, BEAM_Z + 70]) box({ x: LIFT.x - 8, y: LIFT.y - 8, w: 16, d: 16 }, z, 8, steel, { name: 'Lift end cap', explode: [-0.6, 0.9, 0], count: 1 })
+vcyl(LIFT.x, LIFT.y, 6, BEAM_Z + 24, 46, MAT.steel({ roughness: 0.2 }), { name: 'Lift cylinder', explode: [-0.6, 0.9, 0], label: 'Lift cylinder', at: [0, 0, 0] })
+// the door, down at rest; lifted by `lift`
+const door = new THREE.Group()
+part(door, { x: DOOR.x0, y: DOOR.y0, w: DOOR.x1 - DOOR.x0, d: DOOR.y1 - DOOR.y0 }, DOOR.z0, DOOR.h, beige)
+part(door, { x: DOOR.x0 - 0.5, y: DOOR.y0 + 2, w: DOOR.x1 - DOOR.x0 + 1, d: DOOR.y1 - DOOR.y0 - 4 }, DOOR.z0 - 4, 4, rubber)
+part(door, { x: LIFT.x - 5, y: LIFT.y - 6, w: 10, d: 12 }, DOOR.z0 + DOOR.h, 7, steelDark)
+part(door, { x: DOOR.x1, y: 130, w: 0.4, d: 40 }, DOOR.z0 + 48, 14, MAT.paint({ color: [0.1, 0.1, 0.1] }))
+lab.add(door, { name: 'Lift door', explode: [-0.9, 0, 0], count: 4, label: 'Door', at: [0.04, 0.9, 1.5] })
+const liftRod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 20), MAT.chrome())
+lab.add(liftRod, { name: 'Lift rod', explode: [-0.6, 0.9, 0] })
+const DOOR_TOP = DOOR.z0 + DOOR.h + 7
+// push-button box on the booth face
+box({ x: BOX.x + 2, y: BOX.y + 10, w: 7, d: 7 }, 0, 70, steelDark, { name: 'Box pedestal', explode: [-0.5, 0, -0.3] })
+box({ x: BOX.x, y: BOX.y, w: BOX.w, d: BOX.d }, 70, 40, beige, { name: 'Button box', explode: [-0.5, 0, -0.3], label: 'Push buttons', at: [0, 0.22, 0] })
+const btnOff = MAT.plastic({ color: [0.12, 0.12, 0.13] })
+const btn = MAT.glow({ emissive: [0.1, 1, 0.3], emissiveIntensity: 0.3 })
+for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) lab.mesh(GEO.disc(0.012, 0.012), r === 0 && c === 0 ? btn : btnOff, { name: 'Push button', pos: W(BOX.x + BOX.w + 0.6, BOX.y + 5 + c * 6, 96 - r * 7), rot: [0, 0, Math.PI / 2], explode: [-0.5, 0, -0.3], count: 1 })
+vcyl(BOX.x + 6, BOX.y + BOX.d - 6, 3.6, 110, 2.6, MAT.glow({ emissive: [1, 0.12, 0.08], emissiveIntensity: 1.2 }), { name: 'E-stop', explode: [-0.5, 0.2, -0.3] })
+
+// ------------------------------------------------------------------ carriage line: sleepers, rodless cylinder, rails, end stops
+for (let x = Math.ceil((RAIL_X[0] + 6) / 40) * 40; x < RAIL_X[1] - 4; x += 40) box({ x: x - 4, y: RAILS[0] - 8, w: 8, d: RAILS[1] - RAILS[0] + 20 }, 0, 4, steelDark, { name: 'Sleeper', explode: [0, -0.2, 0], count: 1 })
+lab.mesh(GEO.disc(0.04, (RAIL_X[1] - RAIL_X[0]) / 100), steel, { name: 'Rodless cylinder', pos: W((RAIL_X[0] + RAIL_X[1]) / 2, LINE_Y, 7), rot: [0, 0, Math.PI / 2], explode: [0, -0.15, 0], label: 'Rodless cylinder', at: [0, 0.6, 0] })
+for (const y of RAILS) box({ x: RAIL_X[0], y, w: RAIL_X[1] - RAIL_X[0], d: 4 }, 4, 6, steel, { name: 'Guide rail', explode: [0, -0.15, 0], count: 1 })
+for (const x of [RAIL_X[0] - 4, RAIL_X[1]]) box({ x, y: RAILS[0] - 4, w: 4, d: RAILS[1] - RAILS[0] + 12 }, 0, 14, steelDark, { name: 'Rail end stop', explode: [0, -0.15, 0], count: 1 })
+
+// carriage, its origin at (cx, LINE_Y, 0): bearing blocks, plate, turntable
 const carriage = new THREE.Group()
-for (const dx of [-0.18, 0.18]) for (const z of RAIL_Z) {
-  const b = new THREE.Mesh(GEO.rbox(0.12, 0.05, 0.1, 0.008), steelDark); b.position.set(dx, TABLE_Y + 0.055, z); carriage.add(b)
+const O = [WORK_X, LINE_Y, 0]
+for (const dx of [-20, 20]) for (const y of RAILS) part(carriage, { x: WORK_X + dx - 7, y: y - 2, w: 14, d: 8 }, 10, 4, steelDark, O)
+part(carriage, { x: WORK_X - CART.half, y: CART.y0, w: CART.half * 2, d: CART.y1 - CART.y0 }, 14, 4, grey, O)
+const turntable = new THREE.Mesh(GEO.disc(0.22, 0.03), steel); turntable.position.y = 0.195; carriage.add(turntable)
+// the cradle turns on the turntable: seat and two cheeks
+const cradle = new THREE.Group(); carriage.add(cradle)
+part(cradle, { x: -21, y: -19, w: 42, d: 38 }, 21, 1, steelDark)
+for (const y of [17.5, -20.5]) part(cradle, { x: -12, y, w: 24, d: 3 }, SEAT_Z, 10, grey)
+lab.add(carriage, { name: 'Carriage and cradle', explode: [0, 0.35, 0], count: 12, label: 'Turntable', at: [0, 0.35, 0], value: () => `face ${Math.min(4, S.face + 1)} of 4` })
+
+// ------------------------------------------------------------------ the block: body, deck bores on its -y face, the flash fin round the parting line
+// built in its own frame (base centre at the origin), turned to three.js like everything else
+const block = new THREE.Group()
+const blockBody = new THREE.Mesh(boxGeo(BLOCK.A, BLOCK.B, BLOCK.H, 0.012), blockMat); blockBody.position.y = BLOCK.H / 200; block.add(blockBody)
+for (const zc of [7.5, 18.5, 29.5, 40.5]) {
+  const bore = new THREE.Mesh(GEO.tube(0.044, 0.036, 0.01), steelDark)
+  bore.rotation.x = Math.PI / 2; bore.position.set(...W(0, -BLOCK.B / 2 - 0.4, zc)); block.add(bore)
 }
-const cplate = new THREE.Mesh(GEO.rbox(0.56, 0.04, 0.6, 0.008), grey); cplate.position.y = TABLE_Y + 0.1; carriage.add(cplate)
-const turntable = new THREE.Mesh(GEO.disc(0.2, 0.02), steel); turntable.position.y = TABLE_Y + 0.13; carriage.add(turntable)
-const cradle = new THREE.Group(); cradle.position.y = SEAT_Y; carriage.add(cradle)
-const seat = new THREE.Mesh(GEO.rbox(0.44, 0.012, 0.36, 0.004), steelDark); seat.position.y = -0.006; cradle.add(seat)
-for (const s of [-1, 1]) {
-  const cheek = new THREE.Mesh(GEO.rbox(0.3, 0.1, 0.03, 0.006), grey); cheek.position.set(0, 0.05, s * 0.205); cradle.add(cheek)
-  const boss = new THREE.Mesh(GEO.disc(0.035, 0.03), steelDark); boss.rotation.x = Math.PI / 2; boss.position.set(0, 0.05, s * 0.235); cradle.add(boss)
-}
-const block = new THREE.Group(); cradle.add(block)
-const blockBody = new THREE.Mesh(GEO.rbox(BLOCK[0], BLOCK[1], BLOCK[2], 0.015), blockMat); blockBody.position.y = BLOCK[1] / 2; block.add(blockBody)
-for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(GEO.tube(0.044, 0.038, 0.012), steelDark); b.position.set(-0.165 + i * 0.11, BLOCK[1] + 0.003, 0); block.add(b) }
-// the flash: a thin fin all round the parting line, cut into segments the chisel takes off one by one
-const HX = BLOCK[0] / 2, HZ = BLOCK[2] / 2, FIN = 0.006
-const FACES = [ // [start, end] of each face in block coordinates, in the order the chisel works them
-  [[-HX, HZ], [HX, HZ]], [[HX, HZ], [HX, -HZ]], [[HX, -HZ], [-HX, -HZ]], [[-HX, -HZ], [-HX, HZ]],
-]
-const FACE_LEN = FACES.map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]))
-const FACE_END = FACE_LEN.map((_, k) => FACE_LEN.slice(0, k + 1).reduce((s, l) => s + l, 0))
-const PERIM = FACE_END[3]
 const fins = []
-FACES.forEach(([a, b], k) => {
-  const n = Math.round(FACE_LEN[k] / 0.02)
-  const out = [(b[1] - a[1]) / FACE_LEN[k], -(b[0] - a[0]) / FACE_LEN[k]] // outward normal in (x, z)
-  for (let i = 0; i < n; i++) {
-    const u = (i + 0.5) / n
-    const m = new THREE.Mesh(GEO.rbox((FACE_LEN[k] / n) * 0.96, 0.003, FIN, 0.0008), finMat)
-    m.position.set(lerp(a[0], b[0], u) + (out[0] * FIN) / 2, PARTING, lerp(a[1], b[1], u) + (out[1] * FIN) / 2)
-    m.rotation.y = Math.atan2(-(b[1] - a[1]), b[0] - a[0])
-    block.add(m)
-    fins.push({ m, s: FACE_END[k] - FACE_LEN[k] + u * FACE_LEN[k] })
-  }
-})
-lab.add(carriage, { name: 'Carriage and cradle', explode: [0, 0.35, 0], count: 14 + fins.length, label: 'Cradle', at: [0, SEAT_Y + 0.4, 0], value: () => `face ${Math.min(4, S.face + 1)} of 4` })
-
-// ------------------------------------------------------------------ pusher: tie-rod air cylinder at the far end
-const PX0 = -2.14
-lab.mesh(GEO.rbox(0.08, 0.34, 0.28, 0.008), steelDark, { name: 'Pusher bracket', pos: [TX0 + 0.1, TABLE_Y + 0.17, 0], explode: [-0.3, 0, 0] })
-for (const x of [PX0, -1.32]) lab.mesh(GEO.rbox(0.1, 0.2, 0.2, 0.012), steel, { name: 'End cap', pos: [x + 0.05, ROD_Y, 0], explode: [-0.6, 0.2, 0], count: 1 })
-lab.mesh(GEO.disc(0.075, 0.72), MAT.steel({ roughness: 0.2 }), { name: 'Pusher barrel', pos: [(PX0 + 0.1 - 1.32) / 2, ROD_Y, 0], rot: [0, 0, Math.PI / 2], explode: [-0.6, 0.2, 0], label: 'Pusher', at: [0, 0.12, 0], value: () => `${fmt(S.F)} N` })
-for (const [y, z] of [[0.08, 0.08], [0.08, -0.08], [-0.08, 0.08], [-0.08, -0.08]]) lab.mesh(GEO.disc(0.008, 0.82), steel, { name: 'Tie rod', pos: [(PX0 - 1.22) / 2, ROD_Y + y, z], rot: [0, 0, Math.PI / 2], explode: [-0.6, 0.2, 0], count: 1 })
-lab.mesh(GEO.rbox(0.06, ROD_Y - 0.1, 0.06, 0.008), steelDark, { name: 'Rear stand', pos: [PX0 + 0.11, (ROD_Y - 0.1) / 2, 0], explode: [-0.6, -0.1, 0] })
-const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 24), MAT.chrome())
-rod.rotation.z = Math.PI / 2
-lab.add(rod, { name: 'Piston rod', explode: [-0.3, 0.2, 0] })
-const hoseAt = new THREE.Vector3(PX0 + 0.05, ROD_Y + 0.1, 0.05)
-
-// ------------------------------------------------------------------ timber portal, lift cylinder, guard plate
-for (const s of [-1, 1]) {
-  lab.mesh(GEO.rbox(0.14, POST_H - 0.03, 0.14, 0.01), timber, { name: 'Timber post', pos: [0, 0.03 + (POST_H - 0.03) / 2, s * POST_Z], explode: [0, 0, s * 0.6], label: s > 0 ? 'Portal' : undefined, at: [0.07, 0.4, 0] })
-  lab.mesh(GEO.rbox(0.22, 0.03, 0.22, 0.004), steelDark, { name: 'Post foot', pos: [0, 0.015, s * POST_Z], explode: [0, 0, s * 0.6], count: 1 })
-  lab.mesh(GEO.rbox(0.06, 1.3, 0.03, 0.004), steelDark, { name: 'Guide strip', pos: [0, 1.55, s * (POST_Z - 0.085)], explode: [0, 0, s * 0.6], count: 1 })
-  lab.mesh(GEO.rbox(0.016, 0.3, 0.18, 0.003), steelDark, { name: 'Beam bracket', pos: [0.078, POST_H - 0.01, s * POST_Z], explode: [0, 0.4, s * 0.6], count: 1 })
+{
+  let from = 0
+  FACE_LEN.forEach((len, f) => {
+    // face f turns towards the chisel (-y) after f quarter turns
+    const a = (-f * Math.PI) / 2
+    const r = ([x, y]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)]
+    const half = (f % 2 ? BLOCK.A : BLOCK.B) / 2 + 0.3
+    const n = Math.round(len / 2)
+    const along = Math.abs(r([1, 0])[0]) > 0.5 // the face runs along local x
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n
+      const [lx, ly] = r([-len / 2 + t * len, -half])
+      const m = new THREE.Mesh(along ? boxGeo((len / n) * 0.96, 0.6, 0.3, 0.0008) : boxGeo(0.6, (len / n) * 0.96, 0.3, 0.0008), finMat)
+      m.position.set(...W(lx, ly, BLOCK.PART))
+      block.add(m)
+      fins.push({ m, s: from + t * len })
+    }
+    from += len
+  })
 }
-lab.mesh(GEO.rbox(0.18, 0.18, 1.4, 0.012), timberDark, { name: 'Top beam', pos: [0, BEAM_Y, 0], explode: [0, 0.6, 0] })
-lab.mesh(GEO.rbox(0.24, 0.04, 0.24, 0.006), steelDark, { name: 'Cylinder flange', pos: [0, BEAM_Y + 0.11, 0], explode: [0, 0.9, 0] })
-for (const y of [BEAM_Y + 0.18, BEAM_Y + 0.78]) lab.mesh(GEO.rbox(0.18, 0.1, 0.18, 0.01), steel, { name: 'Lift end cap', pos: [0, y, 0], explode: [0, 0.9, 0], count: 1 })
-lab.mesh(GEO.disc(0.07, 0.5), MAT.steel({ roughness: 0.2 }), { name: 'Lift cylinder', pos: [0, BEAM_Y + 0.48, 0], explode: [0, 0.9, 0], label: 'Lift cylinder', at: [0.1, 0, 0] })
-const guard = new THREE.Group()
-const crossbar = new THREE.Mesh(GEO.rbox(0.08, 0.08, 0.96, 0.008), steelDark); crossbar.position.y = 0.31; guard.add(crossbar)
-const plate = new THREE.Mesh(GEO.rbox(0.03, 0.56, 0.84, 0.006), yellow); plate.position.set(0.065, 0, 0); guard.add(plate)
-const lip = new THREE.Mesh(GEO.rbox(0.04, 0.04, 0.8, 0.008), rubber); lip.position.set(0.065, -0.3, 0); guard.add(lip)
-const sign = new THREE.Mesh(GEO.rbox(0.004, 0.11, 0.28, 0.002), MAT.paint({ color: [0.1, 0.1, 0.1] })); sign.position.set(0.082, 0.08, 0); guard.add(sign)
-lab.add(guard, { name: 'Guard plate', explode: [0.4, 0, 0], count: 4, label: 'Guard', at: [0.08, 0.2, 0.3] })
-const liftRod = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 20), MAT.chrome())
-lab.add(liftRod, { name: 'Lift rod', explode: [0, 0.9, 0] })
+lab.add(block, { name: 'BC block', explode: [0, 0.7, 0], count: 5 + fins.length, label: 'BC block', at: [0, 0.55, 0] })
 
-// ------------------------------------------------------------------ balancer arm, spring balancer, air chisel
-const ARM_Z = 0.36
-lab.mesh(GEO.rbox(0.62, 0.06, 0.06, 0.006), steelDark, { name: 'Balancer arm', pos: [0.39, BEAM_Y, ARM_Z], explode: [0.3, 0.6, 0.3] })
-lab.mesh(GEO.disc(0.07, 0.09), yellow, { name: 'Spring balancer', pos: [WORK_X, BEAM_Y - 0.13, ARM_Z], rot: [Math.PI / 2, 0, 0], explode: [0.3, 0.6, 0.3], label: 'Balancer', at: [0.08, 0, 0] })
-const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1, 8), steel)
-lab.add(cable, { name: 'Balancer cable', explode: [0.3, 0.3, 0.3] })
-const chisel = new THREE.Group() // origin at the bit's tip, the tool points along -z
-const bit = new THREE.Mesh(GEO.disc(0.008, 0.06), MAT.steel({ roughness: 0.25 })); bit.rotation.x = Math.PI / 2; bit.position.z = 0.03
-const body = new THREE.Mesh(GEO.disc(0.028, 0.2), steelDark); body.rotation.x = Math.PI / 2; body.position.z = 0.16
-const grip = new THREE.Mesh(GEO.rbox(0.04, 0.14, 0.05, 0.012), rubber); grip.position.set(0, -0.06, 0.24)
-const trigger = new THREE.Mesh(GEO.rbox(0.02, 0.03, 0.02, 0.004), MAT.paint({ color: [0.8, 0.12, 0.1] })); trigger.position.set(0, -0.03, 0.205)
-const eye = new THREE.Mesh(GEO.tube(0.016, 0.009, 0.01), steel); eye.rotation.x = Math.PI / 2; eye.position.set(0, 0.04, 0.2)
-chisel.add(bit, body, grip, trigger, eye)
-lab.add(chisel, { name: 'Air chisel', explode: [0, 0.2, 0.5], count: 5, label: 'Air chisel', at: [0, 0.05, 0.16], value: () => `${fmt(S.f)} blows/s · ${fmt(S.E, 1)} J` })
+// ------------------------------------------------------------------ gantry inside the booth: columns, beam, slide, chisel
+for (const x of [GANTRY.x0, GANTRY.x1 - 10]) {
+  box({ x: x - 3, y: GANTRY.y - 5, w: 16, d: 20 }, 1, 2, steelDark, { name: 'Column foot', explode: [0, 0, -0.5], count: 1 })
+  box({ x, y: GANTRY.y - 2, w: 10, d: 14 }, 3, GANTRY.z - 3, grey, { name: 'Gantry column', explode: [0, 0, -0.5], count: 1 })
+}
+box({ x: GANTRY.x0, y: GANTRY.y - 1, w: GANTRY.x1 - GANTRY.x0, d: 12 }, GANTRY.z, 8, grey, { name: 'Gantry beam', explode: [0, 0.4, -0.5] })
+const slide = new THREE.Group()
+part(slide, { x: -7, y: GANTRY.y - 3, w: 14, d: 16 }, GANTRY.z - 4, 16, steelDark)
+part(slide, { x: -4, y: GANTRY.y - 2, w: 8, d: 6 }, 44, GANTRY.z - 48, steelDark)
+lab.add(slide, { name: 'Slide', explode: [0, 0.4, -0.5], count: 2 })
+const feedRod = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 16), MAT.chrome()); feedRod.rotation.x = Math.PI / 2
+lab.add(feedRod, { name: 'Feed rod', explode: [0, 0.2, -0.5] })
+// the chisel, its tip at the origin pointing at the block (+y), body towards the camera
+const chisel = new THREE.Group()
+const along = (y0, y1, r, mat) => { const m = new THREE.Mesh(GEO.disc(r / 100, (y1 - y0) / 100), mat); m.rotation.x = Math.PI / 2; m.position.set(...W(0, (y0 + y1) / 2, 0)); chisel.add(m); return m }
+along(-6, 0, 0.8, MAT.steel({ roughness: 0.25 }))
+along(-8, -5, 2.2, steelDark)
+along(-27, -8, 2.8, steelDark)
+along(-30, -27, 1.2, rubber)
+lab.add(chisel, { name: 'Air chisel', explode: [0, 0.2, -0.6], count: 4, label: 'Air chisel', at: [0, 0.05, -0.16], value: () => `${fmt(S.f)} blows/s · ${fmt(S.E, 1)} J` })
 const chips = lab.flow({
   parent: chisel,
   paths: Array.from({ length: 14 }, (_, i) => {
     const a = (i / 14) * Math.PI - Math.PI / 2, r = 0.05 + (i % 3) * 0.02
-    return [[0, 0, 0.005], [Math.sin(a) * r, 0.02, 0.05], [Math.sin(a) * r * 2.2, -0.12, 0.12 + (i % 4) * 0.02]]
+    return [[0, 0, -0.005], [Math.sin(a) * r, 0.02, -0.05], [Math.sin(a) * r * 2.2, -0.12, -0.12 - (i % 4) * 0.02]]
   }),
   count: 260, length: 0.18, speed: 0, color: () => [0.35, 0.33, 0.31],
 })
 
-// ------------------------------------------------------------------ roller conveyor towards HSB05
-for (const s of [-1, 1]) {
-  lab.mesh(GEO.rbox(CONV_X1 - CONV_X0, 0.09, 0.04, 0.006), steelDark, { name: 'Conveyor rail', pos: [(CONV_X0 + CONV_X1) / 2, CONV_Y - 0.035, s * 0.34], explode: [0.4, -0.2, 0], count: 1 })
-  for (const x of [CONV_X0 + 0.1, CONV_X1 - 0.1]) lab.mesh(GEO.rbox(0.04, CONV_Y - 0.08, 0.04, 0.006), steelDark, { name: 'Conveyor leg', pos: [x, (CONV_Y - 0.08) / 2, s * 0.34], explode: [0.4, -0.2, 0], count: 1 })
-}
-lab.mesh(GEO.rbox(0.04, 0.16, 0.72, 0.006), steelDark, { name: 'Conveyor stop', pos: [CONV_X1 + 0.02, CONV_Y, 0], explode: [0.6, -0.2, 0] })
-const rollers = []
-for (let i = 0, x = CONV_X0 + 0.06; x < CONV_X1 - 0.03; i++, x += 0.07) rollers.push(lab.mesh(GEO.disc(0.023, 0.64, 0.003, 24), steel, { name: 'Roller', pos: [x, CONV_Y - 0.023, 0], rot: [Math.PI / 2, 0, 0], explode: [0.4, -0.2, 0], count: 1, label: i === 4 ? 'To HSB05' : undefined, at: [0, 0.05, 0] }))
+// ------------------------------------------------------------------ kicker at the mouth
+box({ x: KICK.x - 8, y: KICK.y0 - 2, w: 16, d: 16 }, 0, 2, steelDark, { name: 'Kicker foot', explode: [0, 0, -0.5] })
+box({ x: KICK.x - 3, y: KICK.y0 + 3, w: 6, d: 6 }, 2, KICK.z - 7, steelDark, { name: 'Kicker stand', explode: [0, 0, -0.5] })
+lab.mesh(GEO.disc(0.05, (KICK.y1 - KICK.y0) / 100), steel, { name: 'Kicker cylinder', pos: W(KICK.x, (KICK.y0 + KICK.y1) / 2, KICK.z), rot: [Math.PI / 2, 0, 0], explode: [0, 0, -0.5], label: 'Kicker', at: [0, 0.1, 0] })
+const kickRod = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1, 16), MAT.chrome()); kickRod.rotation.x = Math.PI / 2
+lab.add(kickRod, { name: 'Kicker rod', explode: [0, 0, -0.5] })
+const kickPad = lab.mesh(boxGeo(10, 2, 10), steelDark, { name: 'Kicker pad', explode: [0, 0, -0.5] })
 
-// ------------------------------------------------------------------ push-button box and the railing
-lab.mesh(GEO.rbox(0.06, 0.8, 0.06, 0.006), steelDark, { name: 'Box pedestal', pos: [-0.64, 0.42, 0.7], explode: [0, 0, 0.5] })
-lab.mesh(GEO.rbox(0.16, 0.02, 0.16, 0.004), steelDark, { name: 'Pedestal foot', pos: [-0.64, 0.01, 0.7], explode: [0, 0, 0.5] })
-lab.mesh(GEO.rbox(0.32, 0.42, 0.16, 0.02), beige, { name: 'Button box', pos: [-0.64, 1.03, 0.7], explode: [0, 0, 0.5], label: 'Push buttons', at: [0, 0.22, 0.08] })
-const btnGeo = GEO.disc(0.012, 0.012)
-const btnOff = MAT.plastic({ color: [0.12, 0.12, 0.13] })
-const btn = MAT.glow({ emissive: [0.1, 1, 0.3], emissiveIntensity: 0.3 })
-for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) lab.mesh(btnGeo, r === 0 && c === 0 ? btn : btnOff, { name: 'Push button', pos: [-0.74 + c * 0.05, 1.13 - r * 0.065, 0.785], rot: [Math.PI / 2, 0, 0], explode: [0, 0, 0.5], count: 1 })
-lab.mesh(GEO.disc(0.035, 0.03), MAT.glow({ emissive: [1, 0.12, 0.08], emissiveIntensity: 1.2 }), { name: 'E-stop', pos: [-0.56, 1.26, 0.7], explode: [0, 0.2, 0.5] })
-const RAIL_XS = [-2.0, -1.4, -0.8, -0.2, 0.4, 1.0, 1.6, 2.2]
-for (const x of RAIL_XS) lab.mesh(GEO.rbox(0.04, 1.0, 0.04, 0.006), yellow, { name: 'Railing post', pos: [x, 0.5, -0.86], explode: [0, 0, -0.5], count: 1 })
-for (const y of [0.54, 0.98]) lab.mesh(GEO.rbox(RAIL_XS.at(-1) - RAIL_XS[0] + 0.04, 0.04, 0.04, 0.008), yellow, { name: 'Railing bar', pos: [(RAIL_XS[0] + RAIL_XS.at(-1)) / 2, y, -0.86], explode: [0, 0, -0.5], count: 1 })
+// ------------------------------------------------------------------ roller conveyor at right angles to the line, on to HSB05
+for (const x of [CONV.x0 - 4, CONV.x1]) {
+  box({ x, y: CONV.y0, w: 4, d: CONV.y1 - CONV.y0 + 4 }, CONV.z - 9, 10, steelDark, { name: 'Conveyor rail', explode: [0, -0.2, 0.4], count: 1 })
+  for (let y = CONV.y0 + 20; y < CONV.y1; y += 96) box({ x, y, w: 4, d: 4 }, 0, CONV.z - 9, steelDark, { name: 'Conveyor leg', explode: [0, -0.2, 0.4], count: 1 })
+}
+const rollers = []
+for (let i = 0, y = CONV.y0 + 5.3; y < CONV.y1 - 3; i++, y += 8) rollers.push(lab.mesh(GEO.disc(0.023, (CONV.x1 - CONV.x0) / 100, 0.003, 24), steel, { name: 'Roller', pos: W((CONV.x0 + CONV.x1) / 2, y, CONV.z - 2.3), rot: [0, 0, Math.PI / 2], explode: [0, -0.2, 0.4], count: 1, label: i === 28 ? 'To HSB05' : undefined, at: [0, 0.05, 0] }))
+box({ x: CONV.x0 - 4, y: CONV.y1, w: CONV.x1 - CONV.x0 + 8, d: 5 }, CONV.z - 9, 26, steelDark, { name: 'Conveyor end stop', explode: [0, -0.2, 0.7] })
+
+// ------------------------------------------------------------------ low yellow rails along the walkway
+{
+  const xs = [-24, 6, 36, RAILING_X]
+  for (const x of xs) box({ x: x - 1.5, y: 90.5, w: 3, d: 3 }, 0, RAILING_H - 3, yellow, { name: 'Rail post', explode: [0, 0, -0.5], count: 1 })
+  box({ x: xs[0] - 2, y: 90, w: RAILING_X - xs[0] + 4, d: 4 }, RAILING_H - 3, 3, yellow, { name: 'Guard rail', explode: [0, 0, -0.5], count: 1 })
+  const ys = Array.from({ length: 16 }, (_, i) => 92 + i * 26)
+  for (const y of ys) box({ x: RAILING_X - 1.5, y: y - 1.5, w: 3, d: 3 }, 0, RAILING_H - 3, yellow, { name: 'Rail post', explode: [-0.4, 0, 0], count: 1 })
+  box({ x: RAILING_X - 2, y: ys[0] - 2, w: 4, d: ys.at(-1) - ys[0] + 4 }, RAILING_H - 3, 3, yellow, { name: 'Guard rail', explode: [-0.4, 0, 0], count: 1 })
+}
 
 // ------------------------------------------------------------------ the solver
 const BAR = 1e5, ATM = 1.013e5
-const A_PUSH = Math.PI * 0.0315 ** 2          // 63 mm bore
-const A_HAM = Math.PI * 0.0095 ** 2           // 19 mm bore
+const A_PUSH = Math.PI * 0.025 ** 2            // 50 mm rodless carriage cylinder
+const A_HAM = Math.PI * 0.0095 ** 2           // 19 mm chisel piston
 const STROKE_H = 0.05, ETA = 0.45
 const E_CHIP = 3e9                            // J/m3, grey iron
 const A_FIN = 3e-3 * 1.5e-3                   // fin section, m2
@@ -1720,7 +1776,7 @@ function solve(p) {
   const F = p * A_PUSH
   const f = p > 0.5 * BAR ? 30 * Math.sqrt(p / (6 * BAR)) : 0
   const E = ETA * p * A_HAM * STROKE_H
-  const rate = (f * E) / (E_CHIP * A_FIN)     // m of flash per second
+  const rate = ((f * E) / (E_CHIP * A_FIN)) * 100 // cm of flash per second
   const Q = ((f * A_HAM * STROKE_H * (p + ATM)) / ATM) * 60e3 // free air, L/min
   return { F, f, E, rate, Q }
 }
@@ -1728,14 +1784,28 @@ function solve(p) {
 lab.hero({ label: 'Flash removed', unit: '%', max: 100, digits: 0 })
 const pressure = lab.slider({ id: 'bar', label: 'Line pressure', min: 4, max: 7, value: 6, unit: 'bar', ends: ['4', '7'] })
 
-// one cycle, shaped like the Blender animation: load, push in, guard down, chip four faces, guard up, hand on, back
-const DUR = { load: 1.6, in: 2.2, guard: 1.2, turn: 0.9, raise: 1.2, index: 2.4, back: 2.2 }
-const NEXT = { load: 'in', in: 'guard', guard: 'deburr', raise: 'index', index: 'back', back: 'load' }
-const SAY = { load: 'loading', in: 'pushing in', guard: 'guard down', deburr: 'chipping the flash', turn: 'indexing 90°', raise: 'guard up', index: 'to HSB05', back: 'carriage back' }
-let phase = 'load', pt = 0, clock = 0, turnFrom = 0, airLost = false
-const turnTo = () => (-Math.PI / 2) * S.face
+// one cycle, as in the card figure: load at the mouth, carriage in, door down, chip four faces with a quarter
+// turn between them, door up (the fourth quarter turn), carriage out, tip onto the conveyor, roll on to HSB05
+const DUR = { load: 1.6, in: 2.6, close: 1.2, turn: 0.9, open: 1.2, out: 2.6, tip: 1.6, convey: 2.6 }
+const NEXT = { load: 'in', in: 'close', close: 'deburr', turn: 'deburr', open: 'out', out: 'tip', tip: 'convey', convey: 'load' }
+const SAY = { load: 'loading a raw block', in: 'carriage in', close: 'door down', deburr: 'chipping the flash', turn: 'turning 90°', open: 'door up', out: 'carriage out', tip: 'tipping onto the conveyor', convey: 'on to HSB05' }
+let phase = 'load', pt = 0, clock = 0, airLost = false
 const setPhase = (p) => { phase = p; pt = 0 }
-const chiselAt = [WORK_X, SEAT_Y + PARTING + 0.12, 0.42]
+const chiselAt = [...PARK]
+
+// rotations in the card figure's world (rows), turned to three.js (X = -x, Y = z, Z = y)
+const Rz = (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]]
+const Rtip = (a) => [[1, 0, 0], [0, Math.cos(a), Math.sin(a)], [0, -Math.sin(a), Math.cos(a)]]
+const mulR = (R, v) => R.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2])
+const TT = [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]
+const mm = (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j]))
+const m4 = new THREE.Matrix4()
+function poseBlock(o, R) {
+  const M = mm(mm(TT, R), TT)
+  m4.set(M[0][0], M[0][1], M[0][2], 0, M[1][0], M[1][1], M[1][2], 0, M[2][0], M[2][1], M[2][2], 0, 0, 0, 0, 1)
+  block.quaternion.setFromRotationMatrix(m4)
+  lab.place(block, ...W(...o))
+}
 
 lab.onTick((dt) => {
   clock += dt
@@ -1750,79 +1820,81 @@ lab.onTick((dt) => {
   const u = DUR[phase] ? clamp(pt / DUR[phase]) : 0
   const e = smoothstep(0, 1, u)
 
-  // carriage position along the table, piston rod from the bracket to the carriage
-  let cx = LOAD_X
-  if (phase === 'in') cx = lerp(LOAD_X, WORK_X, e)
-  else if (['guard', 'deburr', 'turn', 'raise', 'index'].includes(phase)) cx = WORK_X
-  else if (phase === 'back') cx = lerp(WORK_X, LOAD_X, e)
-  lab.place(carriage, cx, 0, 0)
-  const rodEnd = cx - 0.28
-  rod.scale.y = Math.max(0.01, rodEnd - PUSH_X0); lab.place(rod, (rodEnd + PUSH_X0) / 2, ROD_Y, 0)
-
-  // guard plate and the lift rod above it
-  const down = phase === 'guard' ? e : ['deburr', 'turn'].includes(phase) ? 1 : phase === 'raise' ? 1 - e : 0
-  const gy = lerp(GUARD_UP, GUARD_DOWN, down)
-  lab.place(guard, 0, gy, 0)
-  const rTop = BEAM_Y + 0.13, rBot = gy + 0.35
-  liftRod.scale.y = Math.max(0.01, rTop - rBot); lab.place(liftRod, 0, (rTop + rBot) / 2, 0)
-
-  // chipping: the flash comes off at the solver's rate, one face at a time; the cradle indexes 90° between faces
-  if (phase === 'deburr' && live) {
-    S.removed = Math.min(FACE_END[S.face], S.removed + S.rate * TIME_K * dt)
-    if (S.removed >= FACE_END[S.face] - 1e-6) {
-      S.face++
-      if (S.face >= 4) setPhase('raise')
-      else { turnFrom = cradle.rotation.y; setPhase('turn') }
-    }
-  } else if (phase === 'turn') {
-    cradle.rotation.y = lerp(turnFrom, turnTo(), e)
-    if (u >= 1) setPhase('deburr')
-  } else if (phase !== 'deburr' && u >= 1) {
-    if (phase === 'raise') cradle.rotation.y = 0 // four quarter turns: square again
-    if (phase === 'back') { S.removed = 0; S.face = 0 }
+  // the cycle: chipping takes as long as the flash takes to come off, everything else has its time
+  if (phase === 'deburr') {
+    if (live) S.removed = Math.min(FACE_END[S.face], S.removed + S.rate * TIME_K * dt)
+    if (S.removed >= FACE_END[S.face] - 1e-6) { S.face++; setPhase(S.face >= 4 ? 'open' : 'turn') }
+  } else if (u >= 1) {
+    if (phase === 'convey') { S.removed = 0; S.face = 0 }
     setPhase(NEXT[phase])
   }
-  for (const { m, s } of fins) m.visible = s > S.removed
 
-  // the chisel: parked under its balancer, or on the parting line of the face that looks at the operator
-  const k = Math.min(S.face, 3)
-  const half = FACE_LEN[k] / 2, depth = k % 2 ? HX : HZ
-  const along = clamp((S.removed - (FACE_END[k] - FACE_LEN[k])) / FACE_LEN[k])
+  // carriage along the line, cradle turn, door
+  const cx = phase === 'in' ? lerp(MOUTH_X, WORK_X, e) : phase === 'out' ? lerp(WORK_X, MOUTH_X, e) : ['close', 'deburr', 'turn', 'open'].includes(phase) ? WORK_X : MOUTH_X
+  lab.place(carriage, ...W(cx, LINE_Y, 0))
+  const quarter = phase === 'turn' || phase === 'open' ? S.face - 1 + e : phase === 'deburr' ? S.face : 0
+  const angle = (quarter * Math.PI) / 2
+  cradle.rotation.y = angle
+  const down = phase === 'close' ? e : phase === 'deburr' || phase === 'turn' ? 1 : phase === 'open' ? 1 - e : 0
+  const lift = (1 - down) * DOOR.lift
+  lab.place(door, ...W(0, 0, lift))
+  const rBot = DOOR_TOP + lift - 2, rTop = BEAM_Z + 16
+  liftRod.scale.y = Math.max(0.01, (rTop - rBot) / 100); lab.place(liftRod, ...W(LIFT.x, LIFT.y, (rTop + rBot) / 2))
+
+  // the block: on the cradle, tipped over by the kicker, or rolling along the conveyor
+  const B = BLOCK.B
+  let kick = KICK.rest
+  if (phase === 'tip' || phase === 'convey') {
+    const PUSH = (35 * Math.PI) / 180
+    const contact = (phi) => LINE_Y + B / 2 - B * Math.cos(phi) + ((KICK.z - SEAT_Z - B * Math.sin(phi)) / Math.cos(phi)) * Math.sin(phi)
+    let phi = Math.PI / 2
+    if (phase === 'tip') {
+      phi = u < 0.15 ? 0 : u < 0.5 ? PUSH * smoothstep(0.15, 0.5, u) : u < 0.75 ? PUSH + (Math.PI / 2 - PUSH) * ((u - 0.5) / 0.25) ** 2 : Math.PI / 2
+      kick = u < 0.15 ? lerp(KICK.rest, contact(0), smoothstep(0, 0.15, u)) : u < 0.5 ? contact(phi) : lerp(contact(PUSH), KICK.rest, smoothstep(0.5, 0.9, u))
+    }
+    const R = Rtip(phi)
+    const off = mulR(R, [0, -B / 2, 0])
+    const run = phase === 'convey' ? smoothstep(0, 0.8, u) * (CONV.y1 - (LINE_Y + B / 2 + BLOCK.H)) : 0
+    poseBlock([MOUTH_X + off[0], LINE_Y + B / 2 + off[1] + run, SEAT_Z + off[2]], R)
+    blockMat.opacity = finMat.opacity = phase === 'convey' ? 1 - smoothstep(0.85, 1, u) : 1
+  } else {
+    poseBlock([cx, LINE_Y, SEAT_Z], Rz(angle))
+    blockMat.opacity = finMat.opacity = phase === 'load' ? e : 1
+  }
+  for (const { m, s } of fins) m.visible = s > S.removed
+  kickRod.scale.y = Math.max(0.01, (kick - 2 - KICK.y1) / 100); lab.place(kickRod, ...W(KICK.x, (KICK.y1 + kick - 2) / 2, KICK.z))
+  lab.place(kickPad, ...W(KICK.x, kick - 1, KICK.z))
+
+  // the chisel rides the parting line of the face towards the gantry, or waits retracted
   const working = phase === 'deburr'
-  const target = working ? [cx + lerp(-half, half, along), SEAT_Y + PARTING, depth + FIN + 0.002] : [WORK_X, SEAT_Y + PARTING + 0.12, 0.42]
+  let target = PARK
+  if (working) {
+    const f = Math.min(S.face, 3), len = FACE_LEN[f]
+    const t = clamp((S.removed - (FACE_END[f] - len)) / len)
+    const half = (f % 2 ? BLOCK.A : BLOCK.B) / 2
+    target = [WORK_X - len / 2 + len * t, LINE_Y - half - 1, SEAT_Z + BLOCK.PART]
+  }
   for (let i = 0; i < 3; i++) chiselAt[i] = approach(chiselAt[i], target[i], working ? 0.06 : 0.25, dt)
-  const buzz = working && live ? Math.sin(clock * S.f * 2 * Math.PI) * 0.0015 : 0
-  lab.place(chisel, chiselAt[0], chiselAt[1], chiselAt[2] + buzz)
-  // balancer cable from the drum to the chisel's eye
-  const a = new THREE.Vector3(WORK_X, BEAM_Y - 0.18, ARM_Z), b = new THREE.Vector3(chiselAt[0], chiselAt[1] + 0.05, chiselAt[2] + 0.2)
-  const dir = b.clone().sub(a)
-  cable.scale.y = Math.max(0.01, dir.length())
-  const mid = a.clone().add(b).multiplyScalar(0.5)
-  lab.place(cable, mid.x, mid.y, mid.z)
-  cable.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize())
+  const [tx, ty, tz] = chiselAt
+  const buzz = working && live ? Math.sin(clock * S.f * 2 * Math.PI) * 0.3 : 0
+  lab.place(chisel, ...W(tx, ty + buzz, tz))
+  lab.place(slide, ...W(tx, 0, 0))
+  const feed = Math.max(0.5, ty - 30 - FEED_Y)
+  feedRod.scale.y = feed / 100; lab.place(feedRod, ...W(tx, FEED_Y + feed / 2, tz))
   chips.speed = working && live ? 1.6 : 0
   chips.opacity = working && live ? clamp(S.f / 20) : 0
 
   // the casting goes from raw brown to clean grey as the flash comes off
   const C = S.removed / PERIM
   blockMat.color.setRGB(lerp(0.24, 0.42, C), lerp(0.2, 0.4, C), lerp(0.17, 0.38, C))
-  // hand-on: the block slides off the cradle onto the rollers and away; a raw one is loaded at the start
-  if (phase === 'index') {
-    block.position.x = smoothstep(0, 0.6, u) * 0.95
-    block.position.y = smoothstep(0.2, 0.6, u) * (CONV_Y - SEAT_Y)
-    blockMat.opacity = finMat.opacity = u < 0.6 ? 1 : 1 - (u - 0.6) / 0.4
-    rollers.forEach((r) => { r.rotation.y += dt * 8 })
-  } else if (phase === 'back' || phase === 'load') {
-    block.position.set(0, 0, 0)
-    blockMat.opacity = finMat.opacity = phase === 'load' ? u : 0
-  } else blockMat.opacity = finMat.opacity = 1
   btn.emissiveIntensity = phase === 'load' ? 3 : 0.3
 
+  const face = phase === 'deburr' || phase === 'turn' ? ` · face ${Math.min(4, S.face + 1)} of 4` : ''
   lab.setHero(C * 100, {
-    state: airLost ? `air lost · ${SAY[phase]}` : SAY[phase],
+    state: airLost ? `air lost · ${SAY[phase]}` : SAY[phase] + face,
     sub: airLost
-      ? `line ${fmt(S.p / BAR, 1)} bar · chisel ${live ? 'slowing' : 'stopped'} · pusher stalled`
-      : `${fmt(S.p / BAR, 1)} bar · ${fmt(S.f)} blows/s · ${fmt(S.E, 1)} J per blow · ${fmt(S.rate * 1000, 1)} mm/s · ${fmt(S.Q)} L/min`,
+      ? `line ${fmt(S.p / BAR, 1)} bar · chisel ${live ? 'slowing' : 'stopped'} · carriage stalled`
+      : `${fmt(S.p / BAR, 1)} bar · ${fmt(S.f)} blows/s · ${fmt(S.E, 1)} J per blow · ${fmt(S.rate * 10, 1)} mm/s · ${fmt(S.Q)} L/min`,
     bad: airLost,
   })
 })
@@ -1832,28 +1904,28 @@ lab.breakIt({
   label: 'Burst the hose',
   run(lab) {
     airLost = true
-    lab.sparks.emit(lab.machine.localToWorld(hoseAt.clone()), 60, 2)
+    lab.sparks.emit(lab.machine.localToWorld(new THREE.Vector3(...W(GANTRY.x0 + 5, GANTRY.y, GANTRY.z))), 60, 2)
   },
   reset() { airLost = false },
 })
 lab.how(
-  'A tie-rod cylinder pushes the carriage through the timber portal, the guard drops, and an air chisel hung on a spring balancer chips the casting flash off the parting line, face by face, while the cradle indexes the block 90° between faces. Each blow carries the piston energy, and the flash it takes off is that energy over the chipping energy of grey iron times the fin section. The chipping is shown 12x fast. Bursting the supply hose bleeds the line pressure away; below 2 bar the pusher stalls where it stands and the chisel stops. Simplified: every blow lands on the fin, and the fin has one section all round.',
+  'A rodless cylinder runs the carriage in through the timber portal of the closed booth, the lift door drops, and an air chisel on a gantry slide chips the casting flash off the parting line of the face towards it, while the turntable turns the block a quarter turn between faces. Each blow carries the piston energy, and the flash it takes off is that energy over the chipping energy of grey iron times the fin section; the chipping is shown 12x fast. Then the door lifts, the carriage brings the block out, a kicker tips it over onto the roller conveyor at right angles to the line, and it rolls away to HSB05. Bursting the supply hose bleeds the line pressure away; below 2 bar the carriage stalls where it stands and the chisel stops. The booth is closed in the Blender file; the chisel gantry inside is our assumption.',
   [
-    'F = p A               A = pi (0.063/2)^2',
+    'F = p A               A = pi (0.050/2)^2',
     'E = eta p A_h s       A_h = pi (0.019/2)^2, s = 50 mm, eta = 0.45',
     'f = 30 Hz sqrt(p / 6 bar)',
     'l = E / (e a)         e = 3 J/mm^3, a = 3 x 1.5 mm',
-    'dL/dt = f l           L = 2 (0.475 + 0.371) m',
+    'dL/dt = f l           L = 2 (0.37 + 0.34) m',
     'Q = f A_h s (p + 1 atm) / 1 atm',
   ],
 )
-lab.autoFilm({ runBeat: 'It chips.', runSub: 'The flash comes off the parting line, one face at a time.', breakBeat: 'Burst the hose.', breakSub: 'The pressure bleeds off; the chisel and the pusher stop.', sliderTo: 0.9 })
+lab.autoFilm({ runBeat: 'It chips.', runSub: 'Inside the booth the flash comes off the parting line, one face at a time.', breakBeat: 'Burst the hose.', breakSub: 'The pressure bleeds off; the chisel and the carriage stop.', sliderTo: 0.9 })
 // jump to a phase for review shots: __bari.go('deburr', 0.4) starts chipping with 40 % of the flash gone
 window.__bari = {
   go(p, frac = 0) {
-    S.removed = PERIM * frac
-    S.face = Math.min(3, FACE_END.findIndex((end) => S.removed < end - 1e-6) === -1 ? 3 : FACE_END.findIndex((end) => S.removed < end - 1e-6))
-    cradle.rotation.y = p === 'deburr' || p === 'turn' ? turnTo() : 0
+    S.removed = ['open', 'out', 'tip', 'convey'].includes(p) ? PERIM : p === 'deburr' ? PERIM * frac : 0
+    const k = FACE_END.findIndex((end) => S.removed < end - 1e-6)
+    S.face = k === -1 ? 4 : k
     setPhase(p)
   },
 }

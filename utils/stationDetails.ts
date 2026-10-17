@@ -30,6 +30,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'HSB05',
     subtitle: 'Hanger Shot Blast',
     image: { light: '/stations/hsb05-light.svg', dark: '/stations/hsb05-dark.svg' },
+    live: '/stations/hsb05-live.html',
     play: '/stations/hsb05-3d.html',
     description: [
       'The monorail hoist picks the cast block off the in conveyor on a C-hook hanger and carries it through the left door into the octagonal blast chamber.',

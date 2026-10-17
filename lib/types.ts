@@ -193,3 +193,19 @@ export const DEFECT_PRODUCTS: { value: DefectProduct; label: string }[] = [
   { value: 'camshaft', label: 'Camshaft' },
   { value: 'crankshaft', label: 'Crankshaft' },
 ];
+
+// Lines 1-2 are BC 1TR/2TR, 3 Camshaft, 4 Crankshaft.
+export function productForLine(line: ProductLine): DefectProduct {
+  return line <= 2 ? 'bc' : line === 3 ? 'camshaft' : 'crankshaft';
+}
+
+// A defect/repair type added from Master Data on top of the built-in lists in
+// utils/constants.ts. Stored in defect_types, one list per product × kind.
+export type DefectTypeKind = 'defect' | 'repair';
+
+export interface CustomDefectType {
+  id: number;
+  product: DefectProduct;
+  kind: DefectTypeKind;
+  name: string;
+}

@@ -2,11 +2,11 @@
 
 import { DefectModal } from './DefectModal';
 import { RepairModal } from './RepairModal';
-import { DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES } from '@/utils/constants';
 import { takenFlasks } from '@/utils/flask';
 import type { EntryLogEdit } from '@/utils/entryLogEdit';
 import type { EntryLog } from '@/lib/types';
-import { lineGroup } from '@/lib/types';
+import { lineGroup, productForLine } from '@/lib/types';
+import { useTypesFor } from '@/hooks/useDefectTypes';
 
 interface Props {
   logs: EntryLog[];
@@ -20,6 +20,8 @@ interface Props {
 // cavity picker, free-text Crankshaft cavity).
 export function EntryLogEditModal({ logs, index, onSave, onClose }: Props) {
   const log = logs[index];
+  // Built-in list + Master Data additions for the entry's own product and kind.
+  const types = useTypesFor(productForLine(log?.line ?? 1), log?.kind ?? 'defect');
   if (!log) return null;
   const line = log.line ?? 1;
   const isShaft = lineGroup(line) === 'shaft';
@@ -43,14 +45,14 @@ export function EntryLogEditModal({ logs, index, onSave, onClose }: Props) {
     <DefectModal
       {...shared}
       title="Edit Defect (NG)"
-      types={isShaft ? SHAFT_DEFECT_TYPES : DEFECT_TYPES}
+      types={types}
       onSave={(type, qty, lot, flask, overDimensi) => onSave({ type, qty, lot, flask, ...(overDimensi ? { overDimensi } : {}) })}
     />
   ) : (
     <RepairModal
       {...shared}
       title="Edit Repair"
-      types={isShaft ? SHAFT_REPAIR_TYPES : REPAIR_TYPES}
+      types={types}
       onSave={(type, qty, lot, flask, die, overDimensi) =>
         onSave({ type, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) })}
     />

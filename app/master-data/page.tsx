@@ -7,6 +7,7 @@ import { DEFECT_LINE_NAMES, DEFECT_PRODUCTS } from '@/lib/types';
 import type { DefectLineName, DefectProduct } from '@/lib/types';
 import modalStyles from '@/components/production/EntryModal.module.css';
 import styles from './page.module.css';
+import { DefectTypeSection } from './DefectTypeSection';
 
 type Drafts = Record<string, string>;
 
@@ -56,7 +57,9 @@ export default function MasterDataPage() {
 
   return (
     <main className={styles.page}>
-      <h1 className={styles.title}>Master Data — Suspect Defect Line</h1>
+      <h1 className={styles.title}>Master Data</h1>
+      <DefectTypeSection />
+      <h2 className={styles.sectionTitle}>Suspect Defect Line</h2>
       {/* Tiap produk sumber line-nya beda (mis. Dross di B/C dari Moulding,
           di Camshaft dari stage lain), jadi tiap line diisi per produk. */}
       {isLoading && <p>Memuat data…</p>}

@@ -21,10 +21,11 @@ import { todayString } from '@/utils/date';
 import { entryDie, takenFlasks } from '@/utils/flask';
 import { canonicalType } from '@/utils/typeName';
 import {
-  SHIFTS, SHIFT_TIMES, PICS, findPic, DEFECT_TYPES, REPAIR_TYPES, SHAFT_DEFECT_TYPES, SHAFT_REPAIR_TYPES,
+  SHIFTS, SHIFT_TIMES, PICS, findPic,
 } from '@/utils/constants';
 import type { OverDimensiDetail, ProductLine, ProductionState } from '@/lib/types';
-import { lineGroup } from '@/lib/types';
+import { lineGroup, productForLine } from '@/lib/types';
+import { useTypesFor } from '@/hooks/useDefectTypes';
 import { withShiftHours } from '@/utils/shiftHours';
 import type { ShiftTime } from '@/utils/shiftHours';
 import styles from './page.module.css';
@@ -85,13 +86,6 @@ type CounterField = 'ok1' | 'repair1' | 'ng1' | 'ok2' | 'repair2' | 'ng2'
 type DefectTarget = 'ng1' | 'ng2' | 'ng3' | 'ng4';
 type RepairTarget = 'repair1' | 'repair2' | 'repair3' | 'repair4';
 
-// BC 1TR/2TR share one defect/repair list; Camshaft/Crankshaft share another.
-function defectTypesFor(target: DefectTarget | null): readonly string[] {
-  return target === 'ng3' || target === 'ng4' ? SHAFT_DEFECT_TYPES : DEFECT_TYPES;
-}
-function repairTypesFor(target: RepairTarget | null): readonly string[] {
-  return target === 'repair3' || target === 'repair4' ? SHAFT_REPAIR_TYPES : REPAIR_TYPES;
-}
 
 // The counter target ('ng3', 'repair1', …) always ends in its line number.
 // Lines 1-2 are Block Cylinder; lines 3-4 are Camshaft/Crankshaft. Defect and
@@ -139,6 +133,9 @@ export default function InputPage() {
 
   const [defectTarget, setDefectTarget] = useState<DefectTarget | null>(null);
   const [repairTarget, setRepairTarget] = useState<RepairTarget | null>(null);
+  // Built-in list + types added from Master Data, per product and NG/Repair.
+  const defectTypes = useTypesFor(defectTarget ? productForLine(lineForTarget(defectTarget)) : 'bc', 'defect');
+  const repairTypes = useTypesFor(repairTarget ? productForLine(lineForTarget(repairTarget)) : 'bc', 'repair');
   const [isResetOpen, setResetOpen] = useState(false);
 
   function commit(patch: Partial<ProductionState>) {
@@ -204,7 +201,7 @@ export default function InputPage() {
     const dataKey = group === 'shaft' ? 'defectDataShaft' : 'defectData';
     const currentData = current[dataKey] ?? {};
     // An "Other" name typed in a different case/spacing joins the existing type.
-    const defectType = canonicalType(typedType, [...defectTypesFor(defectTarget), ...Object.keys(currentData)]);
+    const defectType = canonicalType(typedType, [...defectTypes, ...Object.keys(currentData)]);
     const die = entryDie(line, flask);
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
@@ -227,7 +224,7 @@ export default function InputPage() {
     const group = lineGroup(line);
     const dataKey = group === 'shaft' ? 'repairDataShaft' : 'repairData';
     const currentData = current[dataKey] ?? {};
-    const repairType = canonicalType(typedType, [...repairTypesFor(repairTarget), ...Object.keys(currentData)]);
+    const repairType = canonicalType(typedType, [...repairTypes, ...Object.keys(currentData)]);
     commit({
       [repairTarget]: (current[repairTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [repairType]: (currentData[repairType] ?? 0) + qty },
@@ -472,7 +469,7 @@ export default function InputPage() {
         isOpen={defectTarget !== null}
         onClose={() => setDefectTarget(null)}
         onSave={handleSaveDefect}
-        types={defectTypesFor(defectTarget)}
+        types={defectTypes}
         flaskLabel={flaskLabelFor(defectTarget)}
         takenFlasks={takenFlasksFor(defectTarget)}
         cavityPicker={isCamshaft(defectTarget)}
@@ -481,7 +478,7 @@ export default function InputPage() {
         isOpen={repairTarget !== null}
         onClose={() => setRepairTarget(null)}
         onSave={handleSaveRepair}
-        types={repairTypesFor(repairTarget)}
+        types={repairTypes}
         flaskLabel={flaskLabelFor(repairTarget)}
         takenFlasks={takenFlasksFor(repairTarget)}
         cavityPicker={isCamshaft(repairTarget)}

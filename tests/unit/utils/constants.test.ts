@@ -33,3 +33,18 @@ describe('production constants', () => {
     expect(SHIFTS).toEqual(['Shift Red', 'Shift White']);
   });
 });
+
+describe('typesFor', () => {
+  it('appends types added for that product and kind only', async () => {
+    const { typesFor, DEFECT_TYPES } = await import('@/utils/constants');
+    const custom = [
+      { id: 1, product: 'bc' as const, kind: 'defect' as const, name: 'Retak Halus' },
+      { id: 2, product: 'bc' as const, kind: 'repair' as const, name: 'Gerinda Ulang' },
+      { id: 3, product: 'camshaft' as const, kind: 'defect' as const, name: 'Bari Cam' },
+    ];
+    const list = typesFor('bc', 'defect', custom);
+    expect(list.slice(0, DEFECT_TYPES.length)).toEqual([...DEFECT_TYPES]);
+    expect(list.slice(DEFECT_TYPES.length)).toEqual(['Retak Halus']);
+    expect(typesFor('crankshaft', 'defect', custom)).not.toContain('Bari Cam');
+  });
+});

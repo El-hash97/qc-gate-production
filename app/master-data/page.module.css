@@ -108,3 +108,50 @@
 @media (max-width: 768px) {
   .columns { grid-template-columns: 1fr; }
 }
+
+/* Daftar Jenis Defect & Repair section (above Suspect Defect Line). */
+.section {
+  margin-bottom: 28px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+}
+
+.productTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 140px));
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.typeColumns {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* Built-in lists are long (up to 24) - scroll inside the column. */
+.typeList {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.builtinTag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.addedItem {
+  border-left: 3px solid var(--accent-green);
+}
+
+@media (max-width: 768px) {
+  .typeColumns { grid-template-columns: 1fr; }
+}

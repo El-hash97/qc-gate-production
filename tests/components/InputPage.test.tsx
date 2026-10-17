@@ -19,6 +19,10 @@ vi.mock('@/hooks/useProductionState', () => ({
 }));
 vi.mock('@/hooks/useHourlySnapshot', () => ({ useHourlySnapshot: () => {} }));
 vi.mock('@/hooks/useAutoReset', () => ({ useAutoReset: () => {} }));
+vi.mock('@/hooks/useDefectTypes', async () => {
+  const { typesFor } = await vi.importActual<typeof import('@/utils/constants')>('@/utils/constants');
+  return { useTypesFor: (product: any, kind: any) => typesFor(product, kind, []) };
+});
 vi.mock('@/hooks/useReset', () => ({ useReset: () => ({ mutate: vi.fn() }) }));
 
 import InputPage from '@/app/input/page';

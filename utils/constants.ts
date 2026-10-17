@@ -1,3 +1,5 @@
+import type { CustomDefectType, DefectProduct, DefectTypeKind } from '@/lib/types';
+
 export const OVER_DIMENSI = 'Over Dimensi' as const;
 
 export const DEFECT_TYPES = [
@@ -80,6 +82,21 @@ export const SHAFT_DEFECT_TYPES = [
 ] as const;
 
 export const SHAFT_REPAIR_TYPES = SHAFT_DEFECT_TYPES;
+
+// The built-in (code) list for a product's NG or Repair picker. Camshaft and
+// Crankshaft share one list for both kinds.
+export function builtinTypes(product: DefectProduct, kind: DefectTypeKind): readonly string[] {
+  if (product !== 'bc') return kind === 'defect' ? SHAFT_DEFECT_TYPES : SHAFT_REPAIR_TYPES;
+  return kind === 'defect' ? DEFECT_TYPES : REPAIR_TYPES;
+}
+
+// Built-in list plus the types added from Master Data for that product × kind.
+export function typesFor(product: DefectProduct, kind: DefectTypeKind, custom: readonly CustomDefectType[]): string[] {
+  return [
+    ...builtinTypes(product, kind),
+    ...custom.filter((t) => t.product === product && t.kind === kind).map((t) => t.name),
+  ];
+}
 
 // Repair types that need a die (mould) number recorded — one of the four
 // boring stations, each fed from a specific die, so which die the piece

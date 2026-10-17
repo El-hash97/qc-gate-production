@@ -14,6 +14,14 @@ vi.mock('@/hooks/useDefectLines', () => ({
   useAddDefectLine: () => ({ mutate: addMutate }),
   useDeleteDefectLine: () => ({ mutate: deleteMutate }),
 }));
+const mockCustomTypes = [{ id: 7, product: 'camshaft', kind: 'repair', name: 'Gerinda Ulang' }];
+const addTypeMutate = vi.fn();
+const deleteTypeMutate = vi.fn();
+vi.mock('@/hooks/useDefectTypes', () => ({
+  useDefectTypes: () => ({ custom: mockCustomTypes, isLoading: false }),
+  useAddDefectType: () => ({ mutate: addTypeMutate }),
+  useDeleteDefectType: () => ({ mutate: deleteTypeMutate }),
+}));
 const mockShowToast = vi.fn();
 vi.mock('@/components/ui/ToastProvider', () => ({
   useToast: () => ({ showToast: mockShowToast }),
@@ -28,6 +36,8 @@ function lineColumn(line: string) {
 describe('MasterDataPage', () => {
   beforeEach(() => {
     addMutate.mockClear();
+    addTypeMutate.mockClear();
+    deleteTypeMutate.mockClear();
     deleteMutate.mockClear();
     mockShowToast.mockClear();
   });
@@ -93,4 +103,37 @@ describe('MasterDataPage', () => {
     expect(deleteMutate).toHaveBeenCalledTimes(1);
     expect(deleteMutate.mock.calls[0][0]).toBe(1);
   });
+
+  describe('Daftar Jenis Defect & Repair', () => {
+    function typeSection() {
+      return screen.getByRole('heading', { name: /Daftar Jenis Defect/ }).closest('section')!;
+    }
+
+    it('lists the built-in B/C types as locked, without a delete button', () => {
+      render(<MasterDataPage />);
+      const ngList = within(typeSection()).getByRole('list', { name: 'Daftar Defect (NG) B/C' });
+      expect(within(ngList).getByText('Gas Hole Cope')).toBeInTheDocument();
+      expect(within(ngList).getAllByText('bawaan').length).toBeGreaterThan(0);
+      expect(within(ngList).queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('shows added types for the picked product with a delete button', async () => {
+      render(<MasterDataPage />);
+      const section = typeSection();
+      expect(within(section).queryByText('Gerinda Ulang')).not.toBeInTheDocument();
+      await userEvent.click(within(section).getByRole('button', { name: 'Camshaft' }));
+      await userEvent.click(within(section).getByRole('button', { name: 'Hapus Gerinda Ulang dari Repair Camshaft' }));
+      expect(deleteTypeMutate.mock.calls[0][0]).toBe(7);
+    });
+
+    it('adds a new type to the picked product and kind', async () => {
+      render(<MasterDataPage />);
+      const section = typeSection();
+      await userEvent.click(within(section).getByRole('button', { name: 'Crankshaft' }));
+      await userEvent.type(within(section).getByRole('textbox', { name: 'Tambah jenis Defect (NG) Crankshaft' }), 'Retak Halus');
+      await userEvent.click(within(section).getByRole('button', { name: 'Tambah ke Defect (NG) Crankshaft' }));
+      expect(addTypeMutate.mock.calls[0][0]).toEqual({ product: 'crankshaft', kind: 'defect', name: 'Retak Halus' });
+    });
+  });
 });
+

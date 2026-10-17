@@ -162,6 +162,17 @@ ALTER TABLE history ADD COLUMN IF NOT EXISTS hourly_data_bc2 JSONB NOT NULL DEFA
 -- per (product, line, defect_name), since e.g. "Gas Hole" is suspect for
 -- three different lines at once, and different products come from different
 -- process stages ('bc' = BC 1TR + BC 2TR).
+-- Defect/repair types added from Master Data on top of the built-in lists
+-- in utils/constants.ts — one list per product (bc/camshaft/crankshaft) x
+-- kind (defect/repair). Built-in types are never stored here.
+CREATE TABLE IF NOT EXISTS defect_types (
+  id      SERIAL PRIMARY KEY,
+  product TEXT NOT NULL,
+  kind    TEXT NOT NULL,
+  name    TEXT NOT NULL,
+  CONSTRAINT defect_types_product_kind_name_key UNIQUE (product, kind, name)
+);
+
 CREATE TABLE IF NOT EXISTS defect_lines (
   id          SERIAL PRIMARY KEY,
   product     TEXT NOT NULL DEFAULT 'bc',

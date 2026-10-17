@@ -31,7 +31,7 @@ const A0 = (6 * Math.PI) / 180; // a face runs from the point (A0) out to A1, bo
 const A1 = (58 * Math.PI) / 180;
 const DOOR = { half: 22, z0: 10, z1: 74, depth: 16 };
 const BLOCK = { half: 12, d: 9.5, h: 17 }; // half length along the face, half width, height
-const PILLAR = [-146, 112];
+const PILLAR = [0, 160]; // on the chamber axis, in front of the panel, as in the 3D page
 const BOOM_Z = 150;
 const STAND_Z = 34;
 
@@ -477,10 +477,10 @@ function h6Scene(st, pose = h6Pose(st), still = false) {
     const near = (b) => Math.abs(Math.atan2(Math.sin(ta - b), Math.cos(ta - b))) < 0.12;
     if (near(-M.MID) || near(M.MID)) door = h6Block(h6At(ta, M.SPOT), ta, M.TABLE, true);
   }
-  // a raw block waits on the loading stand from the return until it is picked; the cleaned one stays
-  // on the output stand until the next cycle opens the right door (Grinding takes it)
+  // a raw block waits on the loading stand from the return until it is picked; the cleaned one is set
+  // on the output stand and taken away (to Grinding) while the manipulator goes back
   const inAlpha = phase === "return" ? smooth01(0.5, 1, u) : phase === "pick" && !held ? 1 : 0;
-  const outAlpha = phase === "drop" ? (held ? 0 : 1) : phase === "open" ? 1 - smooth01(0.1, 0.8, u) : ["reach in", "lift out"].includes(phase) ? 0 : 1;
+  const outAlpha = phase === "drop" ? (held ? 0 : 1) : phase === "return" ? 1 - smooth01(0.4, 0.9, u) : 0;
   const fade = (alpha, svg) => (alpha <= 0.001 ? "" : alpha >= 0.999 ? svg : `<g opacity="${alpha.toFixed(3)}">${svg}</g>`);
   const leftUp = phase === "close" ? 1 - e : phase === "return" ? e : ["pick", "swing in", "place", "retract"].includes(phase) ? 1 : 0;
   const rightUp = phase === "open" ? e : phase === "return" ? 1 - e : ["reach in", "lift out", "drop"].includes(phase) ? 1 : 0;
@@ -556,7 +556,7 @@ function sceneBody(f) {
 }
 
 // the still image is the approved drawing: the manipulator carrying the raw block half way in through the
-// left door (a moment of the swing in), both doors up, the cleaned block waiting on the output stand
+// left door (a moment of the swing in), both doors up, the output stand empty
 const STILL = { phase: "swing in", u: 0.8, a: -MID, r: FACE_D + 6, z: CARRY, hd: -MID, held: true };
 const body = sceneBody(h6Scene(h6State(), STILL, true));
 
@@ -567,7 +567,7 @@ const STYLE = `<style>
 </style>`;
 
 const LABEL =
-  "Station HSB06, rotary table shot blast: a round blast cabinet whose front is two flat faces, each with a door, and a control panel where they meet. A pillar jib manipulator reaches in through the left door with a BC block; the rotary table carries it past the blast wheels to the right door, and the cleaned block waits on the output stand.";
+  "Station HSB06, rotary table shot blast: a round blast cabinet whose front is two flat faces, each with a door, and a control panel where they meet. A pillar jib manipulator reaches in through the left door with a BC block; the rotary table carries it past the blast wheels to the right door, where the manipulator lifts it out onto the output stand.";
 
 if (!CHECK) {
   for (const theme of ["light", "dark"]) {

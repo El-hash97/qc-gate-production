@@ -10,6 +10,7 @@
   z-index: 3;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
+  zoom: var(--ui-zoom, 1);
 }
 
 .overlay > * { pointer-events: auto; }
@@ -539,4 +540,10 @@
   .right,
   .bottom { display: none; }
   .kpis { flex-wrap: wrap; }
+}
+
+/* phones: three KPIs per row instead of six squeezed into one */
+@media (max-width: 600px) {
+  .kpi { flex-basis: 30%; padding: 2px 8px; }
+  .kpi:nth-child(3n + 1) { border-left: 0; }
 }

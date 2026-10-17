@@ -7,6 +7,11 @@
   pointer-events: none;
 }
 
+/* zoom the pin parts, not the pin: its translate() is screen px from the 3D
+   projection; each part's offsets from that anchor scale with it */
+.pin > *,
+.tagPin > * { zoom: var(--ui-zoom, 1); }
+
 /* origin = the anchor point on the object */
 .pin {
   --tone: var(--accent-green);

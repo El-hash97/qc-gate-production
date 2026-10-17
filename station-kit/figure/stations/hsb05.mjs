@@ -6,8 +6,8 @@
 // the hoist picks the BC block off the stand at the end of the conveyor from
 // Baritori (cut short here), carries it on a hanger into the chamber, and sets
 // the blasted block down on the stand on the out side, where HSB06 takes it.
-// Seen the way the Baritori figure is, so the two pictures join: the conveyor
-// from Baritori comes in towards the viewer, the out side runs off to the right.
+// Seen as the overview camera sees it: the in door almost face on, the conveyor
+// from Baritori coming in from the left, the out side off to the right.
 //   node station-kit/figure/stations/hsb05.mjs [outDir]   →   <outDir>/hsb05-{light,dark}.svg
 //   (outDir defaults to public/stations, relative to where you run it)
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -31,7 +31,7 @@ const DOOR = { x0: -21, x1: 21, z0: 12, z1: 78, depth: 22 };
 const BEAM_Y = [70, 228];
 const BEAM_Z = 114; // underside of the bottom flange
 const TROLLEY_Y = 101;
-const CONV = { y0: 160, y1: 240, z: 31 }; // the tail of the conveyor from Baritori, cut at the pad edge; roller tops at z
+const CONV = { x0: -160, x1: -21, y0: 117, y1: 153, z: 31 }; // the tail of the conveyor from Baritori, in from the left to the stand, cut at the pad edge; roller tops at z
 const STAND = { y0: 116, y1: 154, z: 31 }; // pick (in) and set-down (out) stand under each monorail leg, top at z
 const HANG = { x: -12, y: 91.5, w: 24, d: 19, r: 1 }; // block on the hanger
 const QUEUE = { x: -12, y: 126, w: 24, d: 19, r: 1 }; // block on a stand
@@ -47,11 +47,8 @@ const P = k.fitProjection(
   [...k.boxCorners(PAD, -8, 0), [0, 0, 112], [-158, -84, 132], [-106, -28, 132], [-158, -28, 132], [0, BEAM_Y[1], BEAM_Z + 16], [BEAM_Y[1], 0, BEAM_Z + 16], [-34, BEAM_Y[1], BEAM_Z + 16], [BEAM_Y[1], 34, BEAM_Z + 16]],
   WIDTH,
   HEIGHT,
-  // The Baritori figure's camera (kit azimuth -58, elevation 35, picture mirrored) brought into this frame:
-  // in Blender the in leg points from the cabinet at the Baritori pick stand (-37.6° in Baritori's world)
-  // and the out leg 90° round from it, a reflection of this frame turned by -37.6°; the reflection cancels
-  // Baritori's mirror and leaves azimuth 90 - (-58 - -37.6) = 110.4, unmirrored.
-  { pad: 26, azimuth: 110.4, elevation: 35 },
+  // the overview camera: facing the in door, a little round towards the control panel
+  { pad: 26, azimuth: 72, elevation: 30 },
 );
 
 const at = (p) => k.iso(p, P);
@@ -280,24 +277,26 @@ function block(plan, z, { lit = false } = {}) {
   return out.join("");
 }
 
-// ---- the tail of the roller conveyor from Baritori, cut at the pad edge ------------------
-// one rail at a time, so the near one is drawn over the rollers and the far one under them
-function conveyorRail(x) {
-  const { y0, y1, z } = CONV;
+// ---- the tail of the roller conveyor from Baritori: in from the left, cut at the pad edge --------
+// one rail at a time (y is its inner face), so the near one is drawn over the rollers and the far one under
+function conveyorRail(y) {
+  const { x0, x1, z } = CONV;
+  const near = y > CONV.y0;
+  const ry = near ? y : y - 4;
   const out = [];
-  for (const y of [y0 + 10, y1 - 14]) {
-    out.push(S(cyl(x + 2, y, 4, 0, 1.4, 16), { tone: "mid" }));
-    out.push(S(sl({ x: x + 0.4, y: y - 1.6, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
+  for (const x of [x0 + 14, x1 - 12]) {
+    out.push(S(cyl(x, ry + 2, 4, 0, 1.4, 16), { tone: "mid" }));
+    out.push(S(sl({ x: x - 1.6, y: ry + 0.4, w: 3.2, d: 3.2, r: 0.4 }, 1.4, z - 6.4, 2), { tone: "mid", crease: "none" }));
   }
-  out.push(S(sl({ x, y: y0, w: 4, d: y1 - y0, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
-  out.push(D(Array.from({ length: 12 }, (_, i) => A([x < 0 ? x : x + 4, y0 + 3 + i * 6.4 + 2.2, z - 3])), { size: 0.35, tone: "lo" }));
+  out.push(S(sl({ x: x0, y: ry, w: x1 - x0, d: 4, r: 0.5 }, z - 7, 8, 2, 0.4), { tone: "mid" }));
+  if (near) out.push(D(Array.from({ length: 21 }, (_, i) => A([x0 + 3 + i * 6.4 + 2.2, ry + 4, z - 3])), { size: 0.35, tone: "lo" }));
   return out.join("");
 }
 
 function rollers() {
-  const { y0, y1, z } = CONV;
+  const { x0, x1, y0, y1, z } = CONV;
   const out = [];
-  for (let y = y1 - 7.4; y > y0; y -= 6.4) out.push(S(sl({ x: -21, y, w: 42, d: 4.4, r: 2.2 }, z - 4.4, 4.4, 6), { tone: "mid", crease: "none" }));
+  for (let x = x0 + 3; x < x1 - 3; x += 6.4) out.push(S(sl({ x, y: y0, w: 4.4, d: y1 - y0, r: 2.2 }, z - 4.4, 4.4, 6), { tone: "mid", crease: "none" }));
   return out.join("");
 }
 
@@ -349,12 +348,12 @@ const inSide = () => [
   beam(),
   hoist(),
   leaf(-32),
+  conveyorRail(CONV.y0),
+  rollers(),
+  conveyorRail(CONV.y1),
   stand("back"),
   block(QUEUE, STAND.z),
   stand("front"),
-  conveyorRail(21),
-  rollers(),
-  conveyorRail(-25),
   portalColumn(34),
   portalTop(),
   portalColumn(-34),

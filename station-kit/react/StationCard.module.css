@@ -87,6 +87,12 @@
   overflow: hidden;
 }
 
+/* light artwork keeps a light frame even when the page is dark */
+.figure[data-theme='light'] {
+  background: #ffffff;
+  border-color: #e3e6ec;
+}
+
 .figure img {
   display: block;
   width: 100%;

@@ -46,7 +46,7 @@ export function StationCard({ detail, theme, onClose }: Props) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.media}>
-          <div className={styles.figure}>
+          <div className={styles.figure} data-theme={theme}>
             {playing && detail.play ? (
               <iframe className={styles.machine} src={detail.play} title={`${detail.title} 3D`} allow="fullscreen" />
             ) : (

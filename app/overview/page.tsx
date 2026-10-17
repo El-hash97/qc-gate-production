@@ -54,7 +54,8 @@ export default function OverviewPage() {
           labels={panelModes.mode('labels') !== 'hidden'} />
         {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} />}
         {!running && <div className={styles.overlay}>Production has not started</div>}
-        {detail && <StationCard detail={detail} theme={theme} onClose={() => setOpen(null)} />}
+        {/* station figures always use the light artwork, even in dark mode */}
+        {detail && <StationCard detail={detail} theme="light" onClose={() => setOpen(null)} />}
       </div>
     </div>
   );

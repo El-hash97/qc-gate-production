@@ -47,6 +47,7 @@ const lab = new Lab({
   prompt: 'Baritori: the deburring booth of the BC line, moving the way it does in the Blender layout',
   no: 4, title: 'Baritori', sub: 'deburring',
   size: 5.2,
+  ground: -0.08, // the studio floor at the pad's underside: a floor at the pad's top face z-fights with it and flickers
   view: { az: -148, el: 30, dist: 2.3, target: [1.6, 0.5, 2.55], fov: 30 }, // the card figure's camera: from the booth's end, left of the portal
   cut: { a: [0, 0, 1], b: [0, 1, 0], center: [2.2, 0.9, 1.6], reach: 1.6 },
   pills: ['three.js', 'Pneumatics', 'Chipping'],
@@ -285,7 +286,7 @@ const pressure = lab.slider({ id: 'bar', label: 'Line pressure', min: 4, max: 7,
 
 // one cycle, as in the card figure: load at the mouth, carriage in, door down, chip four faces with a quarter
 // turn between them, door up (the fourth quarter turn), carriage out, tip onto the conveyor, roll on to HSB05
-const DUR = { load: 1.6, in: 2.6, close: 1.2, turn: 0.9, open: 1.2, out: 2.6, tip: 1.6, convey: 2.6 }
+const DUR = { load: 1.6, in: 2.6, close: 1.2, turn: 0.9, open: 1.2, out: 2.6, tip: 2.2, convey: 2.6 }
 const NEXT = { load: 'in', in: 'close', close: 'deburr', turn: 'deburr', open: 'out', out: 'tip', tip: 'convey', convey: 'load' }
 const SAY = { load: 'loading a raw block', in: 'carriage in', close: 'door down', deburr: 'chipping the flash', turn: 'turning 90°', open: 'door up', out: 'carriage out', tip: 'tipping onto the conveyor', convey: 'on to HSB05' }
 let phase = 'load', pt = 0, clock = 0, airLost = false
@@ -344,12 +345,16 @@ lab.onTick((dt) => {
   const B = BLOCK.B
   let kick = KICK.rest
   if (phase === 'tip' || phase === 'convey') {
+    // one smooth turn over the pivot edge (smootherstep: no jerk at either end); the kicker rod rides the
+    // block's face until the block is past balance, then draws back, all from the angle so nothing jumps
     const PUSH = (35 * Math.PI) / 180
     const contact = (phi) => LINE_Y + B / 2 - B * Math.cos(phi) + ((KICK.z - SEAT_Z - B * Math.sin(phi)) / Math.cos(phi)) * Math.sin(phi)
+    const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10)
     let phi = Math.PI / 2
     if (phase === 'tip') {
-      phi = u < 0.15 ? 0 : u < 0.5 ? PUSH * smoothstep(0.15, 0.5, u) : u < 0.75 ? PUSH + (Math.PI / 2 - PUSH) * ((u - 0.5) / 0.25) ** 2 : Math.PI / 2
-      kick = u < 0.15 ? lerp(KICK.rest, contact(0), smoothstep(0, 0.15, u)) : u < 0.5 ? contact(phi) : lerp(contact(PUSH), KICK.rest, smoothstep(0.5, 0.9, u))
+      phi = (Math.PI / 2) * ease(clamp((u - 0.12) / 0.78))
+      const reach = lerp(KICK.rest, contact(Math.min(phi, PUSH)), smoothstep(0, 0.12, u))
+      kick = lerp(reach, KICK.rest, smoothstep(PUSH * 0.8, PUSH + 0.5, phi))
     }
     const R = Rtip(phi)
     const off = mulR(R, [0, -B / 2, 0])

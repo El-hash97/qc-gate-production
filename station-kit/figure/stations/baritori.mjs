@@ -365,7 +365,7 @@ const M = {
   E_CHIP: 3e9, // J/m3 to chip grey iron
   A_FIN: 3e-3 * 1.5e-3, // fin section
   TIME_K: 12, // chipping shown 12x fast
-  DUR: { load: 1.6, in: 2.6, close: 1.2, turn: 0.9, open: 1.2, out: 2.6, tip: 1.6, convey: 2.6 },
+  DUR: { load: 1.6, in: 2.6, close: 1.2, turn: 0.9, open: 1.2, out: 2.6, tip: 2.2, convey: 2.6 },
   NEXT: { load: "in", in: "close", close: "deburr", turn: "deburr", open: "out", out: "tip", tip: "convey", convey: "load" },
   ORDER: ["load", "in", "close", "deburr", "open", "out", "tip", "convey"],
   // world (cm)
@@ -472,15 +472,16 @@ function bariPose(st) {
   const pose = { cx, down, angle, carried: ph !== "convey", alpha: ph === "load" ? e : 1, kick: M.KICK.rest };
   const B = M.BLOCK.B;
   if (ph === "tip" || ph === "convey") {
-    // the kicker pushes the top over past balance (35°), then the block falls onto the rollers
+    // one smooth turn over the pivot edge (smootherstep: no jerk at either end); the kicker rod rides the
+    // block's face until the block is past balance (35°), then draws back, all from the angle so nothing jumps
     const PUSH = (35 * Math.PI) / 180;
     const contact = (phi) => M.LINE_Y + B / 2 - B * Math.cos(phi) + ((M.KICK.z - M.SEAT_Z - B * Math.sin(phi)) / Math.cos(phi)) * Math.sin(phi);
+    const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10);
     let phi = Math.PI / 2;
     if (ph === "tip") {
-      phi = u < 0.15 ? 0 : u < 0.5 ? PUSH * smooth01(0.15, 0.5, u) : u < 0.75 ? PUSH + (Math.PI / 2 - PUSH) * ((u - 0.5) / 0.25) ** 2 : Math.PI / 2;
-      if (u < 0.15) pose.kick = M.KICK.rest + (contact(0) - M.KICK.rest) * smooth01(0, 0.15, u);
-      else if (u < 0.5) pose.kick = contact(phi);
-      else pose.kick = contact(PUSH) + (M.KICK.rest - contact(PUSH)) * smooth01(0.5, 0.9, u);
+      phi = (Math.PI / 2) * ease(Math.min(1, Math.max(0, (u - 0.12) / 0.78)));
+      const reach = M.KICK.rest + (contact(Math.min(phi, PUSH)) - M.KICK.rest) * smooth01(0, 0.12, u);
+      pose.kick = reach + (M.KICK.rest - reach) * smooth01(PUSH * 0.8, PUSH + 0.5, phi);
     }
     const R = bariRtip(phi);
     const pivot = [M.MOUTH_X, M.LINE_Y + B / 2, M.SEAT_Z];

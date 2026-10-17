@@ -20,14 +20,18 @@ const WIDTH = 600;
 const HEIGHT = 440;
 
 // ---- world (z up, about 1 unit = 1 cm) -------------------------------------
-// The in door is on the +y face (left in the picture) and the out door on the +x face (right); the face
-// between them, facing 45 degrees, carries the control panel. Everything on the out side is the in side
-// mirrored across x = y, so each piece is drawn once and the mirror flag (SW) swaps x and y.
+// The in door is on the +y face and the out door on the face next to it, facing 45 degrees; the +x face to
+// the right of the out door carries the control panel. Everything on the out side is the in side turned
+// 45 degrees round the cabinet, so each piece is drawn once and TURN rotates it.
 const PAD = { x: -166, y: -92, w: 408, d: 334, r: 8 };
-const R = 72; // cabinet circumradius
+const R = 86; // cabinet circumradius
 const AP = R * Math.cos(Math.PI / 8); // apothem: each door face sits at AP from the centre
 const BODY = [6, 92];
-const DOOR = { x0: -21, x1: 21, z0: 12, z1: 78, depth: 22 };
+const DOOR = { x0: -16, x1: 16, z0: 12, z1: 78, depth: 22 }; // posts 8 wide either side
+// each door sits 8.5 off its face centre, away from the other door, leaving room between them for the
+// control panel (centred PANEL_X across the in door's face)
+const SHIFT = 8.5;
+const PANEL_X = 24.2;
 const BEAM_Y = [70, 228];
 const BEAM_Z = 114; // underside of the bottom flange
 const TROLLEY_Y = 101;
@@ -58,19 +62,32 @@ const D = (points, style) => k.dotsSvg(points, style);
 const slab = (plan, z, h, steps = 3, bevel = 0.5) => k.slabOf(plan, z, h, P, steps, bevel);
 const byDepth = (list, of = (p) => p) => [...list].sort((a, b) => k.depthOf(of(a), P) - k.depthOf(of(b), P));
 
-// ---- the mirror: SW swaps x and y, turning the in side (+y) into the out side (+x) ----
-let SW = false;
-const P3 = (p) => (SW ? [p[1], p[0], p[2]] : p);
-const PL = (pl) => (SW ? { ...pl, x: pl.y, y: pl.x, w: pl.d, d: pl.w } : pl);
+// ---- the turn: TURN rotates the in side (+y) round the cabinet onto the out door's face -----------
+let TURN = 0;
+const R2 = ([x, y]) => (TURN ? [x * Math.cos(TURN) - y * Math.sin(TURN), x * Math.sin(TURN) + y * Math.cos(TURN)] : [x, y]);
+const P3 = (p) => [...R2(p), p[2]];
 const A = (p) => at(P3(p));
-const sl = (plan, z, h, steps = 3, bevel = 0.5) => slab(PL(plan), z, h, steps, bevel);
+const sl = (plan, z, h, steps = 3, bevel = 0.5) => (TURN ? k.extrude(k.ringOf(plan, steps).map(R2), z, h, P, { convex: true, bevel }) : slab(plan, z, h, steps, bevel));
 const seg = (p, q) => k.segment(P3(p), P3(q), P);
-const ring = (x, y, r, z, n = 24) => (SW ? k.ring(y, x, r, z, P, n) : k.ring(x, y, r, z, P, n));
-const cyl = (x, y, r, z, h, n = 16, bevel = 0) => (SW ? k.cylinder(y, x, r, z, h, P, n, bevel) : k.cylinder(x, y, r, z, h, P, n, bevel));
-const sideSeam = (plan, z, steps) => k.sideSeam(PL(plan), z, P, steps);
-const onTop = (a, b, z) => k.lineOnTop(SW ? [a[1], a[0]] : a, SW ? [b[1], b[0]] : b, z, P);
+const ring = (x, y, r, z, n = 24) => k.ring(...R2([x, y]), r, z, P, n);
+const cyl = (x, y, r, z, h, n = 16, bevel = 0) => k.cylinder(...R2([x, y]), r, z, h, P, n, bevel);
+// a seam round the sides we see of a (turned) plan, at height z
+function sideSeam(plan, z, steps) {
+  if (!TURN) return k.sideSeam(plan, z, P, steps);
+  const ringPts = k.ringOf(plan, steps).map(R2);
+  const [vx, vy] = k.towardViewer(P);
+  let area = 0;
+  ringPts.forEach(([ax, ay], i) => { const [bx, by] = ringPts[(i + 1) % ringPts.length]; area += ax * by - bx * ay; });
+  return ringPts.map(([ax, ay], i) => {
+    const [bx, by] = ringPts[(i + 1) % ringPts.length];
+    const nx = area > 0 ? by - ay : ay - by;
+    const ny = area > 0 ? ax - bx : bx - ax;
+    return nx * vx + ny * vy > 1e-9 ? k.segment([ax, ay, z], [bx, by, z], P) : "";
+  }).join("");
+}
+const onTop = (a, b, z) => k.lineOnTop(R2(a), R2(b), z, P);
 const poly = (points, cls) => `<path class="${cls}" d="${k.pathOf(points.map(A), true)}"/>`;
-const mirrored = (sw, draw) => { SW = sw; const out = draw(); SW = false; return out; };
+const turned = (t, draw) => { TURN = t; const out = draw(); TURN = 0; return out; };
 
 // ---- floor -------------------------------------------------------------------
 function floor() {
@@ -118,11 +135,11 @@ function cabinet() {
   out.push(S(k.extrude(octagon(R + 3), BODY[1], 5, P, { bevel: 0.8 }), { tone: "mid" }));
   // the round lid, its hub and three lifting eyes
   const top = BODY[1] + 5;
-  out.push(S(k.cylinder(0, 0, 60, top, 7, P, 96, 1), { tone: "mid", crease: "lo" }));
-  out.push(L(k.ring(0, 0, 52, top + 7, P, 96), { tone: "faint" }));
+  out.push(S(k.cylinder(0, 0, R * 0.83, top, 7, P, 96, 1), { tone: "mid", crease: "lo" }));
+  out.push(L(k.ring(0, 0, R * 0.72, top + 7, P, 96), { tone: "faint" }));
   const eyes = [0, 1, 2].map((i) => {
     const a = Math.PI / 6 + (i * 2 * Math.PI) / 3;
-    return [Math.cos(a) * 44, Math.sin(a) * 44];
+    return [Math.cos(a) * R * 0.61, Math.sin(a) * R * 0.61];
   });
   for (const [x, y] of byDepth(eyes, ([x, y]) => [x, y, top + 7])) {
     out.push(S(k.cylinder(x, y, 3.2, top + 7, 2, P, 16), { tone: "mid" }));
@@ -137,20 +154,19 @@ function cabinet() {
     return [ax + (bx - ax) * t, ay + (by - ay) * t, z];
   };
   const rivets = [];
-  for (const z of [36, 64]) for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) rivets.push(at(faceAt(0, t, z + 1.4)));
+  for (const z of [36, 64]) for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) rivets.push(at(faceAt(7, t, z + 1.4)));
   out.push(D(rivets, { size: 0.4, tone: "mid" }));
-  // the control panel on that face: a box standing off it, buttons, a screen
-  const [[ax, ay], [bx, by]] = [body[0], body[1]];
-  const len = Math.hypot(bx - ax, by - ay);
-  const u = [(bx - ax) / len, (by - ay) / len], n = [Math.SQRT1_2, Math.SQRT1_2];
-  const c = [(ax + bx) / 2, (ay + by) / 2];
+  // the control panel in the gap between the two doors: a box standing off the face, a screen, buttons
+  const u = [1, 0], n = [0, 1];
+  const c = [PANEL_X, AP];
   const pt = (s, d) => [c[0] + u[0] * s + n[0] * d, c[1] + u[1] * s + n[1] * d];
-  out.push(S(k.extrude([pt(-11, 0), pt(11, 0), pt(11, 6), pt(-11, 6)], 38, 28, P, { bevel: 0.4 }), { tone: "mid" }));
+  out.push(S(k.extrude([pt(-8, 0), pt(8, 0), pt(8, 6), pt(-8, 6)], 38, 30, P, { bevel: 0.4 }), { tone: "mid" }));
   const face = (s, z) => at([...pt(s, 6), z]);
-  out.push(L(k.pathOf([face(-8, 56), face(8, 56), face(8, 63), face(-8, 63)], true), { tone: "lo" }));
-  out.push(D([face(-5, 46), face(0, 46), face(5, 46)], { size: 0.8, tone: "hi" }));
+  out.push(L(k.pathOf([face(-5.5, 58), face(5.5, 58), face(5.5, 64), face(-5.5, 64)], true), { tone: "lo" }));
+  out.push(D([face(-4, 50), face(0, 50), face(4, 50), face(-4, 44), face(0, 44), face(4, 44)], { size: 0.8, tone: "hi" }));
+  out.push(D([face(-6, 40), face(6, 40), face(-6, 66), face(6, 66)], { size: 0.4, tone: "mid" }));
   // stack light on the rim
-  const [lx, ly] = [46, -40];
+  const [lx, ly] = [R * 0.64, -R * 0.56];
   out.push(S(k.cylinder(lx, ly, 3, top, 3, P, 20), { tone: "mid" }));
   out.push(S(k.cylinder(lx, ly, 1, top + 3, 8, P, 12), { tone: "mid", crease: "none" }));
   for (const [i, tone] of [[0, "mid"], [1, "mid"], [2, "hi"]]) out.push(S(k.cylinder(lx, ly, 2.6, top + 11 + i * 5, 5, P, 20), { tone }));
@@ -171,14 +187,14 @@ function door() {
   // grating of the blast floor, edge to edge across the chamber floor
   out.push(L(Array.from({ length: 6 }, (_, i) => onTop([x0, back + 3 + i * 3.4], [x1, back + 3 + i * 3.4], z0)).join(""), { tone: "faint" }));
   // rubber curtain strips hanging from the lintel
-  out.push(L(Array.from({ length: 9 }, (_, i) => seg([x0 + 4.2 * (i + 1), back + 6, z1], [x0 + 4.2 * (i + 1), back + 6, z1 - 18])).join(""), { tone: "lo" }));
+  out.push(L(Array.from({ length: 7 }, (_, i) => seg([x0 + 4 * (i + 1), back + 6, z1], [x0 + 4 * (i + 1), back + 6, z1 - 18])).join(""), { tone: "lo" }));
   out.push(L(k.pathOf([A([x0, AP, z0]), A([x1, AP, z0]), A([x1, AP, z1]), A([x0, AP, z1])], true), { tone: "mid" }));
   // posts and header, bolted to the cabinet face
-  for (const x of [-29, 21]) {
+  for (const x of [x0 - 8, x1]) {
     out.push(S(sl({ x, y: AP - 6, w: 8, d: 12, r: 0.8 }, 0, z1 + 12, 2, 0.5), { tone: "mid" }));
     out.push(D([14, 30, 46, 62, 78].map((z) => A([x + 4, AP + 6, z])), { size: 0.45 }));
   }
-  const header = { x: -29, y: AP - 6, w: 58, d: 12, r: 0.8 };
+  const header = { x: x0 - 8, y: AP - 6, w: x1 - x0 + 16, d: 12, r: 0.8 };
   out.push(S(sl(header, z1, 12, 2, 0.6), { tone: "mid", inner: L(sideSeam(header, z1 + 6, 2), { tone: "faint" }) }));
   return out.join("");
 }
@@ -266,8 +282,7 @@ function hangerFront() {
 // ---- BC block (47.5 × 37.1 × 33.6 cm): deck with four bores, head bolts -----
 function block(plan, z, { lit = false } = {}) {
   const top = z + BLOCK_H;
-  const pl = PL(plan);
-  const out = [S(slab(pl, z, BLOCK_H, 2, 0.6), { tone: "hi", crease: "lo", lit, inner: L(k.sideSeam(pl, z + 5, P, 2), { tone: "faint" }) })];
+  const out = [S(sl(plan, z, BLOCK_H, 2, 0.6), { tone: "hi", crease: "lo", lit, inner: L(sideSeam(plan, z + 5, 2), { tone: "faint" }) })];
   const cy = plan.y + plan.d / 2;
   const bores = [0, 1, 2, 3].map((i) => plan.x + 4 + i * 5.33);
   out.push(L(bores.map((x) => ring(x, cy, 2.2, top)).join(""), { tone: lit ? "lit" : "mid" }));
@@ -322,32 +337,31 @@ function stand(part) {
   return out.join("");
 }
 
-// the out side (+x, drawn through the mirror): monorail leg and portal running off behind the cabinet,
-// the set-down stand with a blasted block on it, the door (on the far side, mostly hidden)
-const outSide = () => mirrored(true, () => [
-  portalColumn(34),
-  portalColumn(-34),
+// the out side: the in side turned 45 degrees round the cabinet, so the two doors sit on neighbouring
+// faces; its door, the monorail leg and portal, the set-down stand with a blasted block on it. The leaf
+// between the two doors is left off on both sides (two leaves swung there would meet)
+const outSide = () => `<g transform="${k.translateAlong(P, [SHIFT * Math.SQRT1_2, -SHIFT * Math.SQRT1_2, 0])}">` + turned(-Math.PI / 4, () => [
+  door(),
+  leaf(DOOR.x1 + 8),
   beam(),
-  portalTop(),
   stand("back"),
   block(QUEUE, STAND.z),
   stand("front"),
-  leaf(29),
-  leaf(-32),
-  door(),
-].join(""));
+  portalColumn(-34),
+  portalColumn(34),
+  portalTop(),
+].join("")) + "</g>";
 
 // the in side (+y, towards the viewer): door, the hoist carrying a block in, the pick stand with the next
 // raw block, and the tail of the conveyor from Baritori
-const inSide = () => [
+const inSide = () => `<g transform="${k.translateAlong(P, [-SHIFT, 0, 0])}">` + [
   door(),
-  leaf(29),
   hanger(),
   hangerFront(),
   block(HANG, 37, { lit: true }),
   beam(),
   hoist(),
-  leaf(-32),
+  leaf(DOOR.x0 - 11),
   conveyorRail(CONV.y0),
   rollers(),
   conveyorRail(CONV.y1),
@@ -357,9 +371,9 @@ const inSide = () => [
   portalColumn(34),
   portalTop(),
   portalColumn(-34),
-].join("");
+].join("") + "</g>";
 
-const body = [floor(), outSide(), collector(), cabinet(), inSide()];
+const body = [floor(), collector(), cabinet(), outSide(), inSide()];
 
 const STYLE = `<style>
 .iso[data-theme="light"] .hsb-cav{fill:#cfcfcb}.iso[data-theme="light"] .hsb-cav-side{fill:#dadad6}.iso[data-theme="light"] .hsb-cav-floor{fill:#c4c4c0}

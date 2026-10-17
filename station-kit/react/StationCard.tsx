@@ -11,6 +11,8 @@ export interface StationDetail {
   subtitle: string;
   // isometric figure per theme (station-kit/figure)
   image: { light: string; dark: string };
+  // the same figure running its cycle (station-kit/figure, <id>-live.html), shown in place of the image
+  live?: string;
   // interactive 3D machine page (station-kit/machine), opened by Play
   play?: string;
   description: string[];
@@ -49,6 +51,8 @@ export function StationCard({ detail, theme, onClose }: Props) {
           <div className={styles.figure} data-theme={theme}>
             {playing && detail.play ? (
               <iframe className={styles.machine} src={detail.play} title={`${detail.title} 3D`} allow="fullscreen" />
+            ) : detail.live ? (
+              <iframe className={styles.live} src={`${detail.live}?theme=${theme}`} title={`${detail.title} ${detail.subtitle} cycle`} />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element -- static SVG per theme
               <img src={detail.image[theme]} alt={`${detail.title} ${detail.subtitle}`} />

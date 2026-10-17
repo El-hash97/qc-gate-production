@@ -12,6 +12,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Baritori',
     subtitle: 'Deburring',
     image: { light: '/stations/baritori-light.svg', dark: '/stations/baritori-dark.svg' },
+    live: '/stations/baritori-live.html',
     play: '/stations/baritori-3d.html',
     description: [
       'The cast block sits on a cradle on the slide table, and a pusher cylinder drives the carriage through the timber portal while the guard plate drops behind it.',

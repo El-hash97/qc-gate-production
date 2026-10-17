@@ -59,6 +59,14 @@
   border: 0;
 }
 
+/* the figure running its cycle, with its step buttons under it */
+.live {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 10;
+  border: 0;
+}
+
 .play {
   align-self: center;
   padding: 8px 18px;
@@ -184,5 +192,9 @@
 @media (max-width: 760px) {
   .card {
     grid-template-columns: 1fr;
+  }
+
+  .live {
+    aspect-ratio: 3 / 4;
   }
 }

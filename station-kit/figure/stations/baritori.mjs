@@ -3,14 +3,20 @@
 // cylinder that lowers a guard plate, a slide table whose carriage carries the BC
 // block on a tilting cradle, a tie-rod pusher cylinder at the far end, the roller
 // conveyor that takes the block on to HSB05 and the push-button box beside the portal.
-//   node station-kit/figure/stations/baritori.mjs [outDir]   →   <outDir>/baritori-{light,dark}.svg
+// The live page runs the same cycle as baritori-3d.html: load, push in, guard down,
+// chip the flash off four faces with a quarter turn between them, guard up, hand the
+// block on to HSB05, carriage back.
+//   node station-kit/figure/stations/baritori.mjs [outDir]
+//     →   <outDir>/baritori-{light,dark}.svg and <outDir>/baritori-live.html (?theme=dark|light)
 //   (outDir defaults to public/stations, relative to where you run it)
-import { mkdirSync, writeFileSync } from "node:fs";
+//   node station-kit/figure/stations/baritori.mjs --check   runs the cycle model's self-check only
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as k from "../iso-kit.mjs";
 
-const OUT = resolve(process.argv[2] ?? "public/stations");
-mkdirSync(OUT, { recursive: true });
+const CHECK = process.argv.includes("--check");
+const OUT = resolve(process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "public/stations");
+if (!CHECK) mkdirSync(OUT, { recursive: true });
 const WIDTH = 600;
 const HEIGHT = 420;
 
@@ -352,8 +358,518 @@ const body = [
 const LABEL =
   "Station Baritori, deburring: a timber portal whose air cylinder lowers a guard plate over a slide table. A pusher cylinder drives the carriage that carries a BC block on its cradle, and a roller conveyor takes the cleaned block on to HSB05.";
 
-for (const theme of ["light", "dark"]) {
-  const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body, standalone: theme });
-  writeFileSync(join(OUT, `baritori-${theme}.svg`), svg);
-  console.log(`wrote ${join(OUT, `baritori-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
+if (!CHECK) {
+  for (const theme of ["light", "dark"]) {
+    const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body, standalone: theme });
+    writeFileSync(join(OUT, `baritori-${theme}.svg`), svg);
+    console.log(`wrote ${join(OUT, `baritori-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
+  }
+}
+
+// =============================================================================
+// Live figure: the same drawing, moving through the cycle of baritori-3d.html.
+// The model (bariSolve, bariStep, bariGo) and the moving geometry (bariScene and
+// its parts) are plain functions over `k`, `P` and `M`; the page gets their source
+// with the kit inlined, so the browser draws every frame with the build's own code.
+// =============================================================================
+
+const WORK_X = CART_X;
+const M = {
+  // physics, from baritori-3d.html (SI units)
+  BAR: 1e5,
+  ATM: 1.013e5,
+  A_PUSH: Math.PI * 0.0315 ** 2, // 63 mm pusher bore
+  A_HAM: Math.PI * 0.0095 ** 2, // 19 mm chisel piston
+  STROKE: 0.05,
+  ETA: 0.45,
+  E_CHIP: 3e9, // J/m3 to chip grey iron
+  A_FIN: 3e-3 * 1.5e-3, // fin section
+  TIME_K: 12, // chipping shown 12x fast, as in 3D
+  // cycle (s); deburr lasts as long as the flash takes to come off
+  DUR: { load: 1.6, in: 2.2, guard: 1.2, turn: 0.9, raise: 1.2, index: 2.4, back: 2.2 },
+  NEXT: { load: "in", in: "guard", guard: "deburr", turn: "deburr", raise: "index", index: "back", back: "load" },
+  ORDER: ["load", "in", "guard", "deburr", "raise", "index", "back"],
+  // world (cm)
+  LOAD_X: -30,
+  WORK_X,
+  TABLE_Z,
+  TURN_Z: TABLE_Z + 12, // turntable top
+  BLOCK_Z: TABLE_Z + 13, // block base on the cradle seat
+  BLOCK_L: 48,
+  BLOCK_W: 37,
+  BLOCK_H,
+  PARTING,
+  FACE_LEN: [48, 37, 48, 37], // in the order the chisel works them
+  ROD_X0: TABLE.x + 14,
+  ROD_Z: ROD.z,
+  PLATE_BACK: 36, // carriage plate runs from cx - 36: clear of the block's 30.3 sweep
+  GUARD_Z1: GUARD.z1,
+  GUARD_DROP: 28, // rubber lip stops 2 above the clevis
+  BEAM_Z,
+  CONV_DROP: TABLE_Z + 13 - CONV.z,
+  BAL: [WORK_X, 36, 213], // cable leaves the spring balancer here
+  EYE: [0, 16.5, 5.8], // cable eye on the chisel, from its tip
+  PARK: [WORK_X, 44, TABLE_Z + 13 + PARTING + 12],
+  LAMP: [-74, 76, 110], // first push button: lit while loading
+};
+M.FACE_END = M.FACE_LEN.map((_, i) => M.FACE_LEN.slice(0, i + 1).reduce((s, l) => s + l, 0));
+M.PERIM = M.FACE_END[3];
+
+const approach = (a, b, tau, dt) => b + (a - b) * Math.exp(-dt / tau);
+const smooth01 = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+// one line pressure → pusher force, blow rate and energy, flash taken off per second
+function bariSolve(p) {
+  const f = p > 0.5 * M.BAR ? 30 * Math.sqrt(p / (6 * M.BAR)) : 0;
+  const E = M.ETA * p * M.A_HAM * M.STROKE;
+  return { F: p * M.A_PUSH, f, E, rate: (f * E) / (M.E_CHIP * M.A_FIN) * 100 }; // rate in cm/s
+}
+
+function bariState() {
+  return { phase: "load", pt: 0, clock: 0, face: 0, removed: 0, p: 6 * M.BAR, target: 6, f: 0, E: 0, rate: 0, F: 0, chisel: [...M.PARK] };
+}
+
+// jump to a step of the cycle, the flash taken off up to `frac`
+function bariGo(st, phase, frac = 0) {
+  st.phase = phase;
+  st.pt = 0;
+  st.removed = phase === "raise" || phase === "index" || phase === "back" ? M.PERIM : M.PERIM * frac;
+  const k = M.FACE_END.findIndex((end) => st.removed < end - 1e-6);
+  st.face = k === -1 ? 4 : k;
+}
+
+function bariStep(st, dt) {
+  st.clock += dt;
+  st.p = approach(st.p, st.target * M.BAR, 0.3, dt);
+  const sol = bariSolve(st.p);
+  st.F = sol.F;
+  st.E = sol.E;
+  st.rate = sol.rate;
+  st.f = st.phase === "deburr" ? sol.f : approach(st.f, 0, 0.1, dt);
+  st.pt += dt;
+  const u = M.DUR[st.phase] ? Math.min(1, st.pt / M.DUR[st.phase]) : 0;
+  if (st.phase === "deburr") {
+    st.removed = Math.min(M.FACE_END[st.face], st.removed + st.rate * M.TIME_K * dt);
+    if (st.removed >= M.FACE_END[st.face] - 1e-6) {
+      st.face++;
+      st.phase = st.face >= 4 ? "raise" : "turn"; // the raise brings the fourth quarter turn: square again
+      st.pt = 0;
+    }
+  } else if (u >= 1) {
+    if (st.phase === "back") {
+      st.removed = 0;
+      st.face = 0;
+    }
+    st.phase = M.NEXT[st.phase];
+    st.pt = 0;
+  }
+  // the chisel rides the parting line of the face towards the operator, or hangs parked
+  const working = st.phase === "deburr";
+  let target = M.PARK;
+  if (working) {
+    const k = Math.min(st.face, 3);
+    const len = M.FACE_LEN[k];
+    const along = Math.min(1, Math.max(0, (st.removed - (M.FACE_END[k] - len)) / len));
+    target = [M.WORK_X - len / 2 + len * along, (k % 2 ? M.BLOCK_L : M.BLOCK_W) / 2 + 1, M.BLOCK_Z + M.PARTING];
+  }
+  for (let i = 0; i < 3; i++) st.chisel[i] = approach(st.chisel[i], target[i], working ? 0.06 : 0.25, dt);
+}
+
+// where everything is at this moment of the cycle
+function bariPose(st) {
+  const u = M.DUR[st.phase] ? Math.min(1, st.pt / M.DUR[st.phase]) : 0;
+  const e = u * u * (3 - 2 * u);
+  const ph = st.phase;
+  const cx = ph === "load" ? M.LOAD_X : ph === "in" ? M.LOAD_X + (M.WORK_X - M.LOAD_X) * e : ph === "back" ? M.WORK_X + (M.LOAD_X - M.WORK_X) * e : M.WORK_X;
+  const down = ph === "guard" ? e : ph === "deburr" || ph === "turn" ? 1 : ph === "raise" ? 1 - e : 0;
+  const quarter = ph === "turn" || ph === "raise" ? st.face - 1 + e : ph === "deburr" ? st.face : 0;
+  const pose = { cx, down, angle: (quarter * Math.PI) / 2, carried: ph !== "index" && ph !== "back", alpha: ph === "load" ? e : 1 };
+  if (ph === "index") {
+    pose.travel = {
+      dx: smooth01(0, 0.6, u) * 95 + Math.max(0, u - 0.6) * 50,
+      dz: -M.CONV_DROP * smooth01(0.45, 0.6, u),
+      alpha: u < 0.6 ? 1 : 1 - (u - 0.6) / 0.4,
+    };
+  }
+  return pose;
+}
+
+// the BC block at any turn: body, parting line on the faces we see, bores, bolt holes,
+// and the flash still left on the parting line
+function bariBlock(b) {
+  const c = Math.cos(b.angle);
+  const s = Math.sin(b.angle);
+  const W = ([lx, ly]) => [b.x + lx * c - ly * s, b.y + lx * s + ly * c];
+  const L = M.BLOCK_L;
+  const D = M.BLOCK_W;
+  const top = b.z + M.BLOCK_H;
+  const zp = b.z + M.PARTING;
+  const ring = k.ringOf({ x: -L / 2, y: -D / 2, w: L, d: D, r: 1.2 }, 2).map(W);
+  const [vx, vy] = k.towardViewer(P);
+  let area = 0;
+  ring.forEach(([ax, ay], i) => {
+    const [bx, by] = ring[(i + 1) % ring.length];
+    area += ax * by - bx * ay;
+  });
+  let seam = "";
+  ring.forEach(([ax, ay], i) => {
+    const [bx, by] = ring[(i + 1) % ring.length];
+    const nx = area > 0 ? by - ay : ay - by;
+    const ny = area > 0 ? ax - bx : bx - ax;
+    if (nx * vx + ny * vy > 1e-9) seam += k.segment([ax, ay, zp], [bx, by, zp], P);
+  });
+  const out = [k.solidSvg(k.extrude(ring, b.z, M.BLOCK_H, P, { convex: true, bevel: 0.6 }), { tone: "hi", crease: "lo", lit: true, inner: k.lineSvg(seam, { tone: "lit" }) })];
+  out.push(k.lineSvg([-16.5, -5.5, 5.5, 16.5].map((lx) => k.ring(...W([lx, 0]), 4.4, top, P, 32)).join(""), { tone: "lit" }));
+  const bolts = [-21.5, -11, 0, 11, 21.5].flatMap((lx) => [W([lx, -16]), W([lx, 16])]);
+  out.push(k.dotsSvg(bolts.map(([x, y]) => k.iso([x, y, top], P)), { size: 0.45, tone: "lit" }));
+  // flash: face f is the one that turns to the operator after f quarter turns
+  const fins = [];
+  let from = 0;
+  M.FACE_LEN.forEach((len, f) => {
+    const a = (-f * Math.PI) / 2;
+    const r = ([x, y]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+    const [nlx, nly] = r([0, 1]);
+    if ((nlx * c - nly * s) * vx + (nlx * s + nly * c) * vy > 0.05) {
+      const half = (f % 2 ? L : D) / 2 + 0.6;
+      const n = Math.round(len / 5);
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n;
+        if (from + t * len > b.removed) fins.push(k.iso([...W(r([-len / 2 + t * len, half])), zp], P));
+      }
+    }
+    from += len;
+  });
+  out.push(k.dotsSvg(fins, { size: 0.55, tone: "lit" }));
+  return out.join("");
+}
+
+// seat and cheeks on the turntable, turning together; the block between the cheeks
+function bariCradle(pose, removed) {
+  const c = Math.cos(pose.angle);
+  const s = Math.sin(pose.angle);
+  const W = ([lx, ly]) => [pose.cx + lx * c - ly * s, lx * s + ly * c];
+  const box = (plan) => k.ringOf(plan, 2).map(W);
+  const solid = (plan, z, h, style, bevel = 0.4) => k.solidSvg(k.extrude(box(plan), z, h, P, { convex: true, bevel }), style);
+  const out = [solid({ x: -22, y: -18, w: 44, d: 36, r: 0.6 }, M.TURN_Z, 1, { tone: "mid", crease: "none" }, 0)];
+  const cheeks = [-1, 1]
+    .map((side) => {
+      const y = side > 0 ? 19 : -22;
+      const face = side > 0 ? 22 : -22;
+      const parts = [solid({ x: -15, y, w: 30, d: 3, r: 0.5 }, M.BLOCK_Z, 10, { tone: "mid" })];
+      const dot = (lx, z) => k.iso([...W([lx, face]), z], P);
+      parts.push(k.dotsSvg([dot(0, M.BLOCK_Z + 5)], { size: 0.8, tone: "mid" }));
+      parts.push(k.dotsSvg([dot(-11, M.BLOCK_Z + 5), dot(11, M.BLOCK_Z + 5)], { size: 0.4 }));
+      return { depth: k.depthOf([...W([0, side * 20.5]), 0], P), svg: parts.join("") };
+    })
+    .sort((a, b) => a.depth - b.depth);
+  out.push(cheeks[0].svg);
+  if (pose.carried && pose.alpha > 0) {
+    const block = bariBlock({ x: pose.cx, y: 0, z: M.BLOCK_Z, angle: pose.angle, removed });
+    out.push(pose.alpha < 1 ? `<g opacity="${pose.alpha.toFixed(3)}">${block}</g>` : block);
+  }
+  out.push(cheeks[1].svg);
+  return out.join("");
+}
+
+// every moving piece of the drawing for one state, as markup and transforms
+function bariScene(st) {
+  const pose = bariPose(st);
+  const drop = pose.down * M.GUARD_DROP;
+  const rodEnd = pose.cx - M.PLATE_BACK;
+  const working = st.phase === "deburr";
+  const [tx, ty, tz] = st.chisel;
+  const eye = [tx + M.EYE[0], ty + M.EYE[1], tz + M.EYE[2]];
+  let chips = "";
+  if (working && st.f > 1) {
+    const pts = [];
+    for (let i = 0; i < 12; i++) {
+      const a = (st.clock * 2.2 + i / 12) % 1;
+      const vx = ((i % 5) - 2) * 6;
+      const vy = 12 + (i % 3) * 5;
+      const vz = 8 + (i % 4) * 4;
+      const [sx, sy] = k.iso([tx + vx * a, ty + vy * a, tz + vz * a - 40 * a * a], P);
+      pts.push([sx, sy, (1 - a) * Math.min(1, st.f / 20)]);
+    }
+    chips = k.dotsSvg(pts, { size: 0.6, tone: "mid" });
+  }
+  let travel = "";
+  if (pose.travel && pose.travel.alpha > 0) {
+    const block = bariBlock({ x: M.WORK_X + pose.travel.dx, y: 0, z: M.BLOCK_Z + pose.travel.dz, angle: 0, removed: M.PERIM });
+    travel = `<g opacity="${pose.travel.alpha.toFixed(3)}">${block}</g>`;
+  }
+  return {
+    carriage: k.translateAlong(P, [pose.cx - M.WORK_X, 0, 0]),
+    rod: k.solidSvg(k.slabOf({ x: M.ROD_X0, y: -2.2, w: rodEnd - M.ROD_X0, d: 4.4, r: 2.2 }, M.ROD_Z - 2.2, 4.4, P, 6), { tone: "hi", crease: "none" }),
+    cradle: bariCradle(pose, st.removed),
+    travel,
+    // the guard is drawn behind the carriage once the block has passed under it
+    guardBehind: pose.cx > 6,
+    guard: k.translateAlong(P, [0, 0, -drop]),
+    liftRod: k.solidSvg(k.cylinder(0, 0, 2.2, M.GUARD_Z1 + 6 - drop, M.BEAM_Z - M.GUARD_Z1 - 6 + drop, P, 20), { tone: "hi", crease: "none" }),
+    chisel: k.translateAlong(P, [tx, ty + (working ? Math.sin(st.clock * st.f * 2 * Math.PI) * 0.3 : 0), tz]),
+    cable: k.lineSvg(k.segment(M.BAL, eye, P), { tone: "lo" }) + k.dotsSvg([k.iso(eye, P)], { size: 0.5, tone: "mid" }),
+    chips,
+    lamp: st.phase === "load" ? 1 : 0,
+  };
+}
+
+const SAY = { load: "loading a raw block", in: "pushing in", guard: "guard down", deburr: "chipping the flash", turn: "turning 90°", raise: "guard up", index: "on to HSB05", back: "carriage back" };
+const STEPS = { load: "Load", in: "Push in", guard: "Guard down", deburr: "Chip ×4", raise: "Guard up", index: "To HSB05", back: "Back" };
+
+function bariReadout(st) {
+  const pct = Math.round((st.removed / M.PERIM) * 100);
+  const face = st.phase === "deburr" || st.phase === "turn" ? ` · face ${Math.min(4, st.face + 1)} of 4` : "";
+  return `${SAY[st.phase]}${face} · ${pct}% flash off`;
+}
+
+function bariNumbers(st) {
+  const bar = (st.p / M.BAR).toFixed(1);
+  return `${bar} bar · ${Math.round(st.f)} blows/s · ${st.E.toFixed(1)} J/blow · ${(st.rate * 10).toFixed(1)} mm/s · pusher ${Math.round(st.F)} N`;
+}
+
+// ---- self-check: one full cycle visits every step in order, takes all the flash off, ends square
+{
+  const st = bariState();
+  const seen = ["load"];
+  let removedAll = false;
+  for (let t = 0; t < 60 && !(seen.length > 1 && seen.at(-1) === "load"); t += 1 / 60) {
+    bariStep(st, 1 / 60);
+    if (seen.at(-1) !== st.phase && st.phase !== "turn") seen.push(st.phase);
+    if (st.removed >= M.PERIM - 1e-6) removedAll = true;
+  }
+  const want = ["load", "in", "guard", "deburr", "raise", "index", "back", "load"];
+  if (JSON.stringify(seen) !== JSON.stringify(want)) throw new Error(`cycle order ${seen.join(" → ")}`);
+  if (!removedAll) throw new Error("flash never fully removed");
+  const end = bariState();
+  bariGo(end, "raise");
+  end.pt = M.DUR.raise;
+  if (Math.abs(bariPose(end).angle - 2 * Math.PI) > 1e-9) throw new Error("block not square after the raise");
+  bariGo(end, "deburr", 0.4);
+  if (end.face !== 1) throw new Error(`40% of the flash should be on face 2, got ${end.face + 1}`);
+  console.log(`cycle check passed (${seen.join(" → ")})`);
+}
+
+// ---- static parts that only the live figure has -------------------------------
+// carriage with the turntable and the pusher clevis, drawn at the work station
+function carriageLive() {
+  const out = [];
+  for (const [x, y] of byDepth([[WORK_X - 18, RAIL_Y[0]], [WORK_X + 18, RAIL_Y[0]], [WORK_X - 18, RAIL_Y[1]], [WORK_X + 18, RAIL_Y[1]]], ([x, y]) => [x, y, 0])) {
+    out.push(S(slab({ x: x - 6, y: y - 3, w: 12, d: 10, r: 0.8 }, TABLE_Z + 1, 5, 2, 0.4), { tone: "mid" }));
+  }
+  const plate = { x: WORK_X - M.PLATE_BACK, y: -30, w: M.PLATE_BACK + 30, d: 60, r: 1 };
+  out.push(S(slab(plate, TABLE_Z + 6, 4, 2, 0.5), { tone: "mid" }));
+  out.push(D(k.corners(plate, 3.5).map(([x, y]) => at([x, y, TABLE_Z + 10])), { size: 0.45 }));
+  // clevis standing on the plate's back edge, pin through it on the rod axis
+  out.push(S(slab({ x: plate.x, y: -6, w: 5, d: 12, r: 0.6 }, TABLE_Z + 10, ROD.z - TABLE_Z - 2, 2, 0.4), { tone: "mid" }));
+  out.push(L(k.sideRing([plate.x + 2.5, 6, ROD.z], 2, "y", P), { tone: "lo" }));
+  // turntable under the cradle, bolt circle on top
+  out.push(S(k.cylinder(WORK_X, 0, 20, TABLE_Z + 10, 2, P, 48, 0.4), { tone: "mid" }));
+  out.push(L(k.ring(WORK_X, 0, 17, TABLE_Z + 12, P, 48), { tone: "faint" }));
+  out.push(D([0, 1, 2, 3, 4, 5].map((i) => at([WORK_X + 17 * Math.cos(i + 0.5), 17 * Math.sin(i + 0.5), TABLE_Z + 12])), { size: 0.4 }));
+  return out.join("");
+}
+
+// the chisel at rest: tip at the origin, pointing along -y at the block
+function chisel() {
+  const out = [];
+  out.push(S(slab({ x: -0.8, y: 0, w: 1.6, d: 6, r: 0.8 }, -0.8, 1.6, 4), { tone: "hi", crease: "none" })); // bit
+  out.push(S(slab({ x: -2.2, y: 5, w: 4.4, d: 3, r: 2.2 }, -2.2, 4.4, 4), { tone: "mid", crease: "none" })); // retainer
+  out.push(S(slab({ x: -2.2, y: 23, w: 4.4, d: 3, r: 1 }, -10, 8, 2, 0.4), { tone: "lo" })); // grip
+  out.push(S(slab({ x: -0.8, y: 19, w: 1.6, d: 2.2, r: 0.5 }, -6, 3.2, 2), { tone: "mid", crease: "none" })); // trigger
+  const bodyPlan = { x: -2.8, y: 8, w: 5.6, d: 19, r: 2.8 };
+  const bands = [12, 17, 22].map((y) => k.lineOnTop([-2.8, y], [2.8, y], 2.8, P)).join("");
+  out.push(S(slab(bodyPlan, -2.8, 5.6, 6), { tone: "mid", crease: "none", inner: L(bands, { tone: "faint" }) }));
+  out.push(S(slab({ x: -1.2, y: 27, w: 2.4, d: 3, r: 1.2 }, -1.2, 2.4, 4), { tone: "lo", crease: "none" })); // air inlet
+  out.push(S(slab({ x: -1, y: 15, w: 2, d: 3, r: 0.6 }, 2.8, 3, 2), { tone: "mid", crease: "none" })); // cable eye
+  return out.join("");
+}
+
+// balancer arm off the beam's front face, the spring balancer hanging under it
+function balancer() {
+  const out = [];
+  const arm = { x: 9, y: 33, w: 66, d: 6, r: 0.6 };
+  out.push(S(slab(arm, BEAM_Z + 4, 6, 2, 0.4), { tone: "mid" }));
+  out.push(D([[11.5, 34.5], [11.5, 37.5]].map(([x, y]) => at([x, y, BEAM_Z + 10])), { size: 0.45 }));
+  out.push(S(slab({ x: 73, y: 32, w: 3, d: 8, r: 0.4 }, BEAM_Z + 2, 10, 2), { tone: "mid", crease: "none" })); // end stop
+  const [bx, by] = M.BAL;
+  out.push(S(slab({ x: bx - 1, y: by - 1, w: 2, d: 2, r: 0.4 }, BEAM_Z - 6, 10, 2), { tone: "mid", crease: "none" })); // hook
+  out.push(S(k.cylinder(bx, by, 7, M.BAL[2] + 3, 18, P, 40, 0.6), { tone: "mid", inner: L(k.sideArc(bx, by, 7, M.BAL[2] + 12, P, 24), { tone: "faint" }) }));
+  out.push(L(k.ring(bx, by, 4, M.BAL[2] + 21, P, 24), { tone: "lo" }));
+  out.push(S(k.cylinder(bx, by, 1.6, M.BAL[2], 3, P, 16), { tone: "mid", crease: "none" }));
+  return out.join("");
+}
+
+// ---- page -------------------------------------------------------------------
+function livePage() {
+  const st = bariState();
+  bariGo(st, "deburr", 0.18);
+  st.chisel = [WORK_X - 24 + 48 * 0.64, M.BLOCK_W / 2 + 1, M.BLOCK_Z + PARTING];
+  const f0 = bariScene(st);
+  const slot = (name, inner = "") => `<g data-slot="${name}">${inner}</g>`;
+  const guardPart = `<g data-part="guard">${slot("liftrod", f0.liftRod)}<g data-part="plate" transform="${f0.guard}">${guard()}</g></g>`;
+  const liveBody = [
+    floor(),
+    railing(),
+    post(POST_Y[0]),
+    conveyorBack(),
+    legsBack(),
+    pusher(),
+    tableTop(),
+    slot("rod", f0.rod),
+    slot("guard-behind", f0.guardBehind ? guardPart : ""),
+    `<g data-part="carriage" transform="${f0.carriage}">${carriageLive()}</g>`,
+    slot("cradle", f0.cradle),
+    slot("travel", f0.travel),
+    conveyorFront(),
+    legsFront(),
+    slot("guard-front", f0.guardBehind ? "" : guardPart),
+    post(POST_Y[1]),
+    beam(),
+    liftCylinder(),
+    buttons(),
+    `<g data-part="lamp" opacity="0">${D([at(M.LAMP)], { size: 1.3, tone: "lit" })}</g>`,
+    `<g data-part="chisel" transform="${f0.chisel}">${chisel()}</g>`,
+    balancer(),
+    slot("cable", f0.cable),
+    slot("chips", f0.chips),
+  ];
+  const svg = k.figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Station Baritori, running: the pusher drives the carriage through the portal, the guard drops, an air chisel on a spring balancer chips the flash off the parting line one face at a time while the cradle turns the block a quarter turn between faces, then the block rolls on to HSB05.",
+    body: liveBody,
+  }).replace(`viewBox="0 0 ${WIDTH} ${HEIGHT}"`, 'viewBox="78 34 444 372"'); // cropped to the drawing (getBBox 86 41 428 358) so it fills the card
+  const steps = M.ORDER.map((p) => `<button type="button" data-go="${p}">${STEPS[p]}</button>`).join("");
+  const controls = `<div class="bari-ctl">
+<button type="button" class="bari-play" data-act="play" aria-label="Pause">❚❚</button>
+<div class="bari-steps" role="group" aria-label="Jump to a step">${steps}</div>
+<label class="bari-p">Line pressure <input type="range" min="4" max="7" step="0.1" value="6" aria-label="Line pressure, bar"><output>6.0 bar</output></label>
+<div class="bari-num" data-numbers>${bariNumbers({ ...st, f: 30, E: bariSolve(6 * M.BAR).E, rate: bariSolve(6 * M.BAR).rate, F: bariSolve(6 * M.BAR).F })}</div>
+</div>`;
+  const plate = k.plateHtml({
+    fig: "Baritori",
+    title: "Deburring cycle",
+    hint: "Click to pause",
+    readout: bariReadout(st),
+    body: `<div class="iso-stage" tabindex="0" aria-label="Baritori cycle, click or press space to pause">${svg}</div>`,
+  });
+  const css = `<style>
+/* fills whatever box it is shown in (the station card's iframe): the drawing takes the room the controls leave */
+html,body{height:100%}
+body{background:var(--anatomy-card);display:flex;flex-direction:column}
+.iso-page{flex:1;min-height:0;width:100%;margin:0;padding:0;display:flex;flex-direction:column}
+.iso-figure{flex:1;min-height:0;margin:0;display:flex;flex-direction:column}
+.iso-plate{flex:1;min-height:0;display:flex;padding:28px 10px 24px;box-shadow:none}
+.iso-plate-corners{inset:10px 12px}
+.iso-stage{flex:1;min-height:0;display:flex;outline:none;cursor:pointer}
+.iso-stage .iso-svg{display:block;width:100%;height:100%}
+.bari-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 12px 12px;font:12px/1.3 ui-sans-serif,system-ui,sans-serif;color:var(--anatomy-text)}
+.bari-ctl button{font:inherit;color:inherit;background:transparent;border:1px solid var(--anatomy-mid);border-radius:999px;padding:4px 10px;cursor:pointer}
+.bari-ctl button:hover{color:var(--anatomy-strong);border-color:var(--anatomy-text)}
+.bari-ctl button[aria-current="step"]{color:var(--anatomy-card);background:var(--anatomy-strong);border-color:var(--anatomy-strong)}
+.bari-play{width:30px;padding:4px 0!important}
+.bari-steps{display:flex;flex-wrap:wrap;gap:4px}
+.bari-p{display:flex;align-items:center;gap:6px;margin-left:auto}
+.bari-p input{width:110px;accent-color:var(--anatomy-strong)}
+.bari-p output{min-width:52px;font-variant-numeric:tabular-nums}
+.bari-num{flex-basis:100%;color:var(--anatomy-muted);font:11px/1.3 var(--anatomy-mono);font-variant-numeric:tabular-nums}
+/* phones: the drawing keeps the room, the controls get tight */
+@media (max-width:480px){
+.iso-plate{padding:24px 4px 20px}
+.iso-plate-corner[data-corner="hint"],.bari-num{display:none}
+.bari-ctl{gap:4px 6px;padding:6px 8px 8px;font-size:11px}
+.bari-ctl button{padding:3px 7px}
+.bari-p{margin-left:0}
+.bari-p input{width:84px}
+}
+</style>`;
+  const fns = [approach, smooth01, bariSolve, bariState, bariGo, bariStep, bariPose, bariBlock, bariCradle, bariScene, bariReadout, bariNumbers].map((fn) => (typeof fn === "function" && fn.name && !fn.toString().startsWith("function") ? `const ${fn.name} = ${fn}` : `${fn}`));
+  const live = `
+const k = { iso, segment, ring, ringOf, extrude, slabOf, cylinder, solidSvg, lineSvg, dotsSvg, towardViewer, depthOf, translateAlong };
+const P = ${JSON.stringify(P)};
+const M = ${JSON.stringify(M)};
+const SAY = ${JSON.stringify(SAY)};
+${fns.join("\n")}
+const theme = new URLSearchParams(location.search).get("theme");
+if (theme === "light" || theme === "dark") { document.body.dataset.theme = theme; document.documentElement.style.colorScheme = theme; }
+const stage = document.querySelector(".iso-stage");
+const svg = stage.querySelector("svg");
+const q = (sel) => svg.querySelector(sel);
+const slots = Object.fromEntries([...svg.querySelectorAll("[data-slot]")].map((el) => [el.dataset.slot, el]));
+const parts = { carriage: q('[data-part="carriage"]'), guard: q('[data-part="guard"]'), plate: q('[data-part="plate"]'), chisel: q('[data-part="chisel"]'), lamp: q('[data-part="lamp"]') };
+const liftSlot = parts.guard.querySelector('[data-slot="liftrod"]');
+const readout = document.querySelector("[data-readout]");
+const numbers = document.querySelector("[data-numbers]");
+const playBtn = document.querySelector('[data-act="play"]');
+const range = document.querySelector('.bari-p input');
+const rangeOut = document.querySelector('.bari-p output');
+const stepBtns = [...document.querySelectorAll("[data-go]")];
+const still = matchMedia("(prefers-reduced-motion: reduce)");
+const st = bariState();
+bariGo(st, still.matches ? "deburr" : "load", still.matches ? 0.4 : 0);
+const set = (el, name, value) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+const html = (el, value) => { if (el.__v !== value) { el.__v = value; el.innerHTML = value; } };
+function draw() {
+  const f = bariScene(st);
+  set(parts.carriage, "transform", f.carriage);
+  html(slots.rod, f.rod);
+  html(slots.cradle, f.cradle);
+  html(slots.travel, f.travel);
+  const home = f.guardBehind ? slots["guard-behind"] : slots["guard-front"];
+  if (parts.guard.parentNode !== home) home.appendChild(parts.guard);
+  set(parts.plate, "transform", f.guard);
+  html(liftSlot, f.liftRod);
+  set(parts.chisel, "transform", f.chisel);
+  html(slots.cable, f.cable);
+  html(slots.chips, f.chips);
+  set(parts.lamp, "opacity", String(f.lamp));
+  const text = bariReadout(st);
+  if (readout.textContent !== text) readout.textContent = text;
+  const nums = bariNumbers(st);
+  if (numbers.textContent !== nums) numbers.textContent = nums;
+  const current = st.phase === "turn" ? "deburr" : st.phase;
+  for (const b of stepBtns) if (b.dataset.go === current) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+}
+let playing = !still.matches, visible = true, frame = 0, last = 0;
+function tick(now) {
+  const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
+  last = now;
+  bariStep(st, dt);
+  draw();
+  frame = playing && visible ? requestAnimationFrame(tick) : 0;
+}
+const run = () => { if (!frame && playing && visible) { last = 0; frame = requestAnimationFrame(tick); } };
+const setPlaying = (on) => {
+  playing = on;
+  playBtn.textContent = on ? "❚❚" : "▶";
+  playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+  if (on) run(); else { cancelAnimationFrame(frame); frame = 0; }
+};
+playBtn.addEventListener("click", () => setPlaying(!playing));
+stage.addEventListener("click", () => setPlaying(!playing));
+stage.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setPlaying(!playing); } });
+for (const b of stepBtns) b.addEventListener("click", () => { bariGo(st, b.dataset.go); draw(); });
+range.addEventListener("input", () => { st.target = Number(range.value); rangeOut.textContent = st.target.toFixed(1) + " bar"; if (!playing) { st.p = st.target * M.BAR; draw(); } });
+new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; if (visible) run(); else { cancelAnimationFrame(frame); frame = 0; } }).observe(stage);
+document.addEventListener("visibilitychange", () => { visible = !document.hidden; if (visible) run(); });
+setPlaying(playing);
+draw();
+// review shots: __bari.at("deburr", 0.4, 0) pauses on that step, with that much flash off, that far in
+window.__bari = { at(phase, frac = 0, pt = 0) { setPlaying(false); bariGo(st, phase, frac); for (let t = 0; t < pt; t += 1 / 60) bariStep(st, 1 / 60); draw(); return bariReadout(st); } };
+`;
+  return k.pageHtml({ title: "Baritori · deburring cycle", theme: "light", body: css + plate + controls, script: kitScript() + live, width: 640 });
+}
+
+// the kit as plain script: the page draws with the same functions as the build
+function kitScript() {
+  return readFileSync(new URL("../iso-kit.mjs", import.meta.url), "utf8").replace(/^export /gm, "");
+}
+
+if (!CHECK) {
+  const html = livePage();
+  writeFileSync(join(OUT, "baritori-live.html"), html);
+  console.log(`wrote ${join(OUT, "baritori-live.html")} (${(html.length / 1024).toFixed(0)} KB)`);
 }

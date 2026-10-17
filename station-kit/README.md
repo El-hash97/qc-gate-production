@@ -49,6 +49,24 @@ Ubah bagian bentuk (kabinet, pintu, conveyor, …) sesuai acuan. Aturan gaya men
 anatomy: monokrom, satu aksen (`lit`) untuk benda yang diproses, setiap part duduk di part
 lain, garis selalu berakhir di sesuatu. Review dengan membuka SVG di browser dan zoom 4×.
 
+### 2b. Gambar bergerak (opsional, contoh: Baritori)
+
+`figure/stations/baritori.mjs` juga menulis `<id>-live.html`: gambar isometrik yang sama,
+bergerak mengikuti siklus halaman 3D, dengan tombol step, pause dan slider tekanan.
+
+- Model siklus (`bariStep`, `bariGo`) dan geometri yang bergerak (`bariScene`) adalah fungsi
+  biasa atas `k`, `P`, `M`; source-nya ditempel ke halaman bersama kit, jadi browser
+  menggambar tiap frame dengan kode build yang sama.
+- Part yang hanya bergeser dibangun sekali lalu dipindah dengan `translateAlong`; part yang
+  berubah bentuk (cradle berputar, batang piston, kabel) dibangun ulang per frame.
+- Part yang lewat di depan/belakang part lain pindah slot gambar (guard: `guard-behind` /
+  `guard-front`).
+- `node station-kit/figure/stations/baritori.mjs --check` menjalankan self-check siklus.
+- `window.__bari.at("deburr", 0.4, 0.5)` untuk screenshot review di fase tertentu.
+
+Daftarkan dengan `live: '/stations/<id>-live.html'` di `utils/stationDetails.ts`; card
+menampilkannya sebagai pengganti gambar statis.
+
 ### 3. Mesin 3D (tombol Play)
 
 ```bash

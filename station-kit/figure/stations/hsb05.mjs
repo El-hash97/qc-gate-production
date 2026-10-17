@@ -530,14 +530,15 @@ function sideBody(i, f) {
   const sd = SIDES[i];
   const r = f.rigs[i];
   const slot = (name, inner = "") => `<g data-slot="${name}-${i}">${inner}</g>`;
-  const hookG = `<g data-part="hook-${i}" transform="${r.hook}" opacity="${r.alpha.toFixed(3)}">${hook("back")}<g data-part="cargo-${i}" opacity="${f.carry ? 1 : 0}">${block(HANG, 37, { lit: true })}</g>${hook("front")}</g>`;
-  const hoistG = `<g data-part="hoist-${i}" transform="${r.hoist}" opacity="${r.alpha.toFixed(3)}">${hoist()}</g>`;
-  const parts = i === 0
+  const hookG = () => `<g data-part="hook-${i}" transform="${r.hook}" opacity="${r.alpha.toFixed(3)}">${hook("back")}<g data-part="cargo-${i}" opacity="${f.carry ? 1 : 0}">${block(HANG, 37, { lit: true })}</g>${hook("front")}</g>`;
+  const hoistG = () => `<g data-part="hoist-${i}" transform="${r.hoist}" opacity="${r.alpha.toFixed(3)}">${hoist()}</g>`;
+  // built inside turned(): every helper reads TURN while the parts are drawn
+  const parts = () => i === 0
     ? [
         door(),
-        slot("hook-door", r.nearStand ? "" : hookG),
+        slot("hook-door", r.nearStand ? "" : hookG()),
         beam(),
-        slot("hoist-door", r.nearStand ? "" : hoistG),
+        slot("hoist-door", r.nearStand ? "" : hoistG()),
         slot("leaf", f.leaves[0]),
         conveyorRail(CONV.y0),
         rollers(),
@@ -545,7 +546,7 @@ function sideBody(i, f) {
         stand("back"),
         `<g data-part="raw-block" opacity="${f.raw.alpha}" transform="${f.raw.roll}">${block(QUEUE, STAND.z)}</g>`,
         stand("front"),
-        slot("rig-stand", r.nearStand ? hookG + hoistG : ""),
+        slot("rig-stand", r.nearStand ? hookG() + hoistG() : ""),
         portalColumn(34),
         portalTop(),
         portalColumn(-34),
@@ -553,18 +554,18 @@ function sideBody(i, f) {
     : [
         door(),
         slot("leaf", f.leaves[1]),
-        slot("hook-door", r.nearStand ? "" : hookG),
+        slot("hook-door", r.nearStand ? "" : hookG()),
         beam(),
-        slot("hoist-door", r.nearStand ? "" : hoistG),
+        slot("hoist-door", r.nearStand ? "" : hoistG()),
         stand("back"),
         `<g data-part="done-block" opacity="${f.done}">${block(QUEUE, STAND.z)}</g>`,
         stand("front"),
-        slot("rig-stand", r.nearStand ? hookG + hoistG : ""),
+        slot("rig-stand", r.nearStand ? hookG() + hoistG() : ""),
         portalColumn(-34),
         portalColumn(34),
         portalTop(),
       ];
-  return `<g transform="${k.translateAlong(P, [sd.sx, sd.sy, 0])}">` + turned(sd.turn, () => parts.join("")) + "</g>";
+  return `<g transform="${k.translateAlong(P, [sd.sx, sd.sy, 0])}">` + turned(sd.turn, () => parts().join("")) + "</g>";
 }
 
 function sceneBody(st) {

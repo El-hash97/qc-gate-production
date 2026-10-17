@@ -9,7 +9,7 @@
 // Seen as the overview camera sees it: the in door almost face on, the conveyor
 // from Baritori coming in from the left, the out side off to the right.
 // The live page runs the cycle of hsb05-3d.html: pick up at the left stand, lift, in through the left
-// door, doors close, blast (coverage from the same Avrami model), doors open, out through the right door,
+// door, blast (coverage from the same Avrami model; the doorways have no leaves), out through the right door,
 // set down on the right stand, release, and back empty.
 //   node station-kit/figure/stations/hsb05.mjs [outDir]
 //     →   <outDir>/hsb05-{light,dark}.svg and <outDir>/hsb05-live.html (?theme=dark|light)
@@ -337,12 +337,12 @@ function stand(part) {
 // Each side (0 in, 1 out) is the in side's drawing turned and shifted round the cabinet, with its own
 // hoist and hook built in place and moved along its leg. The rig is drawn in a slot by the door while it
 // is near the door and after the stand once it is over it, and fades as it passes into the chamber.
-// One leaf per door, on the side away from the other door (two leaves swung between them would meet).
+// The doorways are open: no leaves.
 // =============================================================================
 
 const SIDES = [
-  { turn: 0, sx: -SHIFT_IN, sy: 0, leafX: DOOR.x0 - 7.5, leafDir: 1 },
-  { turn: -Math.PI / 4, sx: SHIFT_OUT * Math.SQRT1_2, sy: -SHIFT_OUT * Math.SQRT1_2, leafX: DOOR.x1 + 7.5, leafDir: -1 },
+  { turn: 0, sx: -SHIFT_IN, sy: 0 },
+  { turn: -Math.PI / 4, sx: SHIFT_OUT * Math.SQRT1_2, sy: -SHIFT_OUT * Math.SQRT1_2 },
 ];
 const M = {
   CYCLE: [["pickup", 1.6], ["lift", 2.2], ["in", 3.4], ["close", 1.4], ["blast", 11], ["open", 1.4], ["out", 3.4], ["lower", 2.2], ["release", 2.0], ["return", 5.0]],
@@ -355,7 +355,6 @@ const M = {
   FADE: [AP - 22, AP + 10], // the rig fades as it passes into the chamber
   NEAR_STAND: STAND.y0 - 6, // past this the rig is drawn after the stand
   ROLL: CONV.x1 - 40, // the raw block rolls in from here on the conveyor
-  DOOR: { z0: DOOR.z0, z1: DOOR.z1, leaf: 44 },
   LAMP: [R * 0.64, -R * 0.56, BODY[1] + 5 + 23.5],
   // physics (SI): wheel tip speed, shot dents, Avrami coverage
   WHEEL_D: 0.48,
@@ -419,36 +418,6 @@ function hsbStep(st, dt) {
   if (phase === "blast") st.C = 1 - (1 - st.C) * Math.exp(-sol.k * dt * M.TIME_K);
 }
 
-// a door leaf swung `open` (1 = square to the face, 0 = shut across the doorway), side `i`
-function hsbLeaf(i, open) {
-  const sd = M.SIDES[i];
-  const a = (((1 - open) * Math.PI) / 2) * -sd.leafDir; // swing about the hinge in over the doorway
-  const hx = sd.leafX;
-  const hy = M.AP + 7.5;
-  const c = Math.cos(sd.turn);
-  const s = Math.sin(sd.turn);
-  const W = ([lx, ly]) => {
-    const rx = hx + (lx * Math.cos(a) - ly * Math.sin(a));
-    const ry = hy + (lx * Math.sin(a) + ly * Math.cos(a));
-    return [rx * c - ry * s + sd.sx, rx * s + ry * c + sd.sy];
-  };
-  const L = M.DOOR.leaf;
-  const ring = [[-1.5, 0], [1.5, 0], [1.5, L], [-1.5, L]].map(W);
-  const z0 = M.DOOR.z0 - 4;
-  const h = M.DOOR.z1 - M.DOOR.z0 + 8;
-  const out = [k.solidSvg(k.extrude(ring, z0, h, P, { convex: true, bevel: 0.4 }), { tone: "mid" })];
-  // the face we see: panel outline, the handle near the free edge, the hinges
-  const [vx, vy] = k.towardViewer(P);
-  const n = W([1, 0]);
-  const o = W([0, 0]);
-  const side = (n[0] - o[0]) * vx + (n[1] - o[1]) * vy > 0 ? 1.5 : -1.5;
-  const pt = (t, z) => k.iso([...W([side, t]), z], P);
-  out.push(k.lineSvg(k.pathOf([pt(5, M.DOOR.z0 + 2), pt(L - 5, M.DOOR.z0 + 2), pt(L - 5, M.DOOR.z1 - 2), pt(5, M.DOOR.z1 - 2)], true), { tone: "lo" }));
-  out.push(k.dotsSvg([pt(L - 4, 46)], { size: 1.1, tone: "mid" }));
-  out.push(k.dotsSvg([pt(1.2, M.DOOR.z0 + 9), pt(1.2, M.DOOR.z1 - 7)], { size: 0.8, tone: "mid" }));
-  return out.join("");
-}
-
 // where everything is at this moment of the cycle
 function hsbScene(st) {
   const [phase, u] = hsbPhase(st.t);
@@ -473,7 +442,6 @@ function hsbScene(st) {
     const ly = dd - M.TROLLEY_Y;
     return k.translateAlong(P, [-ly * Math.sin(t), ly * Math.cos(t), z]);
   };
-  const open = phase === "close" ? 1 - e : phase === "blast" ? 0 : phase === "open" ? e : 1;
   const rigs = [0, 1].map((i) => ({
     hoist: along(i, d, 0),
     hook: along(i, d, dz),
@@ -484,7 +452,6 @@ function hsbScene(st) {
     phase,
     rigs,
     carry,
-    leaves: [hsbLeaf(0, open), hsbLeaf(1, open)],
     raw: {
       alpha: phase === "pickup" ? 1 : phase === "return" ? smooth01(0, 0.25, e) : 0,
       roll: phase === "return" ? k.translateAlong(P, [M.ROLL * (1 - smooth01(0.1, 0.8, u)), 0, 0]) : "translate(0 0)",
@@ -494,8 +461,8 @@ function hsbScene(st) {
   };
 }
 
-const SAY = { pickup: "picking up at the left stand", lift: "lifting", in: "in through the left door", close: "doors closing", blast: "blasting", open: "doors opening", out: "out through the right door", lower: "setting down on the right stand", release: "on to HSB06", return: "back empty for the next block" };
-const STEPS = { pickup: "Pick up", lift: "Lift", in: "In", close: "Close", blast: "Blast", open: "Open", out: "Out", lower: "Lower", release: "Release", return: "Return" };
+const SAY = { pickup: "picking up at the left stand", lift: "lifting", in: "in through the left door", close: "ready to blast", blast: "blasting", open: "blast done", out: "out through the right door", lower: "setting down on the right stand", release: "on to HSB06", return: "back empty for the next block" };
+const STEPS = { pickup: "Pick up", lift: "Lift", in: "In", close: "Ready", blast: "Blast", open: "Done", out: "Out", lower: "Lower", release: "Release", return: "Return" };
 
 function hsbReadout(st) {
   const [phase] = hsbPhase(st.t);
@@ -539,7 +506,6 @@ function sideBody(i, f) {
         slot("hook-door", r.nearStand ? "" : hookG()),
         beam(),
         slot("hoist-door", r.nearStand ? "" : hoistG()),
-        slot("leaf", f.leaves[0]),
         conveyorRail(CONV.y0),
         rollers(),
         conveyorRail(CONV.y1),
@@ -553,7 +519,6 @@ function sideBody(i, f) {
       ]
     : [
         door(),
-        slot("leaf", f.leaves[1]),
         slot("hook-door", r.nearStand ? "" : hookG()),
         beam(),
         slot("hoist-door", r.nearStand ? "" : hoistG()),
@@ -650,7 +615,7 @@ body{background:var(--anatomy-card);display:flex;flex-direction:column}
 .bari-p input{width:84px}
 }
 </style>`;
-  const fns = [approach, smooth01, hsbSolve, hsbState, hsbPhase, hsbGo, hsbStep, hsbLeaf, hsbScene, hsbReadout, hsbNumbers].map((fn) => (fn.toString().startsWith("function") ? `${fn}` : `const ${fn.name} = ${fn}`));
+  const fns = [approach, smooth01, hsbSolve, hsbState, hsbPhase, hsbGo, hsbStep, hsbScene, hsbReadout, hsbNumbers].map((fn) => (fn.toString().startsWith("function") ? `${fn}` : `const ${fn.name} = ${fn}`));
   const live = `
 const k = { iso, segment, pathOf, extrude, solidSvg, lineSvg, dotsSvg, towardViewer, translateAlong };
 const P = ${JSON.stringify(P)};
@@ -663,7 +628,7 @@ const stage = document.querySelector(".iso-stage");
 const svg = stage.querySelector("svg");
 const q = (sel) => svg.querySelector(sel);
 const slot = (name) => q('[data-slot="' + name + '"]');
-const rig = [0, 1].map((i) => ({ hook: q('[data-part="hook-' + i + '"]'), hoist: q('[data-part="hoist-' + i + '"]'), cargo: q('[data-part="cargo-' + i + '"]'), hookDoor: slot("hook-door-" + i), hoistDoor: slot("hoist-door-" + i), stand: slot("rig-stand-" + i), leaf: slot("leaf-" + i) }));
+const rig = [0, 1].map((i) => ({ hook: q('[data-part="hook-' + i + '"]'), hoist: q('[data-part="hoist-' + i + '"]'), cargo: q('[data-part="cargo-' + i + '"]'), hookDoor: slot("hook-door-" + i), hoistDoor: slot("hoist-door-" + i), stand: slot("rig-stand-" + i) }));
 const raw = q('[data-part="raw-block"]');
 const done = q('[data-part="done-block"]');
 const lamp = q('[data-part="lamp"]');
@@ -688,7 +653,6 @@ function draw() {
     // over the stand the rig is drawn after it, by the door before the beam
     if (fr.nearStand) { if (r.hook.parentNode !== r.stand) { r.stand.appendChild(r.hook); r.stand.appendChild(r.hoist); } }
     else if (r.hook.parentNode !== r.hookDoor) { r.hookDoor.appendChild(r.hook); r.hoistDoor.appendChild(r.hoist); }
-    html(r.leaf, f.leaves[i]);
   }
   set(raw, "opacity", String(f.raw.alpha)); set(raw, "transform", f.raw.roll);
   set(done, "opacity", f.done.toFixed(3));

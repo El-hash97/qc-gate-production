@@ -5,14 +5,20 @@
 // has carried it past the blast wheels. The control panel sits where the faces meet, a
 // pillar jib's manipulator reaches into the left door with a raw block, and a cleaned
 // block waits on the output stand outside the right door.
-//   node station-kit/figure/stations/hsb06.mjs [outDir]   →   <outDir>/hsb06-{light,dark}.svg
+// The live page runs the cycle of hsb06-3d.html: grip at the loading stand, swing in through the left
+// door, set the block on the rotary table, manipulator out, doors down, blast while the table carries it
+// round, right door up, reach in, lift out, drop on the output stand, back to the loading stand.
+//   node station-kit/figure/stations/hsb06.mjs [outDir]
+//     →   <outDir>/hsb06-{light,dark}.svg and <outDir>/hsb06-live.html (?theme=dark|light)
 //   (outDir defaults to public/stations, relative to where you run it)
-import { mkdirSync, writeFileSync } from "node:fs";
+//   node station-kit/figure/stations/hsb06.mjs --check   runs the cycle model's self-check only
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as k from "../iso-kit.mjs";
 
-const OUT = resolve(process.argv[2] ?? "public/stations");
-mkdirSync(OUT, { recursive: true });
+const CHECK = process.argv.includes("--check");
+const OUT = resolve(process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "public/stations");
+if (!CHECK) mkdirSync(OUT, { recursive: true });
 const WIDTH = 600;
 const HEIGHT = 420;
 
@@ -27,7 +33,6 @@ const DOOR = { half: 22, z0: 10, z1: 74, depth: 16 };
 const BLOCK = { half: 12, d: 9.5, h: 17 }; // half length along the face, half width, height
 const PILLAR = [-146, 112];
 const BOOM_Z = 150;
-const ARM_Z = 70; // the manipulator's reach arm, over the block
 const STAND_Z = 34;
 
 // a face: s = -1 left door (block in), s = +1 right door (block out)
@@ -208,21 +213,6 @@ function panel() {
   return out.join("");
 }
 
-// ---- BC block on any heading: deck with four bores, head bolts ----------------
-function block(f, v, z, { lit = false } = {}) {
-  const { half, d, h } = BLOCK;
-  const F = f.F;
-  const plan = [F(-half, v - d, 0), F(half, v - d, 0), F(half, v + d, 0), F(-half, v + d, 0)].map(([x, y]) => [x, y]);
-  const seam = L(k.ringSeam(plan, z + 5, P), { tone: lit ? "lit" : "faint" });
-  const out = [S(k.extrude(plan, z, h, P, { bevel: 0.6 }), { tone: "hi", crease: "lo", lit, inner: seam })];
-  const bores = [-8, -2.7, 2.7, 8].map((u) => F(u, v, 0));
-  out.push(L(bores.map(([x, y]) => k.ring(x, y, 2.2, z + h, P, 24)).join(""), { tone: lit ? "lit" : "mid" }));
-  const bolts = [];
-  for (const u of [-10.4, -5.3, 0, 5.3, 10.4]) bolts.push(at(F(u, v - d + 2, z + h)), at(F(u, v + d - 2, z + h)));
-  out.push(D(bolts, { size: 0.4, tone: "mid" }));
-  return out.join("");
-}
-
 // ---- stands: a welded frame with a round plate on top -------------------------
 function stand([cx, cy]) {
   const plan = { x: cx - 15, y: cy - 15, w: 30, d: 30, r: 1 };
@@ -244,68 +234,331 @@ function pillar() {
   out.push(S(k.cylinder(px, py, 7.5, BOOM_Z - 4, 4, P, 40, 0.6), { tone: "mid" }));
   out.push(L(k.knurl(px, py, 7.5, BOOM_Z - 3.5, BOOM_Z - 0.5, 28, P), { tone: "faint" }));
   out.push(S(k.cylinder(px, py, 5.5, BOOM_Z + 8, 6, P, 32, 0.6), { tone: "mid" }));
-  // boom from the pillar out past the pole, trolley under it
-  const tip = [POLE[0] + (POLE[0] - px) * 0.12, POLE[1] + (POLE[1] - py) * 0.12];
-  out.push(S(beamBox([px, py], tip, 6, BOOM_Z, 8), { tone: "mid" }));
-  out.push(L(seg([px, py, BOOM_Z + 14], [lerp(px, POLE[0], 0.5), lerp(py, POLE[1], 0.5), BOOM_Z + 8]), { tone: "mid" }));
-  out.push(D([at([lerp(px, POLE[0], 0.5), lerp(py, POLE[1], 0.5), BOOM_Z + 8])], { size: 0.6 }));
-  out.push(S(slab({ x: POLE[0] - 6, y: POLE[1] - 6, w: 12, d: 12, r: 1 }, BOOM_Z - 6, 6, 3, 0.4), { tone: "mid" }));
-  out.push(D([at([POLE[0] - 4, POLE[1] + 6, BOOM_Z - 3]), at([POLE[0] + 4, POLE[1] + 6, BOOM_Z - 3])], { size: 0.55 }));
+  // the boom, trolley and everything hanging from them move with the manipulator: h6Rig draws them
   return out.join("");
 }
 
-// the hanging pole, its steering ring and the reach arm that goes in through the left door
-function manipulator() {
-  const f = LEFT;
-  const [px, py] = POLE;
+
+// =============================================================================
+// The cycle, as in hsb06-3d.html. The model (h6Step, h6Go) and the moving pieces (h6Scene and the
+// builders it calls) are plain functions over `k`, `P` and `M`; the live page gets their source with
+// the kit inlined. The gripper moves in polar coordinates round the chamber axis (angle off +y, radius,
+// block base height), like the 3D page; the pole stands ARM further out on the same radius, and the
+// boom slews from the pillar to it.
+// =============================================================================
+
+const polarOf = ([x, y]) => [Math.atan2(x, y), Math.hypot(x, y)];
+const MID = (A0 + A1) / 2;
+const FACE_D = R * Math.cos((A1 - A0) / 2);
+const [IN_SA, IN_SR] = polarOf(STAND_IN);
+const [OUT_SA, OUT_SR] = polarOf(STAND_OUT);
+const SPOT = FACE_D - 6; // the block on the table, just inside the doorway
+const TABLE = DOOR.z0; // table top: the chamber floor seen through the doorway
+const ON_STAND = STAND_Z + 2;
+const CARRY = 40; // block base while carried, as in the still
+const UP = 48; // gripper parked, empty
+const PARK_R = 106; // parked in front of the panel while blasting
+const M = {
+  // [phase, seconds, angle, radius, block base height] at the end of the phase, as the 3D page
+  CYCLE: [
+    ["pick", 1.4, IN_SA, IN_SR, ON_STAND],
+    ["swing in", 2.2, -MID, SPOT, CARRY],
+    ["place", 1.0, -MID, SPOT, TABLE],
+    ["retract", 1.6, -MID, IN_SR, UP],
+    ["close", 1.4, 0, PARK_R, UP],
+    ["blast", 10, 0, PARK_R, UP],
+    ["open", 1.4, OUT_SA, OUT_SR, UP],
+    ["reach in", 1.6, MID, SPOT, TABLE],
+    ["lift out", 2.2, OUT_SA, OUT_SR, CARRY],
+    ["drop", 1.0, OUT_SA, OUT_SR, ON_STAND],
+    ["return", 2.2, IN_SA, IN_SR, UP],
+  ],
+  MID,
+  FACE_D,
+  STAND_IN,
+  STAND_OUT,
+  IN_SA,
+  OUT_SA,
+  ON_STAND,
+  TABLE,
+  SPOT,
+  ARM: 34, // pole from the gripper, along the radius
+  ARM_UP: 30, // reach arm above the block base
+  BOOM_Z,
+  PILLAR,
+  BLOCK,
+  DOOR,
+  INSIDE: FACE_D + 14, // closer in than this the head is drawn in the doorway slot
+  LAMP: [-50, -62, BODY[1] + 5 + 23.5],
+  // physics (SI), as the 3D page: two wheels, a share of the shot reaches the pockets (Avrami)
+  WHEEL_D: 0.48,
+  MDOT: 2.0,
+  M_SHOT: (7600 * Math.PI * 0.84e-3 ** 3) / 6,
+  F_HIT: 0.12,
+  A_POCKET: 0.35,
+  ETA: 0.6,
+  WHEELS: 2,
+  TIME_K: 8, // blast shown 8x fast
+};
+M.LEN = M.CYCLE.reduce((sum, c) => sum + c[1], 0);
+M.TURN = -(2 * Math.PI - 2 * MID); // the table carries the block the long way round, past the wheels at the back
+
+const approach = (a, b, tau, dt) => b + (a - b) * Math.exp(-dt / tau);
+const smooth01 = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+function h6Solve(n) {
+  const v = (Math.PI * M.WHEEL_D * n) / 60;
+  const dDent = 0.24e-3 * Math.pow(Math.max(v, 1) / 72, 0.4);
+  const kk = (M.F_HIT * ((M.MDOT * M.WHEELS) / M.M_SHOT) * ((Math.PI * dDent * dDent) / 4)) / M.A_POCKET;
+  return { v, k: kk, P: (M.MDOT * v * v) / (2 * M.ETA) };
+}
+
+function h6State() {
+  return { t: 0, n: 0, sim: 0, rpm: 2900, v: 0, P: 0 };
+}
+
+function h6Phase(t) {
+  let a = ((t % M.LEN) + M.LEN) % M.LEN;
+  for (let i = 0; i < M.CYCLE.length; i++) {
+    if (a < M.CYCLE[i][1]) return [i, a / M.CYCLE[i][1]];
+    a -= M.CYCLE[i][1];
+  }
+  return [0, 0];
+}
+
+// jump to the start of a step
+function h6Go(st, name) {
+  let t = 0;
+  for (const c of M.CYCLE) {
+    if (c[0] === name) break;
+    t += c[1];
+  }
+  st.t = t + 1e-6;
+  const order = M.CYCLE.map((c) => c[0]);
+  st.sim = order.indexOf(name) > order.indexOf("blast") ? h6Solve(st.rpm).k * 10 * M.TIME_K : 0;
+}
+
+function h6Step(st, dt) {
+  st.t += dt;
+  const phase = M.CYCLE[h6Phase(st.t)[0]][0];
+  const want = phase === "blast" ? st.rpm : 0;
+  st.n = approach(st.n, want, want > st.n ? 0.9 : 2.2, dt);
+  const sol = h6Solve(st.n);
+  st.v = sol.v;
+  st.P = sol.P;
+  if (phase === "pick") st.sim = 0;
+  if (phase === "blast") st.sim += sol.k * dt * M.TIME_K;
+}
+
+// plan point at angle a (off +y) and radius r
+function h6At(a, r) {
+  return [Math.sin(a) * r, Math.cos(a) * r];
+}
+
+// plan frame at c heading hd: v along the heading (out of the chamber for a radial heading), u across it
+function h6Frame(c, hd) {
+  const n = [Math.sin(hd), Math.cos(hd)];
+  const t = [Math.cos(hd), -Math.sin(hd)];
+  return (u, v) => [c[0] + n[0] * v + t[0] * u, c[1] + n[1] * v + t[1] * u];
+}
+
+function h6Box(c, hd, [u0, u1], [v0, v1], z, h, bevel = 0.4) {
+  const F = h6Frame(c, hd);
+  return k.extrude([F(u0, v0), F(u1, v0), F(u1, v1), F(u0, v1)], z, h, P, { bevel });
+}
+
+// the BC block centred at c, heading hd, base z
+function h6Block(c, hd, z, lit) {
+  const { half, d, h } = M.BLOCK;
+  const F = h6Frame(c, hd);
+  const plan = [F(-half, -d), F(half, -d), F(half, d), F(-half, d)];
+  const seam = k.lineSvg(k.ringSeam(plan, z + 5, P), { tone: lit ? "lit" : "faint" });
+  const out = [k.solidSvg(k.extrude(plan, z, h, P, { bevel: 0.6 }), { tone: "hi", crease: "lo", lit, inner: seam })];
+  out.push(k.lineSvg([-8, -2.7, 2.7, 8].map((u) => k.ring(...F(u, 0), 2.2, z + h, P, 24)).join(""), { tone: lit ? "lit" : "mid" }));
+  const bolts = [];
+  for (const u of [-10.4, -5.3, 0, 5.3, 10.4]) bolts.push(k.iso([...F(u, -d + 2), z + h], P), k.iso([...F(u, d - 2), z + h], P));
+  out.push(k.dotsSvg(bolts, { size: 0.4, tone: "mid" }));
+  return out.join("");
+}
+
+// the gripper at c, heading hd: its jaws (and the block, when it holds one); the near jaw goes after the block
+function h6Head(c, hd, z, held) {
+  const { half } = M.BLOCK;
+  const armZ = z + M.ARM_UP;
+  const [vx, vy] = k.towardViewer(P);
+  const nearPlus = Math.cos(hd) * vx - Math.sin(hd) * vy > 0;
+  const jaw = (plus) => {
+    const u = plus ? half + 1 : -half - 4;
+    return k.solidSvg(h6Box(c, hd, [u, u + 3], [-6, 6], z + 4, armZ - 6 - z - 4), { tone: "mid" });
+  };
+  const out = [jaw(!nearPlus)];
+  if (held) out.push(h6Block(c, hd, z, true));
+  out.push(jaw(nearPlus));
+  return out.join("");
+}
+
+// boom from the pillar to the pole, trolley, the hanging pole with its collar and steering ring, reach arm
+function h6Rig(a, r, z, hd) {
+  const armZ = z + M.ARM_UP;
+  const pr = r + M.ARM;
+  const pole = h6At(a, pr);
+  const [px, py] = M.PILLAR;
   const out = [];
-  out.push(S(slab({ x: px - 2.4, y: py - 2.4, w: 4.8, d: 4.8, r: 0.6 }, 96, BOOM_Z - 102, 2, 0.3), { tone: "mid" }));
-  out.push(S(slab({ x: px - 1.6, y: py - 1.6, w: 3.2, d: 3.2, r: 0.4 }, ARM_Z, 96 - ARM_Z, 2, 0.3), { tone: "hi", crease: "none" }));
-  out.push(S(slab({ x: px - 3.4, y: py - 3.4, w: 6.8, d: 6.8, r: 0.8 }, 92, 4, 2, 0.4), { tone: "mid" }));
-  // steering ring round the pole, on three spokes
-  out.push(L(k.ring(px, py, 11, 84, P, 48) + k.ring(px, py, 9.6, 84, P, 48), { tone: "mid" }));
-  out.push(L([0, 1, 2].map((i) => {
-    const a = (i * 2 * Math.PI) / 3 + 0.4;
-    return seg([px + Math.cos(a) * 1.6, py + Math.sin(a) * 1.6, 84], [px + Math.cos(a) * 9.6, py + Math.sin(a) * 9.6, 84]);
+  const tip = [pole[0] + (pole[0] - px) * 0.12, pole[1] + (pole[1] - py) * 0.12];
+  const len = Math.hypot(tip[0] - px, tip[1] - py);
+  const d = [(tip[0] - px) / len, (tip[1] - py) / len];
+  const o = [-d[1] * 3, d[0] * 3];
+  out.push(k.solidSvg(k.extrude([[px + o[0], py + o[1]], [tip[0] + o[0], tip[1] + o[1]], [tip[0] - o[0], tip[1] - o[1]], [px - o[0], py - o[1]]], M.BOOM_Z, 8, P, { bevel: 0.4 }), { tone: "mid" }));
+  const mid = [(px + pole[0]) / 2, (py + pole[1]) / 2];
+  out.push(k.lineSvg(k.segment([px, py, M.BOOM_Z + 14], [mid[0], mid[1], M.BOOM_Z + 8], P), { tone: "mid" }));
+  out.push(k.dotsSvg([k.iso([mid[0], mid[1], M.BOOM_Z + 8], P)], { size: 0.6 }));
+  const box = (w, r, z0, h, steps, bevel, style) => k.solidSvg(k.slabOf({ x: pole[0] - w / 2, y: pole[1] - w / 2, w, d: w, r }, z0, h, P, steps, bevel), style);
+  out.push(box(12, 1, M.BOOM_Z - 6, 6, 3, 0.4, { tone: "mid" }));
+  out.push(k.dotsSvg([k.iso([pole[0] - 4, pole[1] + 6, M.BOOM_Z - 3], P), k.iso([pole[0] + 4, pole[1] + 6, M.BOOM_Z - 3], P)], { size: 0.55 }));
+  out.push(box(4.8, 0.6, armZ + 26, M.BOOM_Z - 6 - armZ - 26, 2, 0.3, { tone: "mid" }));
+  out.push(box(3.2, 0.4, armZ, 26, 2, 0.3, { tone: "hi", crease: "none" }));
+  out.push(box(6.8, 0.8, armZ + 22, 4, 2, 0.4, { tone: "mid" }));
+  out.push(k.lineSvg(k.ring(pole[0], pole[1], 11, armZ + 14, P, 48) + k.ring(pole[0], pole[1], 9.6, armZ + 14, P, 48), { tone: "mid" }));
+  out.push(k.lineSvg([0, 1, 2].map((i) => {
+    const b = (i * 2 * Math.PI) / 3 + 0.4;
+    return k.segment([pole[0] + Math.cos(b) * 1.6, pole[1] + Math.sin(b) * 1.6, armZ + 14], [pole[0] + Math.cos(b) * 9.6, pole[1] + Math.sin(b) * 9.6, armZ + 14], P);
   }).join(""), { tone: "lo" }));
-  // reach arm from the pole in through the door, a head over the block
-  out.push(S(faceBox(f, [-2.4, 2.4], [-2, 40], ARM_Z, 5), { tone: "mid" }));
-  out.push(S(faceBox(f, [-BLOCK.half - 4, BLOCK.half + 4], [-4, 4], ARM_Z - 6, 6), { tone: "mid" }));
+  out.push(k.solidSvg(h6Box(h6At(a, r), a, [-2.4, 2.4], [-8, M.ARM], armZ, 5), { tone: "mid" }));
+  // the head plate under the arm's end, over the block, turned with the head
+  out.push(k.solidSvg(h6Box(h6At(a, r), hd, [-M.BLOCK.half - 4, M.BLOCK.half + 4], [-10, -2], armZ - 6, 6), { tone: "mid" }));
   return out.join("");
 }
 
-function jaws(v, z, near) {
-  const f = LEFT;
-  const u = near ? BLOCK.half + 1 : -BLOCK.half - 4;
-  return S(faceBox(f, [u, u + 3], [v - 6, v + 6], z + 4, ARM_Z - 6 - z - 4), { tone: "mid" });
+// a lift door coming down over its doorway as a shutter, `down` 0..1 (face sgn: -1 left, +1 right)
+function h6Shutter(sgn, down) {
+  if (down <= 0.001) return "";
+  const a = sgn * M.MID;
+  const { half, z0, z1 } = M.DOOR;
+  const h = (z1 - z0) * down;
+  const c = h6At(a, M.FACE_D);
+  const body = k.solidSvg(h6Box(c, a, [-half - 2, half + 2], [0.5, 3], z1 - h, h), { tone: "mid" });
+  const G = h6Frame(c, a);
+  const F = (u, v, z) => k.iso([...G(u, v), z], P);
+  const slats = [];
+  for (let z = z1 - 6; z > z1 - h + 1; z -= 6) slats.push(k.pathOf([F(-half - 2, 3, z), F(half + 2, 3, z)]));
+  return body + k.lineSvg(slats.join(""), { tone: "faint" });
 }
 
-const lerp = (a, b, t) => a + (b - a) * t;
+// where the gripper is at this moment of the cycle: angle, radius, block base, heading, holding or not
+function h6Pose(st) {
+  const [i, u] = h6Phase(st.t);
+  const cur = M.CYCLE[i];
+  const prev = M.CYCLE[(i + M.CYCLE.length - 1) % M.CYCLE.length];
+  const phase = cur[0];
+  // lift first, then move, then lower: height leads when rising and trails when coming down
+  const a = prev[2] + (cur[2] - prev[2]) * smooth01(0.15, 0.85, u);
+  const r = prev[3] + (cur[3] - prev[3]) * smooth01(0.1, 0.9, u);
+  const z = prev[4] + (cur[4] - prev[4]) * (cur[4] > prev[4] ? smooth01(0, 0.35, u) : smooth01(0.6, 1, u));
+  // the head swivels on the way out so the block lands square on the output stand, and back on the way home
+  const swivel = phase === "lift out" ? smooth01(0.2, 0.9, u) : phase === "drop" ? 1 : phase === "return" ? 1 - smooth01(0.1, 0.6, u) : 0;
+  const held = ["swing in", "lift out"].includes(phase) || (phase === "pick" && u > 0.45) || (phase === "reach in" && u > 0.9) || (phase === "place" && u < 0.85) || (phase === "drop" && u < 0.85);
+  return { phase, u, a, r, z, hd: a - a * swivel, held };
+}
 
-// the block in the gripper sits half way through the left door; the cleaned one waits outside the right
-const IN_V = 6;
-const IN_Z = 40;
-const [vx0, vy0] = k.towardViewer(P);
-const nearIsPlus = LEFT.t[0] * vx0 + LEFT.t[1] * vy0 > 0;
+// everything that moves, for a pose; the still passes its own pose and keeps both doors up
+function h6Scene(st, pose = h6Pose(st), still = false) {
+  const { phase, u, a, r, z, hd, held } = pose;
+  const e = u * u * (3 - 2 * u);
+  const c = h6At(a, r);
+  // the table carries the block the long way round while blasting; it shows only while in a doorway
+  const onTable = ["place", "retract", "close", "blast", "open", "reach in"].includes(phase) && !held;
+  const turn = phase === "blast" ? M.TURN * smooth01(0.05, 0.95, u) : phase === "open" || phase === "reach in" ? M.TURN : 0;
+  let door = "";
+  if (onTable) {
+    const ta = -M.MID + turn;
+    const near = (b) => Math.abs(Math.atan2(Math.sin(ta - b), Math.cos(ta - b))) < 0.12;
+    if (near(-M.MID) || near(M.MID)) door = h6Block(h6At(ta, M.SPOT), ta, M.TABLE, true);
+  }
+  // a raw block waits on the loading stand from the return until it is picked; the cleaned one stays
+  // on the output stand until the next cycle opens the right door (Grinding takes it)
+  const inAlpha = phase === "return" ? smooth01(0.5, 1, u) : phase === "pick" && !held ? 1 : 0;
+  const outAlpha = phase === "drop" ? (held ? 0 : 1) : phase === "open" ? 1 - smooth01(0.1, 0.8, u) : ["reach in", "lift out"].includes(phase) ? 0 : 1;
+  const fade = (alpha, svg) => (alpha <= 0.001 ? "" : alpha >= 0.999 ? svg : `<g opacity="${alpha.toFixed(3)}">${svg}</g>`);
+  const leftUp = phase === "close" ? 1 - e : phase === "return" ? e : ["pick", "swing in", "place", "retract"].includes(phase) ? 1 : 0;
+  const rightUp = phase === "open" ? e : phase === "return" ? 1 - e : ["reach in", "lift out", "drop"].includes(phase) ? 1 : 0;
+  return {
+    phase,
+    head: h6Head(c, hd, z, held),
+    headInside: r < M.INSIDE,
+    rig: h6Rig(a, r, z, hd),
+    door,
+    stand: [fade(inAlpha, h6Block(M.STAND_IN, M.IN_SA, M.ON_STAND, false)), fade(outAlpha, h6Block(M.STAND_OUT, 0, M.ON_STAND, false))],
+    shutters: still ? ["", ""] : [h6Shutter(-1, 1 - leftUp), h6Shutter(1, 1 - rightUp)],
+    lamp: phase === "blast" ? 1 : 0,
+  };
+}
 
-const body = [
-  floor(),
-  collector(),
-  cabinet(),
-  door(LEFT),
-  door(RIGHT),
-  jaws(IN_V, IN_Z, !nearIsPlus),
-  block(LEFT, IN_V, IN_Z, { lit: true }),
-  jaws(IN_V, IN_Z, nearIsPlus),
-  frame(LEFT),
-  frame(RIGHT),
-  panel(),
-  stand(STAND_IN),
-  pillar(),
-  manipulator(),
-  stand(STAND_OUT),
-  block({ F: (u, v, z) => [STAND_OUT[0] + u, STAND_OUT[1] + v, z] }, 0, STAND_Z + 2),
-];
+const SAY = { pick: "gripping at the loading stand", "swing in": "in through the left door", place: "setting on the table", retract: "manipulator out", close: "doors down", blast: "blasting, table turning", open: "right door up", "reach in": "reaching in at the right door", "lift out": "out through the right door", drop: "onto the output stand", return: "back to the loading stand" };
+const STEPS = { pick: "Pick", "swing in": "In", place: "Place", retract: "Retract", close: "Close", blast: "Blast", open: "Open", "reach in": "Reach", "lift out": "Lift out", drop: "Drop", return: "Return" };
+
+function h6Readout(st) {
+  const phase = M.CYCLE[h6Phase(st.t)[0]][0];
+  return `${SAY[phase]} · pocket coverage ${((1 - Math.exp(-st.sim)) * 100).toFixed(1)}%`;
+}
+
+function h6Numbers(st) {
+  const f = (x) => Math.round(x).toLocaleString("en-US");
+  return `${f(st.n)} rpm · shot ${f(st.v)} m/s · ${(st.P / 1000).toFixed(1)} kW per wheel · 2 wheels`;
+}
+
+// ---- self-check: a cycle visits every step in order and the blast reaches the pockets
+{
+  const st = h6State();
+  const seen = [];
+  for (let t = 0; t < M.LEN; t += 1 / 60) {
+    h6Step(st, 1 / 60);
+    const ph = M.CYCLE[h6Phase(st.t)[0]][0];
+    if (seen.at(-1) !== ph) seen.push(ph);
+  }
+  const want = M.CYCLE.map((c) => c[0]);
+  if (JSON.stringify(seen.slice(0, want.length)) !== JSON.stringify(want)) throw new Error(`cycle order ${seen.join(" → ")}`);
+  const full = h6State();
+  h6Go(full, "blast");
+  for (let t = 0; t < 10; t += 1 / 60) h6Step(full, 1 / 60);
+  const C = 1 - Math.exp(-full.sim);
+  if (!(C > 0.5 && C < 1)) throw new Error(`pocket coverage after the blast ${(C * 100).toFixed(1)}%`);
+  console.log(`cycle check passed (${want.join(" → ")}, pocket coverage ${(C * 100).toFixed(1)}%)`);
+}
+
+// ---- the drawing, with slots for the moving pieces --------------------------------
+function sceneBody(f) {
+  const slot = (name, inner = "") => `<g data-slot="${name}">${inner}</g>`;
+  return [
+    floor(),
+    collector(),
+    cabinet(),
+    `<g data-part="lamp" opacity="${f.lamp}">${D([at(M.LAMP)], { size: 2.2, tone: "lit" })}</g>`,
+    door(LEFT),
+    door(RIGHT),
+    slot("block-door", f.door),
+    slot("head-door", f.headInside ? f.head : ""),
+    slot("shutter-0", f.shutters[0]),
+    slot("shutter-1", f.shutters[1]),
+    frame(LEFT),
+    frame(RIGHT),
+    panel(),
+    stand(STAND_IN),
+    slot("block-in", f.stand[0]),
+    pillar(),
+    slot("head-out", f.headInside ? "" : f.head),
+    slot("rig", f.rig),
+    stand(STAND_OUT),
+    slot("block-out", f.stand[1]),
+  ];
+}
+
+// the still image is the approved drawing: the manipulator carrying the raw block half way in through the
+// left door (a moment of the swing in), both doors up, the cleaned block waiting on the output stand
+const STILL = { phase: "swing in", u: 0.8, a: -MID, r: FACE_D + 6, z: CARRY, hd: -MID, held: true };
+const body = sceneBody(h6Scene(h6State(), STILL, true));
 
 const STYLE = `<style>
 .iso[data-theme="light"] .hsb-cav{fill:#cfcfcb}.iso[data-theme="light"] .hsb-cav-side{fill:#dadad6}.iso[data-theme="light"] .hsb-cav-floor{fill:#c4c4c0}
@@ -316,8 +569,140 @@ const STYLE = `<style>
 const LABEL =
   "Station HSB06, rotary table shot blast: a round blast cabinet whose front is two flat faces, each with a door, and a control panel where they meet. A pillar jib manipulator reaches in through the left door with a BC block; the rotary table carries it past the blast wheels to the right door, and the cleaned block waits on the output stand.";
 
-for (const theme of ["light", "dark"]) {
-  const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });
-  writeFileSync(join(OUT, `hsb06-${theme}.svg`), svg);
-  console.log(`wrote ${join(OUT, `hsb06-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
+if (!CHECK) {
+  for (const theme of ["light", "dark"]) {
+    const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });
+    writeFileSync(join(OUT, `hsb06-${theme}.svg`), svg);
+    console.log(`wrote ${join(OUT, `hsb06-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
+  }
 }
+
+// ---- live page ------------------------------------------------------------------------
+function livePage() {
+  const st = h6State();
+  const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...sceneBody(h6Scene(st))] });
+  const steps = M.CYCLE.map(([ph]) => `<button type="button" data-go="${ph}">${STEPS[ph]}</button>`).join("");
+  const controls = `<div class="bari-ctl">
+<button type="button" class="bari-play" data-act="play" aria-label="Pause">❚❚</button>
+<div class="bari-steps" role="group" aria-label="Jump to a step">${steps}</div>
+<label class="bari-p">Wheel speed <input type="range" min="1800" max="3000" step="50" value="2900" aria-label="Blast wheel speed, rpm"><output>2,900 rpm</output></label>
+<div class="bari-num" data-numbers>${h6Numbers(st)}</div>
+</div>`;
+  const plate = k.plateHtml({
+    fig: "HSB06",
+    title: "Rotary table shot blast cycle",
+    hint: "Click to pause",
+    readout: h6Readout(st),
+    body: `<div class="iso-stage" tabindex="0" aria-label="HSB06 cycle, click or press space to pause">${svg}</div>`,
+  });
+  const css = `<style>
+/* fills whatever box it is shown in (the station card's iframe): the drawing takes the room the controls leave */
+html,body{height:100%}
+body{background:var(--anatomy-card);display:flex;flex-direction:column}
+.iso-page{flex:1;min-height:0;width:100%;margin:0;padding:0;display:flex;flex-direction:column}
+.iso-figure{flex:1;min-height:0;margin:0;display:flex;flex-direction:column}
+.iso-plate{flex:1;min-height:0;display:flex;padding:28px 10px 24px;box-shadow:none}
+.iso-plate-corners{inset:10px 12px}
+.iso-stage{flex:1;min-height:0;display:flex;outline:none;cursor:pointer}
+.iso-stage .iso-svg{display:block;width:100%;height:100%}
+.bari-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 12px 12px;font:12px/1.3 ui-sans-serif,system-ui,sans-serif;color:var(--anatomy-text)}
+.bari-ctl button{font:inherit;color:inherit;background:transparent;border:1px solid var(--anatomy-mid);border-radius:999px;padding:4px 10px;cursor:pointer}
+.bari-ctl button:hover{color:var(--anatomy-strong);border-color:var(--anatomy-text)}
+.bari-ctl button[aria-current="step"]{color:var(--anatomy-card);background:var(--anatomy-strong);border-color:var(--anatomy-strong)}
+.bari-play{width:30px;padding:4px 0!important}
+.bari-steps{display:flex;flex-wrap:wrap;gap:4px}
+.bari-p{display:flex;align-items:center;gap:6px;margin-left:auto}
+.bari-p input{width:110px;accent-color:var(--anatomy-strong)}
+.bari-p output{min-width:68px;font-variant-numeric:tabular-nums}
+.bari-num{flex-basis:100%;color:var(--anatomy-muted);font:11px/1.3 var(--anatomy-mono);font-variant-numeric:tabular-nums}
+@media (max-width:480px){
+.iso-plate{padding:24px 4px 20px}
+.iso-plate-corner[data-corner="hint"],.bari-num{display:none}
+.bari-ctl{gap:4px 6px;padding:6px 8px 8px;font-size:11px}
+.bari-ctl button{padding:3px 7px}
+.bari-p{margin-left:0}
+.bari-p input{width:84px}
+}
+</style>`;
+  const fns = [approach, smooth01, h6Solve, h6State, h6Phase, h6Go, h6Step, h6At, h6Frame, h6Box, h6Block, h6Head, h6Rig, h6Shutter, h6Pose, h6Scene, h6Readout, h6Numbers].map((fn) => (fn.toString().startsWith("function") ? `${fn}` : `const ${fn.name} = ${fn}`));
+  const live = `
+const k = { iso, segment, pathOf, ring, ringSeam, extrude, slabOf, solidSvg, lineSvg, dotsSvg, towardViewer };
+const P = ${JSON.stringify(P)};
+const M = ${JSON.stringify(M)};
+const SAY = ${JSON.stringify(SAY)};
+${fns.join("\n")}
+const theme = new URLSearchParams(location.search).get("theme");
+if (theme === "light" || theme === "dark") { document.body.dataset.theme = theme; document.documentElement.style.colorScheme = theme; }
+const stage = document.querySelector(".iso-stage");
+const svg = stage.querySelector("svg");
+const slot = (name) => svg.querySelector('[data-slot="' + name + '"]');
+const slots = ["block-door", "head-door", "shutter-0", "shutter-1", "block-in", "head-out", "rig", "block-out"].reduce((o, n) => ((o[n] = slot(n)), o), {});
+const lamp = svg.querySelector('[data-part="lamp"]');
+const readout = document.querySelector("[data-readout]");
+const numbers = document.querySelector("[data-numbers]");
+const playBtn = document.querySelector('[data-act="play"]');
+const range = document.querySelector(".bari-p input");
+const rangeOut = document.querySelector(".bari-p output");
+const stepBtns = [...document.querySelectorAll("[data-go]")];
+const still = matchMedia("(prefers-reduced-motion: reduce)");
+const st = h6State();
+if (still.matches) { h6Go(st, "swing in"); st.t += 1.5; }
+const html = (el, value) => { if (el.__v !== value) { el.__v = value; el.innerHTML = value; } };
+function draw() {
+  const f = h6Scene(st);
+  html(slots["block-door"], f.door);
+  html(slots["block-in"], f.stand[0]);
+  html(slots["block-out"], f.stand[1]);
+  html(slots["head-door"], f.headInside ? f.head : "");
+  html(slots["head-out"], f.headInside ? "" : f.head);
+  html(slots.rig, f.rig);
+  html(slots["shutter-0"], f.shutters[0]);
+  html(slots["shutter-1"], f.shutters[1]);
+  if (lamp.getAttribute("opacity") !== String(f.lamp)) lamp.setAttribute("opacity", String(f.lamp));
+  const text = h6Readout(st);
+  if (readout.textContent !== text) readout.textContent = text;
+  const nums = h6Numbers(st);
+  if (numbers.textContent !== nums) numbers.textContent = nums;
+  for (const b of stepBtns) if (b.dataset.go === f.phase) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+}
+let playing = !still.matches, visible = true, frame = 0, last = 0;
+function tick(now) {
+  const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
+  last = now;
+  h6Step(st, dt);
+  draw();
+  frame = playing && visible ? requestAnimationFrame(tick) : 0;
+}
+const run = () => { if (!frame && playing && visible) { last = 0; frame = requestAnimationFrame(tick); } };
+const setPlaying = (on) => {
+  playing = on;
+  playBtn.textContent = on ? "❚❚" : "▶";
+  playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+  if (on) run(); else { cancelAnimationFrame(frame); frame = 0; }
+};
+playBtn.addEventListener("click", () => setPlaying(!playing));
+stage.addEventListener("click", () => setPlaying(!playing));
+stage.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setPlaying(!playing); } });
+for (const b of stepBtns) b.addEventListener("click", () => { h6Go(st, b.dataset.go); draw(); });
+range.addEventListener("input", () => { st.rpm = Number(range.value); rangeOut.textContent = st.rpm.toLocaleString("en-US") + " rpm"; draw(); });
+new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; if (visible) run(); else { cancelAnimationFrame(frame); frame = 0; } }).observe(stage);
+document.addEventListener("visibilitychange", () => { visible = !document.hidden; if (visible) run(); });
+setPlaying(playing);
+draw();
+// review shots: __h6.at("reach in", 0.5) pauses that far into that step
+window.__h6 = { at(phase, u = 0) { setPlaying(false); h6Go(st, phase); const d = M.CYCLE.find((c) => c[0] === phase)[1]; for (let t = 0; t < u * d; t += 1 / 60) h6Step(st, 1 / 60); draw(); return h6Readout(st); } };
+`;
+  return k.pageHtml({ title: "HSB06 · rotary table shot blast cycle", theme: "light", body: css + plate + controls, script: kitScript() + live, width: 640 });
+}
+
+// the kit as plain script: the page draws with the same functions as the build
+function kitScript() {
+  return readFileSync(new URL("../iso-kit.mjs", import.meta.url), "utf8").replace(/^export /gm, "");
+}
+
+if (!CHECK) {
+  const html = livePage();
+  writeFileSync(join(OUT, "hsb06-live.html"), html);
+  console.log(`wrote ${join(OUT, "hsb06-live.html")} (${(html.length / 1024).toFixed(0)} KB)`);
+}
+

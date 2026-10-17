@@ -48,6 +48,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'HSB06',
     subtitle: 'Rotary Table Shot Blast',
     image: { light: '/stations/hsb06-light.svg', dark: '/stations/hsb06-dark.svg' },
+    live: '/stations/hsb06-live.html',
     play: '/stations/hsb06-3d.html',
     description: [
       'The operator steers a pillar jib manipulator that takes the block from the loading stand in through the left door and sets it on the rotary table.',

@@ -138,6 +138,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'QC Gate 2',
     subtitle: 'Final Judgement',
     image: { light: '/stations/qc2-light.svg', dark: '/stations/qc2-dark.svg' },
+    live: '/stations/qc2-live.html',
     play: '/stations/qc2-3d.html',
     description: [
       'Each block turns once in a cage in the line for its last look, and the inspector gives it one of three judgements, recorded in this QC Gate app.',

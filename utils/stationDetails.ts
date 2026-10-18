@@ -66,6 +66,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Grinding',
     subtitle: 'Stub Grinding Booth',
     image: { light: '/stations/grinding-light.svg', dark: '/stations/grinding-dark.svg' },
+    live: '/stations/grinding-live.html',
     play: '/stations/grinding-3d.html',
     description: [
       'The operator brings the blasted block over from HSB06 on a hanging manipulator and into an open booth with a large grinding wheel on each side wall.',

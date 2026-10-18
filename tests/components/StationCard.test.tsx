@@ -6,10 +6,10 @@ import { stationDetail } from '@/utils/stationDetails';
 describe('StationCard', () => {
   const hsb05 = stationDetail('hsb05')!;
 
-  it('shows the station figure for the current theme beside its description', () => {
+  it('shows the station running its cycle for the current theme beside its description', () => {
     render(<StationCard detail={hsb05} theme="dark" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /HSB05/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/hsb05-dark.svg');
+    expect(screen.getByTitle(/HSB05 Hanger Shot Blast cycle/)).toHaveAttribute('src', '/stations/hsb05-live.html?theme=dark');
     expect(screen.getByText(/Hanger Shot Blast/)).toBeInTheDocument();
     expect(screen.getByText(/monorail hoist picks the cast block/)).toBeInTheDocument();
     expect(screen.getByText('Cycle time')).toBeInTheDocument();
@@ -17,6 +17,11 @@ describe('StationCard', () => {
 
   it('switches the figure with the theme', () => {
     render(<StationCard detail={hsb05} theme="light" onClose={() => {}} />);
+    expect(screen.getByTitle(/HSB05 Hanger Shot Blast cycle/)).toHaveAttribute('src', '/stations/hsb05-live.html?theme=light');
+  });
+
+  it('shows the still figure for a station without a running cycle', () => {
+    render(<StationCard detail={{ ...hsb05, live: undefined }} theme="light" onClose={() => {}} />);
     expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/hsb05-light.svg');
   });
 
@@ -38,56 +43,56 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/Baritori 3D/)).toHaveAttribute('src', '/stations/baritori-3d.html');
   });
 
-  it('has an HSB06 card with its own figure and 3D machine', () => {
+  it('has an HSB06 card with its running figure and 3D machine', () => {
     const hsb06 = stationDetail('hsb06')!;
     render(<StationCard detail={hsb06} theme="light" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /HSB06/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/hsb06-light.svg');
+    expect(screen.getByTitle(/HSB06 .* cycle/)).toHaveAttribute('src', '/stations/hsb06-live.html?theme=light');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/HSB06 3D/)).toHaveAttribute('src', '/stations/hsb06-3d.html');
   });
 
-  it('has a Grinding card with its own figure and 3D machine', () => {
+  it('has a Grinding card with its running figure and 3D machine', () => {
     const grinding = stationDetail('grinding')!;
     render(<StationCard detail={grinding} theme="dark" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /Grinding/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/grinding-dark.svg');
+    expect(screen.getByTitle(/Grinding .* cycle/)).toHaveAttribute('src', '/stations/grinding-live.html?theme=dark');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/Grinding 3D/)).toHaveAttribute('src', '/stations/grinding-3d.html');
   });
 
-  it('has a Hanten MC card with its own figure and 3D machine', () => {
+  it('has a Hanten MC card with its running figure and 3D machine', () => {
     const hanten = stationDetail('hanten')!;
     render(<StationCard detail={hanten} theme="light" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /Hanten MC/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/hanten-light.svg');
+    expect(screen.getByTitle(/Hanten MC .* cycle/)).toHaveAttribute('src', '/stations/hanten-live.html?theme=light');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/Hanten MC 3D/)).toHaveAttribute('src', '/stations/hanten-3d.html');
   });
 
-  it('has a Final Process card with its own figure and 3D machine', () => {
+  it('has a Final Process card with its running figure and 3D machine', () => {
     const final = stationDetail('final')!;
     render(<StationCard detail={final} theme="dark" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /Final Process/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/final-dark.svg');
+    expect(screen.getByTitle(/Final Process .* cycle/)).toHaveAttribute('src', '/stations/final-live.html?theme=dark');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/Final Process 3D/)).toHaveAttribute('src', '/stations/final-3d.html');
   });
 
-  it('has a QC Gate 1 card with its own figure and 3D machine', () => {
+  it('has a QC Gate 1 card with its running figure and 3D machine', () => {
     const qc1 = stationDetail('qc1')!;
     render(<StationCard detail={qc1} theme="light" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /QC Gate 1/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/qc1-light.svg');
+    expect(screen.getByTitle(/QC Gate 1 .* cycle/)).toHaveAttribute('src', '/stations/qc1-live.html?theme=light');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/QC Gate 1 3D/)).toHaveAttribute('src', '/stations/qc1-3d.html');
   });
 
-  it('has a QC Gate 2 card with its own figure and 3D machine', () => {
+  it('has a QC Gate 2 card with its running figure and 3D machine', () => {
     const qc2 = stationDetail('qc2')!;
     render(<StationCard detail={qc2} theme="dark" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /QC Gate 2/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/qc2-dark.svg');
+    expect(screen.getByTitle(/QC Gate 2 .* cycle/)).toHaveAttribute('src', '/stations/qc2-live.html?theme=dark');
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/QC Gate 2 3D/)).toHaveAttribute('src', '/stations/qc2-3d.html');
   });
@@ -127,9 +132,9 @@ describe('StationCard', () => {
     render(<StationCard detail={hsb05} theme="light" onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     expect(screen.getByTitle(/HSB05 3D/)).toHaveAttribute('src', '/stations/hsb05-3d.html');
-    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByTitle(/HSB05 Hanger Shot Blast cycle/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /picture/i }));
-    expect(screen.getByRole('img')).toBeInTheDocument();
+    expect(screen.getByTitle(/HSB05 Hanger Shot Blast cycle/)).toBeInTheDocument();
   });
 
   it('has no play button for a station without a 3D machine', () => {

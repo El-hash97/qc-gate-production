@@ -27,7 +27,7 @@ const WHEEL = { x0: -42, x1: -36, y: 12, z: 54, r: 20 }; // left wheel: spindle 
 const BLOCK = { x: -48, y: 33, w: 22, d: 19, h: 17, z: 45 }; // pressed against the wheel's front rim
 const POLE = [16, 92]; // off to the right, so the lit block stays in view
 const PILLAR = [-128, 128];
-const BOOM_Z = 150;
+const BOOM_Z = 180; // well clear of the roof (110), so the boom reads as passing over it
 const STAND_Z = 35;
 
 const P = k.fitProjection(

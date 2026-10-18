@@ -340,7 +340,7 @@ function grPole(c) {
   return [c[0] + Math.min(53, Math.max(12, 32.5 - (c[0] * 20.5) / 37)), c[1] + M.POLE_Y];
 }
 
-// reach arm, near jaw, head bar, the pole up to the trolley and the steering ring round it
+// [reach arm, near jaw and head bar; the pole up to the trolley and the steering ring round it]
 function grHead(c, z) {
   const { w, d, h } = M.BLOCK;
   const x = c[0] - w / 2;
@@ -356,15 +356,16 @@ function grHead(c, z) {
   out.push(k.solidSvg(sl({ x: x - 4, y: y + d / 2 - 2, w: w + 8, d: 4, r: 0.5 }, z + h + 1, 3, 0.4), { tone: "mid" }));
   out.push(k.solidSvg(sl({ x: x + w + 1, y: y + 4, w: 3, d: d - 8, r: 0.4 }, z + 4, h + 1), { tone: "mid" }));
   out.push(k.dotsSvg([k.iso([x + w + 4, y + 7, z + 10], P), k.iso([x + w + 4, y + d - 7, z + 10], P)], { size: 0.45 }));
-  out.push(k.solidSvg(sl({ x: px - 1.6, y: py - 1.6, w: 3.2, d: 3.2, r: 0.4 }, armZ, 28, 0.3), { tone: "hi", crease: "none" }));
-  out.push(k.solidSvg(sl({ x: px - 3.4, y: py - 3.4, w: 6.8, d: 6.8, r: 0.8 }, armZ + 24, 4, 0.4), { tone: "mid" }));
-  out.push(k.solidSvg(sl({ x: px - 2.4, y: py - 2.4, w: 4.8, d: 4.8, r: 0.6 }, armZ + 28, M.BOOM_Z - 6 - armZ - 28, 0.3), { tone: "mid" }));
-  out.push(k.lineSvg(k.ring(px, py, 11, armZ + 16, P, 48) + k.ring(px, py, 9.6, armZ + 16, P, 48), { tone: "mid" }));
-  out.push(k.lineSvg([0, 1, 2].map((i) => {
+  const pole = [];
+  pole.push(k.solidSvg(sl({ x: px - 1.6, y: py - 1.6, w: 3.2, d: 3.2, r: 0.4 }, armZ, 28, 0.3), { tone: "hi", crease: "none" }));
+  pole.push(k.solidSvg(sl({ x: px - 3.4, y: py - 3.4, w: 6.8, d: 6.8, r: 0.8 }, armZ + 24, 4, 0.4), { tone: "mid" }));
+  pole.push(k.solidSvg(sl({ x: px - 2.4, y: py - 2.4, w: 4.8, d: 4.8, r: 0.6 }, armZ + 28, M.BOOM_Z - 6 - armZ - 28, 0.3), { tone: "mid" }));
+  pole.push(k.lineSvg(k.ring(px, py, 11, armZ + 16, P, 48) + k.ring(px, py, 9.6, armZ + 16, P, 48), { tone: "mid" }));
+  pole.push(k.lineSvg([0, 1, 2].map((i) => {
     const a = (i * 2 * Math.PI) / 3 + 0.4;
     return k.segment([px + Math.cos(a) * 1.6, py + Math.sin(a) * 1.6, armZ + 16], [px + Math.cos(a) * 9.6, py + Math.sin(a) * 9.6, armZ + 16], P);
   }).join(""), { tone: "lo" }));
-  return out.join("");
+  return [out.join(""), pole.join("")];
 }
 
 // boom from the pillar out past the pole, its tie, the trolley under it
@@ -405,9 +406,11 @@ function grScene(pose) {
   // the block rides in the gripper; it stays on the Hanten stand at the end and a new one comes from HSB06
   const block = phase === "return" ? "" : fade(phase === "pick" ? smooth01(0, 0.4, u) : 1, grBlock(c, z, stub));
   const left = fade(phase === "return" ? 1 - smooth01(0.3, 0.8, u) : 0, grBlock(M.AT.out, M.AT.out[2], stub));
-  const work = grJawBack(c, z) + block + (phase === "grind left" ? grSparks() : "") + grHead(c, z);
+  const [arm, pole] = grHead(c, z);
+  const work = grJawBack(c, z) + block + (phase === "grind left" ? grSparks() : "") + arm;
+  // inside the booth the block and the arm go under the roof and lintel; the pole stands in front of them
   const inside = c[1] < M.INSIDE;
-  return { phase, inside: inside ? work : "", outside: inside ? "" : work, left, boom: grBoom(c) };
+  return { phase, inside: inside ? work : "", pole: inside ? pole : "", outside: inside ? "" : work + pole, left, boom: grBoom(c) };
 }
 
 const SAY = { pick: "lifting from the HSB06 stand", "to right wheel": "to the right wheel", "press right": "pressing in", "grind right": "grinding the right stubs", "back off": "backing off", "to left wheel": "across to the left wheel", "press left": "pressing in", "grind left": "grinding the left stubs", clear: "clearing the wheel", "to Hanten": "on to Hanten", "set down": "setting down", return: "back for the next block" };
@@ -448,9 +451,10 @@ function sceneBody(f) {
     backWall(),
     sideWall(BOOTH.x0),
     table(),
-    roof(),
     wheel(),
     slot("inside", f.inside),
+    roof(),
+    slot("pole", f.pole),
     sideWall(BOOTH.x1 - BOOTH.t),
     motor(BOOTH.x1, 1),
     screen(),
@@ -543,7 +547,7 @@ const theme = new URLSearchParams(location.search).get("theme");
 if (theme === "light" || theme === "dark") { document.body.dataset.theme = theme; document.documentElement.style.colorScheme = theme; }
 const stage = document.querySelector(".iso-stage");
 const svg = stage.querySelector("svg");
-const slots = ["inside", "left", "outside", "boom"].reduce((o, n) => ((o[n] = svg.querySelector('[data-slot="' + n + '"]')), o), {});
+const slots = ["inside", "pole", "left", "outside", "boom"].reduce((o, n) => ((o[n] = svg.querySelector('[data-slot="' + n + '"]')), o), {});
 const readout = document.querySelector("[data-readout]");
 const numbers = document.querySelector("[data-numbers]");
 const playBtn = document.querySelector('[data-act="play"]');

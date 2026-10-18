@@ -120,6 +120,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'QC Gate 1',
     subtitle: 'Visual Inspection',
     image: { light: '/stations/qc1-light.svg', dark: '/stations/qc1-dark.svg' },
+    live: '/stations/qc1-live.html',
     play: '/stations/qc1-3d.html',
     description: [
       'The block stops on a turntable between two portal frames, under an LED light bar, and is turned a quarter at a time so every outside face comes round to the inspector.',

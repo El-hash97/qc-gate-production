@@ -84,6 +84,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Hanten MC',
     subtitle: 'Block Turnover',
     image: { light: '/stations/hanten-light.svg', dark: '/stations/hanten-dark.svg' },
+    live: '/stations/hanten-live.html',
     play: '/stations/hanten-3d.html',
     description: [
       'The block rolls in deck down under a mesh guard and stops inside a cage of two big rings that ride on support rollers.',

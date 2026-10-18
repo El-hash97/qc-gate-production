@@ -102,6 +102,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Final Process',
     subtitle: 'Touch-up & Air Blow-off',
     image: { light: '/stations/final-light.svg', dark: '/stations/final-dark.svg' },
+    live: '/stations/final-live.html',
     play: '/stations/final-3d.html',
     description: [
       'The block stops in a cage in the line, inside an open booth with a light on the back wall and a hose rail overhead.',

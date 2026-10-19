@@ -36,18 +36,38 @@ export const WORKFLOW_CARDS: readonly WorkflowCard[] = [
     desc: 'Repair blocks arrive by forklift, are reworked on the bench and return to QC Gate 2.' },
 ];
 
+export type StepState = 'stopped' | 'lineStop' | 'busy' | 'wait' | 'run';
+
+// Live status of a process. During a line stop (`stop` = its station) that
+// station shows 'lineStop' and every process after it waits; Line Repair only
+// waits when the stop is at or before QC Gate 2, where it branches off.
+export function stepState(
+  card: WorkflowCard, running: boolean, busy: readonly boolean[], stop: StationId | null = null,
+): StepState {
+  if (!running) return 'stopped';
+  if (card.id === stop) return 'lineStop';
+  const at = (id: StationId) => WORKFLOW_CARDS.findIndex((c) => c.id === id);
+  if (stop && at(card.id) > at(stop) && !(card.id === 'lineRepair' && at(stop) > at('qc2'))) return 'wait';
+  if (card.segment === undefined) return 'run';
+  return busy[card.segment] ? 'busy' : 'wait';
+}
+
+const STATUS: Record<StepState, string> = {
+  stopped: 'Stopped', lineStop: 'Line stop', busy: 'Processing', wait: 'Waiting', run: 'Running',
+};
+
 // The data rows printed under a card's description.
 export function cardRows(
   card: WorkflowCard,
   counts: Counts,
   running: boolean,
   busy: readonly boolean[],
+  stop: StationId | null = null,
 ): [string, string][] {
   const rows: [string, string][] = [];
-  if (card.segment !== undefined) {
-    rows.push(['Cycle time', `${segmentSeconds(SEGMENTS[card.segment]).toFixed(1)} s`]);
-    rows.push(['Status', !running ? 'Stopped' : busy[card.segment] ? 'Processing' : 'Waiting']);
-  }
+  const state = stepState(card, running, busy, stop);
+  if (card.segment !== undefined) rows.push(['Cycle time', `${segmentSeconds(SEGMENTS[card.segment]).toFixed(1)} s`]);
+  if (card.segment !== undefined || (running && state !== 'run')) rows.push(['Status', STATUS[state]]);
   const total = counts.ok + counts.repair + counts.ng;
   const pct = (n: number) => (total ? `${((n / total) * 100).toFixed(1)}%` : '0.0%');
   if (card.id === 'qc2') {

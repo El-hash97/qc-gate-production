@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
+import { WORKFLOW_CARDS, cardRows, stepState } from '@/utils/workflowCards';
 
 const card = (id: string) => WORKFLOW_CARDS.find((c) => c.id === id)!;
 const counts = { ok: 90, repair: 6, ng: 4 };
@@ -21,5 +21,15 @@ describe('workflow cards', () => {
   it('show the judgement counts at QC Gate 2 and shares downstream', () => {
     expect(cardRows(card('qc2'), counts, true, [])).toContainEqual(['OK / Repair / NG', '90 / 6 / 4']);
     expect(cardRows(card('lineRepair'), counts, true, [])).toContainEqual(['Repair', '6 (6.0%)']);
+  });
+
+  it('show a line stop at its station and make every process after it wait', () => {
+    const busy = [true, true, true, true, true, true];
+    const states = WORKFLOW_CARDS.map((c) => stepState(c, true, busy, 'qc1'));
+    expect(states).toEqual(['busy', 'busy', 'busy', 'busy', 'run', 'run', 'lineStop', 'wait', 'wait', 'wait', 'wait']);
+    expect(stepState(card('lineRepair'), true, busy, 'spray')).toBe('run');
+    expect(cardRows(card('qc1'), counts, true, busy, 'qc1')).toContainEqual(['Status', 'Line stop']);
+    expect(cardRows(card('hsb06'), counts, true, busy, 'hsb05')).toContainEqual(['Status', 'Waiting']);
+    expect(cardRows(card('final'), counts, true, busy)).not.toContainEqual(expect.arrayContaining(['Status']));
   });
 });

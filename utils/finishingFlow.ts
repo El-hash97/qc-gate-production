@@ -183,3 +183,34 @@ export function pickReinspect(c: Counts, r: number): 'ok' | 'ng' {
   if (decided === 0) return 'ok';
   return r * decided < c.ng ? 'ng' : 'ok';
 }
+
+// Where a line stop at a station halts the line. A station with its own
+// segment freezes its block wherever it is (at: null). Stations sharing one
+// (Hanten → QC Gate 2, Spray → Junbiki) let a block ride up to the point of
+// the recorded path closest to the station and hold it there (at: seconds
+// into the segment); blocks already past it carry on. Line Repair halts the
+// forklift's repair.
+export type Hold = { seg: number; at: number | null } | { repair: true };
+
+const SHARED_SEGMENT: Partial<Record<StationId, number>> = {
+  hanten: QC2_SEGMENT, final: QC2_SEGMENT, qc1: QC2_SEGMENT, qc2: QC2_SEGMENT,
+  spray: JUNBIKI_SEGMENT, junbiki: JUNBIKI_SEGMENT,
+};
+
+export function stationHold(id: StationId): Hold | null {
+  if (id === 'lineRepair') return { repair: true };
+  const own = SEGMENTS.findIndex((s) => s.id === id);
+  if (own >= 0) return { seg: own, at: null };
+  const seg = SHARED_SEGMENT[id];
+  if (seg === undefined) return null;
+  const [x, z] = stationPos(id);
+  const { from, to } = SEGMENTS[seg];
+  let best = from;
+  let bestD = Infinity;
+  for (let f = from; f <= to; f++) {
+    const [px, , pz] = trackAt(f).pos;
+    const d = (px - x) ** 2 + (pz - z) ** 2;
+    if (d < bestD) [best, bestD] = [f, d];
+  }
+  return { seg, at: (best - from) / ANIM_FPS };
+}

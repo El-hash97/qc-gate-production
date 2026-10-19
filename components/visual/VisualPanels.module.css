@@ -289,6 +289,24 @@
 .dot[data-state='run'] { background: color-mix(in srgb, var(--accent-green) 55%, var(--text-muted)); }
 .dot[data-state='stopped'] { background: var(--accent-red); }
 
+/* line stop: the station blinks red, its time under the name */
+.step[data-state='lineStop'] {
+  background: var(--accent-red);
+  color: #fff;
+  animation: lineStopBlink 1s step-end infinite;
+}
+.step[data-state='lineStop'] .stepCt { color: inherit; }
+.dot[data-state='lineStop'] { background: #fff; }
+.stepStop { display: block; font-size: 10px; font-weight: 700; }
+
+@keyframes lineStopBlink {
+  50% { background: color-mix(in srgb, var(--accent-red) 30%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step[data-state='lineStop'] { animation: none; }
+}
+
 /* ---- judgement ---- */
 .stack {
   display: flex;

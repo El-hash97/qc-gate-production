@@ -47,6 +47,23 @@ describe('LineStopSection', () => {
     ]);
   });
 
+  it('saves the picked station with an AV stop, and offers no station for PE', async () => {
+    const onChange = vi.fn();
+    render(<LineStopSection stops={[]} onChange={onChange} />);
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jam Mulai' }), '730');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jam Selesai' }), '800');
+    await userEvent.type(screen.getByPlaceholderText('Problem line stop'), 'Hoist macet');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Station' }), 'hsb05');
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+
+    expect(onChange).toHaveBeenCalledWith([
+      { start: '07:30', end: '08:00', problem: 'Hoist macet', countermeasure: '', category: 'AV', station: 'hsb05' },
+    ]);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Kategori' }), 'PE');
+    expect(screen.queryByRole('combobox', { name: 'Station' })).toBeNull();
+  });
+
   it('keeps Tambah disabled until both times are picked', async () => {
     render(<LineStopSection stops={[]} onChange={vi.fn()} />);
     await userEvent.type(screen.getByPlaceholderText('Problem line stop'), 'Mesin macet');

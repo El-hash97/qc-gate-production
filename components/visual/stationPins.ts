@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TRUCK_DOCK, type Counts, type StationId } from '@/utils/finishingFlow';
 import type { Sim } from '@/utils/finishingSim';
+import type { LineStop } from '@/lib/types';
 import { PINS, pinReadouts, stationPinPos, type PinId } from '@/utils/stationPinData';
 import styles from './stationPins.module.css';
 
@@ -108,20 +109,26 @@ export function createTags(
       name.type = 'button';
       name.addEventListener('click', () => onSelect(s.id));
     }
+    const note = add('div', styles.stopNote, el);
     const b = BADGES[s.id];
     const badge = b ? add('div', styles.badge, el) : null;
     if (badge && b) badge.dataset.kind = b.key;
-    return { el, badge, b, text: '', at: new THREE.Vector3(...stationPinPos(s.id)) };
+    return { id: s.id, el, note, badge, b, text: '', at: new THREE.Vector3(...stationPinPos(s.id)) };
   });
   const v = new THREE.Vector3();
   return {
-    // `visible`: the name tags (the count badges always show)
-    update(camera: THREE.Camera, visible: boolean, counts: Counts) {
+    // `visible`: the name tags (the count badges, and a line-stopped
+    // station's tag, always show)
+    update(camera: THREE.Camera, visible: boolean, counts: Counts, stop: LineStop | null = null) {
       const w = layer.clientWidth;
       const h = layer.clientHeight;
       const total = counts.ok + counts.repair + counts.ng;
       for (const t of tags) {
-        if (!visible && !t.badge) {
+        const stopped = stop?.station === t.id;
+        t.el.toggleAttribute('data-stop', stopped);
+        const note = stopped ? `LINE STOP ${stop.start}–${stop.end}` : '';
+        if (t.note.textContent !== note) t.note.textContent = note;
+        if (!visible && !t.badge && !stopped) {
           t.el.style.display = 'none';
           continue;
         }
@@ -131,7 +138,7 @@ export function createTags(
           continue;
         }
         t.el.style.display = '';
-        t.el.toggleAttribute('data-off', !visible);
+        t.el.toggleAttribute('data-off', !visible && !stopped);
         t.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
         if (t.badge && t.b) {
           const n = counts[t.b.key];

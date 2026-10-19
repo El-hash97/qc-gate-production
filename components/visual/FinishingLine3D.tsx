@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
   BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
-  ANIM_FPS, SEGMENTS, type Counts, type StationId,
+  ANIM_FPS, SEGMENTS, stationHold, type Counts, type StationId,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
 import { createStationAnim } from './stationAnim';
@@ -18,6 +18,7 @@ import { createWorkflowBoards } from './workflowBoards';
 import { createPins, createTags } from './stationPins';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import type { Theme } from '@/hooks/useTheme';
+import type { LineStop } from '@/lib/types';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
   raw: 0x9ca3af, ok: 0x22c55e, repair: 0xf59e0b, ng: 0xdc2626,
@@ -95,6 +96,8 @@ interface Props {
   pins?: readonly PinId[];
   // station name tags
   labels?: boolean;
+  // AV line stop at a station going on now: the line halts there
+  lineStop?: LineStop | null;
 }
 
 
@@ -243,7 +246,9 @@ function makeTruck(): THREE.Group {
   return g;
 }
 
-export default function FinishingLine3D({ counts, running, theme, onSelectStation, onBusyChange, focus, pins, labels = true }: Props) {
+export default function FinishingLine3D({
+  counts, running, theme, onSelectStation, onBusyChange, focus, pins, labels = true, lineStop = null,
+}: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const select = useRef(onSelectStation);
   select.current = onSelectStation;
@@ -252,8 +257,10 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
   const flyTo = useRef<(id: StationId) => void>(() => {});
   // Read by the render loop, so a 3 s poll updates these without rebuilding the scene.
   const shownPins = new Set<PinId>(pins ?? PINS.map((p) => p.id));
-  const live = useRef({ counts, running, pins: shownPins, labels });
-  live.current = { counts, running, pins: shownPins, labels };
+  const station = lineStop?.station;
+  const hold = useMemo(() => (station ? stationHold(station) : null), [station]);
+  const live = useRef({ counts, running, pins: shownPins, labels, lineStop, hold });
+  live.current = { counts, running, pins: shownPins, labels, lineStop, hold };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
   const [noWebGL, setNoWebGL] = useState(false);
 
@@ -422,7 +429,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
       if (live.current.running) {
-        step(sim, dt, live.current.counts);
+        step(sim, dt, live.current.counts, Math.random, live.current.hold);
         // station clips follow their block, then glide back (stationAnim)
         sim.segments.forEach((seg, k) => stations[k]?.update(seg.busy, seg.t, dt));
         mixer?.update(dt);
@@ -468,7 +475,8 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
 
       const c = live.current.counts;
       const busy = sim.segments.map((seg) => seg.busy !== null);
-      boards.draw((card) => cardRows(card, c, live.current.running, busy), boardTheme);
+      const stopAt = live.current.lineStop?.station ?? null;
+      boards.draw((card) => cardRows(card, c, live.current.running, busy, stopAt), boardTheme);
       const busyKey = busy.join();
       if (busyKey !== lastBusy) {
         lastBusy = busyKey;
@@ -487,7 +495,7 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       camera.position.clamp(roomMin, roomMax);
       renderer.render(scene, camera);
       callouts.update(camera, sim, c, live.current.running, live.current.pins, ROOM.x0);
-      nameTags.update(camera, live.current.labels, c);
+      nameTags.update(camera, live.current.labels, c, live.current.lineStop);
     };
     raf = requestAnimationFrame(frame);
 

@@ -31,3 +31,17 @@ export function formatDuration(minutes: number): string {
   const m = minutes % 60;
   return h > 0 ? `${h}j ${String(m).padStart(2, '0')}m` : `${m}m`;
 }
+
+// The AV stop with a station that is going on at `now` (start inclusive, end
+// exclusive, past midnight allowed), or null. The latest logged one wins.
+export function activeStationStop(stops: LineStop[] = [], now: Date): LineStop | null {
+  const t = now.getHours() * 60 + now.getMinutes();
+  for (let i = stops.length - 1; i >= 0; i--) {
+    const s = stops[i];
+    const a = toMinutes(s.start);
+    if (s.category !== 'AV' || !s.station || a === null) continue;
+    const len = lineStopMinutes(s.start, s.end);
+    if ((t - a + 1440) % 1440 < len) return s;
+  }
+  return null;
+}

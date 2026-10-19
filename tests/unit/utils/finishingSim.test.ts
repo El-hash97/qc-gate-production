@@ -4,7 +4,7 @@ import {
 } from '@/utils/finishingSim';
 import {
   ANIM_FPS, FORKLIFT_HOME, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT, REPAIR_DROP, SEGMENTS, TRUCK_CAPACITY,
-  segmentSeconds, trackAt, type Counts,
+  segmentSeconds, stationHold, trackAt, type Counts, type Hold,
 } from '@/utils/finishingFlow';
 
 const MAIN_S = SEGMENTS.slice(0, QC2_SEGMENT + 1).reduce((s, seg) => s + segmentSeconds(seg), 0);
@@ -13,9 +13,9 @@ const OK_S = segmentSeconds(SEGMENTS[JUNBIKI_SEGMENT]);
 const TAKT_S = Math.max(...SEGMENTS.map(segmentSeconds));
 
 // Advance in 0.1 s ticks; `watch` sees the sim after every tick.
-function run(sim: Sim, seconds: number, counts: Counts, rand: () => number, watch?: (s: Sim) => void) {
+function run(sim: Sim, seconds: number, counts: Counts, rand: () => number, watch?: (s: Sim) => void, hold: Hold | null = null) {
   for (let t = 0; t < seconds; t += 0.1) {
-    step(sim, 0.1, counts, rand);
+    step(sim, 0.1, counts, rand, hold);
     watch?.(sim);
   }
 }
@@ -182,5 +182,43 @@ describe('forklift', () => {
     // last leg drives east (+x) onto the bench: heading 0
     expect(headingAtBench).not.toBeNull();
     expect(Math.abs(Math.atan2(Math.sin(headingAtBench!), Math.cos(headingAtBench!)))).toBeLessThan(0.15);
+  });
+});
+
+describe('line stop at a station', () => {
+  const counts = { ok: 1, repair: 0, ng: 0 };
+  const at = (id: Parameters<typeof stationHold>[0]) => {
+    const h = stationHold(id);
+    return h && 'seg' in h ? h : null;
+  };
+
+  it('places shared-segment stations in flow order along their segment', () => {
+    expect(at('hsb05')).toEqual({ seg: 1, at: null });
+    const line = (['hanten', 'final', 'qc1', 'qc2'] as const).map((id) => at(id)!);
+    expect(line.every((h) => h.seg === QC2_SEGMENT)).toBe(true);
+    const ts = line.map((h) => h.at!);
+    expect([...ts].sort((a, b) => a - b)).toEqual(ts);
+    expect(new Set(ts).size).toBe(4);
+    expect(at('spray')!.at!).toBeLessThan(at('junbiki')!.at!);
+    expect(stationHold('lineRepair')).toEqual({ repair: true });
+  });
+
+  it('freezes Baritori in place: nothing gets past it', () => {
+    const sim = createSim();
+    run(sim, MAIN_S * 2, counts, () => 0.5, undefined, stationHold('baritori'));
+    expect(sim.blocks).toHaveLength(1);
+    expect(sim.blocks[0].t).toBe(0);
+  });
+
+  it('holds the block at QC Gate 1 while stations after it wait, then resumes', () => {
+    const sim = createSim();
+    const hold = at('qc1')!;
+    run(sim, MAIN_S * 3, counts, () => 0.5, undefined, hold);
+    expect(sim.blocks.some((b) => b.phase !== 'seg' || b.seg > QC2_SEGMENT)).toBe(false);
+    const held = sim.blocks.find((b) => b.phase === 'seg' && b.seg === QC2_SEGMENT)!;
+    expect(held.t).toBeCloseTo(hold.at!, 5);
+    expect(sim.segments[JUNBIKI_SEGMENT].busy).toBeNull();
+    run(sim, MAIN_S, counts, () => 0.5);
+    expect(sim.blocks.some((b) => b.phase !== 'seg' || b.seg === JUNBIKI_SEGMENT)).toBe(true);
   });
 });

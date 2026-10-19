@@ -11,6 +11,7 @@ import { stationDetail } from '@/utils/stationDetails';
 import { StationCard } from '@/station-kit/react/StationCard';
 import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
 import { panelData } from '@/utils/visualPanels';
+import { activeStationStop } from '@/utils/lineStop';
 import styles from './page.module.css';
 
 const FinishingLine3D = dynamic(() => import('@/components/visual/FinishingLine3D'), {
@@ -35,6 +36,7 @@ export default function OverviewPage() {
     return () => clearInterval(id);
   }, []);
   const panels = useMemo(() => (state ? panelData(state, now) : null), [state, now]);
+  const lineStop = useMemo(() => activeStationStop(state?.lineStops, now), [state, now]);
   // Workflow row: fly the camera there, and open the station card if it has one.
   const goTo = (id: StationId) => {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
@@ -51,8 +53,8 @@ export default function OverviewPage() {
       <div className={styles.stage}>
         <FinishingLine3D counts={counts} running={running} theme={theme} onSelectStation={setOpen}
           onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()}
-          labels={panelModes.mode('labels') !== 'hidden'} />
-        {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} />}
+          labels={panelModes.mode('labels') !== 'hidden'} lineStop={lineStop} />
+        {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} lineStop={lineStop} />}
         {!running && <div className={styles.overlay}>Production has not started</div>}
         {/* station figures always use the light artwork, even in dark mode */}
         {detail && <StationCard detail={detail} theme="light" onClose={() => setOpen(null)} />}

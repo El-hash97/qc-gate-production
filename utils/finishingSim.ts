@@ -11,7 +11,7 @@ import {
   FORKLIFT_SPEED, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT, REPAIR_STUB, REPAIR_TIME_S, SEGMENTS,
   TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
   pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
-  type Counts, type Leg, type Outcome, type Quat, type Vec2,
+  type Counts, type Hold, type Leg, type Outcome, type Quat, type Vec2,
 } from './finishingFlow';
 
 export type Vec3 = [number, number, number];
@@ -194,7 +194,7 @@ function drive(f: Sim['forklift'], legs: readonly Leg[], dt: number): boolean {
   return true;
 }
 
-function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number): void {
+function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number, hold: Hold | null): void {
   const f = sim.forklift;
   const target = FORK_TARGET[f.state];
   const lift = FORK_LIFT_SPEED * dt;
@@ -213,7 +213,7 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number):
       f.timer = REPAIR_TIME_S;
     }
   } else if (f.state === 'repairing') {
-    if (forksReady) f.timer -= dt;
+    if (forksReady && !(hold && 'repair' in hold)) f.timer -= dt;
     if (f.timer <= 0) f.state = 'toGate';
   } else if (f.state === 'toGate') {
     if (drive(f, FORKLIFT_BACK, dt)) f.state = 'unloading';
@@ -232,16 +232,18 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number):
   }
 }
 
-function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => number): void {
+function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => number, hold: Hold | null): void {
   switch (b.phase) {
     case 'seg': {
       const seg = SEGMENTS[b.seg];
-      b.t = Math.min(b.t + dt, segmentSeconds(seg));
+      // line stop: held blocks stop at the station (see stationHold)
+      const h = hold && 'seg' in hold && hold.seg === b.seg && (hold.at === null || b.t <= hold.at) ? hold : null;
+      b.t = h ? (h.at === null ? b.t : Math.min(b.t + dt, h.at)) : Math.min(b.t + dt, segmentSeconds(seg));
       sim.segments[b.seg].t = b.t;
       const at = trackAt(seg.from + b.t * ANIM_FPS);
       b.pos = at.pos;
       b.quat = at.quat;
-      if (b.t < segmentSeconds(seg)) break;
+      if (h || b.t < segmentSeconds(seg)) break;
       if (b.seg === JUNBIKI_SEGMENT) {
         leaveSegment(sim, b);
         b.phase = 'waitJunbiki';
@@ -327,11 +329,13 @@ function layout(sim: Sim): void {
   }
 }
 
-export function step(sim: Sim, dt: number, counts: Counts, rand: () => number = Math.random): void {
+export function step(
+  sim: Sim, dt: number, counts: Counts, rand: () => number = Math.random, hold: Hold | null = null,
+): void {
   spawn(sim);
   stepTruck(sim, dt);
-  stepForklift(sim, dt, counts, rand);
-  for (const b of sim.blocks) stepBlock(sim, b, dt, counts, rand);
+  stepForklift(sim, dt, counts, rand, hold);
+  for (const b of sim.blocks) stepBlock(sim, b, dt, counts, rand, hold);
   layout(sim);
 }
 

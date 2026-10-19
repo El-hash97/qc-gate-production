@@ -1,3 +1,5 @@
+import type { StationId } from '@/utils/finishingFlow';
+
 // 'bc' = BC 1TR + BC 2TR (Block Cylinder). 'shaft' = Camshaft + Crankshaft.
 // The dashboard toggle scopes every panel to one of these groups (or shows
 // both merged).
@@ -66,6 +68,8 @@ export interface LineStop {
   // Optional for back-compat — stops logged before this field existed have none.
   countermeasure?: string;
   category: 'AV' | 'PE' | 'RQ';
+  // AV stops only: the station the line stopped at (/overview halts it there).
+  station?: StationId;
 }
 
 export interface HourlySnapshot {

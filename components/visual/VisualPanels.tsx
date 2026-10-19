@@ -4,7 +4,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { shouldPausePoll } from '@/hooks/useProductionState';
 import type { PanelData } from '@/utils/visualPanels';
-import { WORKFLOW_CARDS } from '@/utils/workflowCards';
+import { WORKFLOW_CARDS, stepState } from '@/utils/workflowCards';
+import type { LineStop } from '@/lib/types';
 import { SEGMENTS, segmentSeconds, type StationId } from '@/utils/finishingFlow';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import styles from './VisualPanels.module.css';
@@ -145,9 +146,11 @@ interface Props {
   now: Date;
   onSelectStation: (id: StationId) => void;
   panels: PanelModes;
+  // AV line stop at a station going on now (activeStationStop)
+  lineStop?: LineStop | null;
 }
 
-export function VisualPanels({ data, running, busy, now, onSelectStation, panels }: Props) {
+export function VisualPanels({ data, running, busy, now, onSelectStation, panels, lineStop = null }: Props) {
   const { mode, set, setAll, allHidden } = panels;
   const toggles = [
     { label: 'Panels', on: PANELS.some((x) => mode(x.id) !== 'hidden'), flip: (on: boolean) => setAll(on ? 'open' : 'hidden') },
@@ -221,12 +224,17 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
           <ol className={styles.steps}>
             {WORKFLOW_CARDS.map((card, i) => {
               const seg = card.segment;
-              const state = !running ? 'stopped' : seg !== undefined && busy[seg] ? 'busy' : seg !== undefined ? 'wait' : 'run';
+              const state = stepState(card, running, busy, lineStop?.station ?? null);
               return (
                 <li key={card.id}>
-                  <button type="button" className={styles.step} onClick={() => onSelectStation(card.id)}>
+                  <button type="button" className={styles.step} data-state={state} onClick={() => onSelectStation(card.id)}>
                     <span className={styles.stepNo}>{i + 1}</span>
-                    <span className={styles.stepName}>{card.title}</span>
+                    <span className={styles.stepName}>
+                      {card.title}
+                      {state === 'lineStop' && lineStop && (
+                        <small className={styles.stepStop}>Line stop {lineStop.start}–{lineStop.end}</small>
+                      )}
+                    </span>
                     {seg !== undefined && <span className={styles.stepCt}>{segmentSeconds(SEGMENTS[seg]).toFixed(1)} s</span>}
                     <span className={styles.dot} data-state={state} title={state} />
                   </button>

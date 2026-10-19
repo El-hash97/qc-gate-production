@@ -4,9 +4,12 @@ import { useState } from 'react';
 import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { LineStop } from '@/lib/types';
 import { lineStopMinutes, formatDuration } from '@/utils/lineStop';
+import { WORKFLOW_CARDS } from '@/utils/workflowCards';
+import type { StationId } from '@/utils/finishingFlow';
 import styles from './LineStop.module.css';
 
 const CATEGORIES: LineStop['category'][] = ['AV', 'PE', 'RQ'];
+const stationTitle = (id?: StationId) => WORKFLOW_CARDS.find((c) => c.id === id)?.title;
 
 interface LineStopSectionProps {
   stops: LineStop[];
@@ -19,6 +22,7 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
   const [problem, setProblem] = useState('');
   const [countermeasure, setCountermeasure] = useState('');
   const [category, setCategory] = useState<LineStop['category']>('AV');
+  const [station, setStation] = useState<StationId | ''>('');
 
   const canAdd = start !== '' && end !== '' && problem.trim() !== '';
 
@@ -26,12 +30,14 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
     if (!canAdd) return;
     onChange([...stops, {
       start, end, problem: problem.trim(), countermeasure: countermeasure.trim(), category,
+      ...(category === 'AV' && station ? { station } : {}),
     }]);
     setStart('');
     setEnd('');
     setProblem('');
     setCountermeasure('');
     setCategory('AV');
+    setStation('');
   }
 
   function remove(index: number) {
@@ -86,6 +92,19 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
+        {category === 'AV' && (
+          <label className={styles.group}>
+            <span className={styles.label}>Station</span>
+            <select
+              className={styles.select}
+              value={station}
+              onChange={(e) => setStation(e.target.value as StationId | '')}
+            >
+              <option value="">— Semua line —</option>
+              {WORKFLOW_CARDS.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          </label>
+        )}
         <button type="button" className={styles.addBtn} onClick={add} disabled={!canAdd}>
           Tambah
         </button>
@@ -101,7 +120,7 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
               <span>({formatDuration(lineStopMinutes(s.start, s.end))})</span>
               <span className={styles.rowProblem}>{s.problem}</span>
               <span className={styles.rowCountermeasure}>{s.countermeasure || '—'}</span>
-              <span className={styles.badge}>{s.category}</span>
+              <span className={styles.badge}>{s.category}{s.station && ` · ${stationTitle(s.station)}`}</span>
               <button
                 type="button"
                 className={styles.removeBtn}

@@ -104,12 +104,13 @@ export function createTags(
     add('span', styles.dot, el);
     add('span', styles.tagStem, el);
     const name = add(clickable(s.id) ? 'button' : 'div', styles.tag, el);
-    name.textContent = clickable(s.id) ? `${s.label} ›` : s.label;
+    add('span', styles.tagName, name).textContent = clickable(s.id) ? `${s.label} ›` : s.label;
+    // line stop: its description and time share the tag, under the name
+    const note = add('span', styles.stopNote, name);
     if (name instanceof HTMLButtonElement) {
       name.type = 'button';
       name.addEventListener('click', () => onSelect(s.id));
     }
-    const note = add('div', styles.stopNote, el);
     const b = BADGES[s.id];
     const badge = b ? add('div', styles.badge, el) : null;
     if (badge && b) badge.dataset.kind = b.key;
@@ -126,7 +127,7 @@ export function createTags(
       for (const t of tags) {
         const stopped = stop?.station === t.id;
         t.el.toggleAttribute('data-stop', stopped);
-        const note = stopped ? `LINE STOP ${stop.start}–${stop.end}` : '';
+        const note = stopped ? `${stop.problem} · ${stop.start}–${stop.end}` : '';
         if (t.note.textContent !== note) t.note.textContent = note;
         if (!visible && !t.badge && !stopped) {
           t.el.style.display = 'none';

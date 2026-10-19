@@ -232,7 +232,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
                     <span className={styles.stepName}>
                       {card.title}
                       {state === 'lineStop' && lineStop && (
-                        <small className={styles.stepStop}>Line stop {lineStop.start}–{lineStop.end}</small>
+                        <small className={styles.stepStop}>{lineStop.problem} · {lineStop.start}–{lineStop.end}</small>
                       )}
                     </span>
                     {seg !== undefined && <span className={styles.stepCt}>{segmentSeconds(SEGMENTS[seg]).toFixed(1)} s</span>}

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { Theme } from '@/hooks/useTheme';
-import type { WorkflowCard } from '@/utils/workflowCards';
+import type { LineStop } from '@/lib/types';
+import { formatDuration, lineStopMinutes, totalLineStopMinutes } from '@/utils/lineStop';
+import { stationTitle, type WorkflowCard } from '@/utils/workflowCards';
 
 // Standing workflow boards on the empty floor beside the line: one per process
 // in flow order along +z, faces turned to the line (-x), arrows on the floor
@@ -31,7 +33,7 @@ function wrap(g: CanvasRenderingContext2D, text: string, width: number): string[
   return lines;
 }
 
-function makeBoard(card: WorkflowCard, step: number, total: number) {
+function makeFrame() {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -58,7 +60,11 @@ function makeBoard(card: WorkflowCard, step: number, total: number) {
     foot.position.set(x, 0.025, -0.05);
     group.add(leg, foot);
   }
+  return { group, g, texture, face };
+}
 
+function makeBoard(card: WorkflowCard, step: number, total: number) {
+  const { group, g, texture } = makeFrame();
   let drawn = '';
   const draw = (rows: [string, string][], theme: Theme) => {
     const key = theme + JSON.stringify(rows);
@@ -142,4 +148,70 @@ export function createWorkflowBoards(cards: readonly WorkflowCard[], x: number, 
     draw: (rows: (card: WorkflowCard) => [string, string][], theme: Theme) =>
       boards.forEach((b, i) => b.draw(rows(cards[i]), theme)),
   };
+}
+
+function fit(g: CanvasRenderingContext2D, text: string, width: number): string {
+  if (g.measureText(text).width <= width) return text;
+  let t = text;
+  while (t.length > 1 && g.measureText(`${t}…`).width > width) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
+const BOARD_ROWS = 5;
+
+// The board at the end of the row: every line stop of the shift, newest first
+// (the stop going on now in red). Clicking it opens the details; `face` is
+// what the renderer raycasts against.
+export function createLineStopBoard(x: number, z: number) {
+  const { group, g, texture, face } = makeFrame();
+  group.rotation.y = -Math.PI / 2;
+  group.position.set(x, 0, z);
+  let drawn = '';
+  const draw = (stops: readonly LineStop[], active: LineStop | null, theme: Theme) => {
+    const key = theme + JSON.stringify(stops) + stops.indexOf(active as LineStop);
+    if (key === drawn) return;
+    drawn = key;
+    const c = COLORS[theme];
+    g.fillStyle = c.bg;
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = ACCENT;
+    g.fillRect(0, 0, 14, H);
+    g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    g.fillStyle = c.ink;
+    g.font = 'bold 58px sans-serif';
+    g.fillText('Line Stop', 50, 80);
+    g.fillStyle = c.muted;
+    g.font = '600 26px sans-serif';
+    g.textAlign = 'right';
+    g.fillText(stops.length ? `${stops.length} stop · ${formatDuration(totalLineStopMinutes([...stops]))}` : 'none today', W - 40, 80);
+    g.fillStyle = c.rule;
+    g.fillRect(40, 130, W - 80, 3);
+    if (stops.length === 0) {
+      g.textAlign = 'center';
+      g.font = '32px sans-serif';
+      g.fillText('No line stop yet', W / 2, 400);
+    }
+    const rowH = 104;
+    [...stops].reverse().slice(0, BOARD_ROWS).forEach((s, i) => {
+      const y = 148 + i * rowH;
+      const now = s === active;
+      g.fillStyle = now ? ACCENT : i % 2 ? c.bg : c.chip;
+      g.fillRect(40, y, W - 80, rowH - 8);
+      g.textAlign = 'left';
+      g.fillStyle = now ? '#ffffff' : c.ink;
+      g.font = 'bold 32px sans-serif';
+      const head = `${s.start}–${s.end}  ·  ${stationTitle(s.station) ?? s.category}`;
+      g.fillText(fit(g, head, W - 140), 64, y + 28);
+      g.fillStyle = now ? '#ffffff' : c.muted;
+      g.font = '28px sans-serif';
+      g.fillText(fit(g, `${s.problem} (${formatDuration(lineStopMinutes(s.start, s.end))})`, W - 140), 64, y + 68);
+    });
+    g.textAlign = 'right';
+    g.fillStyle = c.muted;
+    g.font = '22px sans-serif';
+    g.fillText('Click for details', W - 40, H - 14);
+    texture.needsUpdate = true;
+  };
+  return { group, face, draw };
 }

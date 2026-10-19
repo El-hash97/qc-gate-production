@@ -4,12 +4,11 @@ import { useState } from 'react';
 import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { LineStop } from '@/lib/types';
 import { lineStopMinutes, formatDuration } from '@/utils/lineStop';
-import { WORKFLOW_CARDS } from '@/utils/workflowCards';
+import { WORKFLOW_CARDS, stationTitle } from '@/utils/workflowCards';
 import type { StationId } from '@/utils/finishingFlow';
 import styles from './LineStop.module.css';
 
 const CATEGORIES: LineStop['category'][] = ['AV', 'PE', 'RQ'];
-const stationTitle = (id?: StationId) => WORKFLOW_CARDS.find((c) => c.id === id)?.title;
 
 interface LineStopSectionProps {
   stops: LineStop[];

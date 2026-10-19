@@ -36,6 +36,9 @@ export const WORKFLOW_CARDS: readonly WorkflowCard[] = [
     desc: 'Repair blocks arrive by forklift, are reworked on the bench and return to QC Gate 2.' },
 ];
 
+// Process name for a station id (undefined for an unknown one).
+export const stationTitle = (id?: StationId): string | undefined => WORKFLOW_CARDS.find((c) => c.id === id)?.title;
+
 export type StepState = 'stopped' | 'lineStop' | 'busy' | 'wait' | 'run';
 
 // Live status of a process. During a line stop (`stop` = its station) that

@@ -9,6 +9,7 @@ import { getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import { isRunning, type Counts, type StationId } from '@/utils/finishingFlow';
 import { stationDetail } from '@/utils/stationDetails';
 import { StationCard } from '@/station-kit/react/StationCard';
+import { LineStopDialog } from '@/components/visual/LineStopDialog';
 import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
 import { panelData } from '@/utils/visualPanels';
 import { activeStationStop } from '@/utils/lineStop';
@@ -23,6 +24,7 @@ export default function OverviewPage() {
   const { state } = useProductionState();
   const { theme } = useTheme();
   const [open, setOpen] = useState<StationId | null>(null);
+  const [stopsOpen, setStopsOpen] = useState(false);
   const detail = open ? stationDetail(open) : null;
   const [busy, setBusy] = useState<boolean[]>([]);
   // Guests read the same view, without the display settings.
@@ -53,10 +55,12 @@ export default function OverviewPage() {
       <div className={styles.stage}>
         <FinishingLine3D counts={counts} running={running} theme={theme} onSelectStation={setOpen}
           onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()}
-          labels={panelModes.mode('labels') !== 'hidden'} lineStop={lineStop} />
+          labels={panelModes.mode('labels') !== 'hidden'} lineStop={lineStop}
+          lineStops={state?.lineStops} onSelectLineStops={() => setStopsOpen(true)} />
         {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} lineStop={lineStop} />}
         {!running && <div className={styles.overlay}>Production has not started</div>}
         {/* station figures always use the light artwork, even in dark mode */}
+        {stopsOpen && <LineStopDialog stops={state?.lineStops ?? []} active={lineStop} onClose={() => setStopsOpen(false)} />}
         {detail && <StationCard detail={detail} theme="light" onClose={() => setOpen(null)} />}
       </div>
     </div>

@@ -14,7 +14,7 @@ import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
 import { stationDetail } from '@/utils/stationDetails';
 import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
-import { createWorkflowBoards } from './workflowBoards';
+import { createLineStopBoard, createWorkflowBoards } from './workflowBoards';
 import { createPins, createTags } from './stationPins';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import type { Theme } from '@/hooks/useTheme';
@@ -98,6 +98,10 @@ interface Props {
   labels?: boolean;
   // AV line stop at a station going on now: the line halts there
   lineStop?: LineStop | null;
+  // every line stop of the shift (the board at the end of the row lists them)
+  lineStops?: LineStop[];
+  // the line stop board was clicked
+  onSelectLineStops?: () => void;
 }
 
 
@@ -248,10 +252,13 @@ function makeTruck(): THREE.Group {
 
 export default function FinishingLine3D({
   counts, running, theme, onSelectStation, onBusyChange, focus, pins, labels = true, lineStop = null,
+  lineStops, onSelectLineStops,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const select = useRef(onSelectStation);
   select.current = onSelectStation;
+  const stopsClicked = useRef(onSelectLineStops);
+  stopsClicked.current = onSelectLineStops;
   const busyChanged = useRef(onBusyChange);
   busyChanged.current = onBusyChange;
   const flyTo = useRef<(id: StationId) => void>(() => {});
@@ -259,8 +266,8 @@ export default function FinishingLine3D({
   const shownPins = new Set<PinId>(pins ?? PINS.map((p) => p.id));
   const station = lineStop?.station;
   const hold = useMemo(() => (station ? stationHold(station) : null), [station]);
-  const live = useRef({ counts, running, pins: shownPins, labels, lineStop, hold });
-  live.current = { counts, running, pins: shownPins, labels, lineStop, hold };
+  const live = useRef({ counts, running, pins: shownPins, labels, lineStop, hold, lineStops });
+  live.current = { counts, running, pins: shownPins, labels, lineStop, hold, lineStops };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
   const [noWebGL, setNoWebGL] = useState(false);
 
@@ -321,6 +328,29 @@ export default function FinishingLine3D({
     // workflow boards on the empty floor east of the line, Baritori end to Line Repair
     const boards = createWorkflowBoards(WORKFLOW_CARDS, 15.5, -3, 3.1);
     scene.add(boards.group);
+    // ...and the line stop board after the last one
+    const stopBoard = createLineStopBoard(15.5, -3 + WORKFLOW_CARDS.length * 3.1);
+    scene.add(stopBoard.group);
+    // click (not drag) on it opens the details; the pointer shows it is clickable
+    const ray = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const overStopBoard = (e: PointerEvent) => {
+      const r = renderer.domElement.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      return ray.intersectObject(stopBoard.face).length > 0;
+    };
+    let down: [number, number] | null = null;
+    const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
+    const onUp = (e: PointerEvent) => {
+      const moved = down ? Math.hypot(e.clientX - down[0], e.clientY - down[1]) : Infinity;
+      down = null;
+      if (moved < 5 && overStopBoard(e)) stopsClicked.current?.();
+    };
+    const onMove = (e: PointerEvent) => { renderer.domElement.style.cursor = overStopBoard(e) ? 'pointer' : ''; };
+    renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointerup', onUp);
+    renderer.domElement.addEventListener('pointermove', onMove);
     let boardTheme: Theme = 'dark';
 
     // The plant layout exported from the user's Blender file.
@@ -476,6 +506,7 @@ export default function FinishingLine3D({
       const c = live.current.counts;
       const busy = sim.segments.map((seg) => seg.busy !== null);
       const stopAt = live.current.lineStop?.station ?? null;
+      stopBoard.draw(live.current.lineStops ?? [], live.current.lineStop, boardTheme);
       boards.draw((card) => cardRows(card, c, live.current.running, busy, stopAt), boardTheme);
       const busyKey = busy.join();
       if (busyKey !== lastBusy) {
@@ -504,6 +535,9 @@ export default function FinishingLine3D({
       mixer?.stopAllAction();
       draco.dispose();
       cancelAnimationFrame(raf);
+      renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('pointermove', onMove);
       ro.disconnect();
       controls.dispose();
       for (const m of meshes.values()) scene.remove(m);

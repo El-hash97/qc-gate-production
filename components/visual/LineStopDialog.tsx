@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import type { LineStop } from '@/lib/types';
-import { formatDuration, lineStopMinutes, totalLineStopMinutes } from '@/utils/lineStop';
+import { formatDuration, lineStopMinutes, totalLineStopMinutes, stopRange } from '@/utils/lineStop';
 import { stationTitle } from '@/utils/workflowCards';
 import styles from './LineStopDialog.module.css';
 
@@ -46,7 +46,7 @@ export function LineStopDialog({ title, stops, active, onClose }: Props) {
                   <span className={styles.cat}>{s.category}</span>
                 </div>
                 <div className={styles.time}>
-                  {s.start}–{s.end} · {formatDuration(lineStopMinutes(s.start, s.end))}
+                  {stopRange(s)} · {formatDuration(lineStopMinutes(s.start, s.end))}
                 </div>
                 <dl className={styles.facts}>
                   <div><dt>Problem</dt><dd>{s.problem}</dd></div>

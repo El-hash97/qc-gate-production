@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { lineStopMinutes, totalLineStopMinutes, formatDuration, activeStationStop, stopsAt } from '@/utils/lineStop';
+import { lineStopMinutes, totalLineStopMinutes, formatDuration, activeStationStop, stopsAt, stopRange, toMinutes } from '@/utils/lineStop';
+import { lineStopsByHour, avMinutesByHour } from '@/utils/oee';
+import type { LineStop } from '@/lib/types';
 
 describe('lineStopMinutes', () => {
   it('returns the gap in minutes for a same-day stop', () => {
@@ -67,5 +69,26 @@ describe('stopsAt', () => {
     const c = { ...a, start: '09:00' };
     expect(stopsAt([a, b, c], 'qc1')).toEqual([a, c]);
     expect(stopsAt(undefined, 'qc1')).toEqual([]);
+  });
+});
+
+describe('a line stop with no end time yet', () => {
+  // Written by a still-running stop (e.g. a build that logs open-ended stops):
+  // must not crash the Dashboard, just count as 0 minutes.
+  const open = { start: '10:30', problem: 'tes', category: 'AV' } as unknown as LineStop;
+
+  it('reads a missing time as null instead of throwing', () => {
+    expect(toMinutes(undefined)).toBeNull();
+    expect(lineStopMinutes(open.start, open.end)).toBe(0);
+  });
+
+  it('is skipped by the per-hour OEE buckets', () => {
+    expect(lineStopsByHour([open])).toEqual({});
+    expect(avMinutesByHour([open])).toEqual({});
+  });
+
+  it('shows an ellipsis for the missing end', () => {
+    expect(stopRange(open)).toBe('10:30–…');
+    expect(stopRange({ start: '07:10', end: '07:40' })).toBe('07:10–07:40');
   });
 });

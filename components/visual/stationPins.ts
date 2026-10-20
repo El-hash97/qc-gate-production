@@ -4,6 +4,7 @@ import type { Sim } from '@/utils/finishingSim';
 import type { LineStop } from '@/lib/types';
 import { PINS, pinReadouts, stationPinPos, type PinId } from '@/utils/stationPinData';
 import styles from './stationPins.module.css';
+import { stopRange } from '@/utils/lineStop';
 
 // Callouts pinned to things in the 3D line: a dot on the object, an elbow
 // stem and a small glass card with one live number. Plain DOM over the
@@ -127,7 +128,7 @@ export function createTags(
       for (const t of tags) {
         const stopped = stop?.station === t.id;
         t.el.toggleAttribute('data-stop', stopped);
-        const note = stopped ? `${stop.problem} · ${stop.start}–${stop.end}` : '';
+        const note = stopped ? `${stop.problem} · ${stopRange(stop)}` : '';
         if (t.note.textContent !== note) t.note.textContent = note;
         if (!visible && !t.badge && !stopped) {
           t.el.style.display = 'none';

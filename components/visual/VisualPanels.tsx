@@ -9,6 +9,7 @@ import type { LineStop } from '@/lib/types';
 import { SEGMENTS, segmentSeconds, type StationId } from '@/utils/finishingFlow';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import styles from './VisualPanels.module.css';
+import { stopRange } from '@/utils/lineStop';
 
 // Glass panels floating over the 3D line. Every panel can be folded (–) or
 // hidden (×). The settings menu has three switches — the panels, the 3D pins
@@ -232,7 +233,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
                     <span className={styles.stepName}>
                       {card.title}
                       {state === 'lineStop' && lineStop && (
-                        <small className={styles.stepStop}>{lineStop.problem} · {lineStop.start}–{lineStop.end}</small>
+                        <small className={styles.stepStop}>{lineStop.problem} · {stopRange(lineStop)}</small>
                       )}
                     </span>
                     {seg !== undefined && <span className={styles.stepCt}>{segmentSeconds(SEGMENTS[seg]).toFixed(1)} s</span>}
@@ -316,7 +317,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
               {d.lastStop && (
                 <li data-kind="stop">
                   <span className={styles.alertIcon}>■</span>
-                  <span className={styles.alertText}>Line stop {d.lastStop.start}–{d.lastStop.end} · {d.lastStop.problem}</span>
+                  <span className={styles.alertText}>Line stop {stopRange(d.lastStop)} · {d.lastStop.problem}</span>
                   <b>{d.lastStop.category}</b>
                 </li>
               )}

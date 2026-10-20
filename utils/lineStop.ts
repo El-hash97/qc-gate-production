@@ -10,15 +10,22 @@ export function lineStopMinutes(start: string, end: string): number {
   return e >= s ? e - s : e + 1440 - s;
 }
 
-// "HH:MM" (24h) as minutes since midnight, or null when malformed. Exported
-// so the OEE helpers can bucket a stop by the hours it spans.
-export function toMinutes(hhmm: string): number | null {
+// "HH:MM" (24h) as minutes since midnight, or null when malformed or missing
+// (a stop still running has no end yet). Exported so the OEE helpers can
+// bucket a stop by the hours it spans.
+export function toMinutes(hhmm: string | null | undefined): number | null {
+  if (typeof hhmm !== 'string') return null;
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
   if (!m) return null;
   const h = Number(m[1]);
   const min = Number(m[2]);
   if (h > 23 || min > 59) return null;
   return h * 60 + min;
+}
+
+// "07:10–07:40", or "10:30–…" for a stop with no end time yet.
+export function stopRange(stop: Pick<LineStop, 'start' | 'end'>): string {
+  return `${stop.start}–${stop.end || '…'}`;
 }
 
 // Line stops logged at `station` (oldest first).

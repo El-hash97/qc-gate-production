@@ -1,5 +1,5 @@
 import type { LineStop } from '@/lib/types';
-import { lineStopMinutes, totalLineStopMinutes, formatDuration } from '@/utils/lineStop';
+import { lineStopMinutes, totalLineStopMinutes, formatDuration, stopRange } from '@/utils/lineStop';
 import { stationTitle } from '@/utils/workflowCards';
 import summary from './DefectRepairSummary.module.css';
 import styles from './LineStop.module.css';
@@ -17,7 +17,7 @@ export function LineStopTable({ stops = [] }: { stops?: LineStop[] }) {
       <tbody>
         {stops.map((s, i) => (
           <tr key={i}>
-            <td>{s.start}–{s.end}</td>
+            <td>{stopRange(s)}</td>
             <td>{s.problem}</td>
             <td>{s.countermeasure || '—'}</td>
             <td><span className={styles.badge}>{s.category}{s.station && ` · ${stationTitle(s.station)}`}</span></td>

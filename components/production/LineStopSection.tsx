@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { LineStop } from '@/lib/types';
-import { lineStopMinutes, formatDuration } from '@/utils/lineStop';
+import { lineStopMinutes, formatDuration, stopRange } from '@/utils/lineStop';
 import { WORKFLOW_CARDS, stationTitle } from '@/utils/workflowCards';
 import type { StationId } from '@/utils/finishingFlow';
 import styles from './LineStop.module.css';
@@ -115,7 +115,7 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
         <div className={styles.list}>
           {stops.map((s, i) => (
             <div key={i} className={styles.row}>
-              <span className={styles.rowTime}>{s.start}–{s.end}</span>
+              <span className={styles.rowTime}>{stopRange(s)}</span>
               <span>({formatDuration(lineStopMinutes(s.start, s.end))})</span>
               <span className={styles.rowProblem}>{s.problem}</span>
               <span className={styles.rowCountermeasure}>{s.countermeasure || '—'}</span>

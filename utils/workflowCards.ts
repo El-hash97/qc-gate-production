@@ -1,5 +1,6 @@
 import type { LineStop } from '@/lib/types';
 import { SEGMENTS, segmentSeconds, type Counts, type StationId } from './finishingFlow';
+import { stopRange } from '@/utils/lineStop';
 
 // One workflow board per process, standing on the empty floor beside the line
 // in flow order. Placeholder copy for review.
@@ -82,7 +83,7 @@ export function cardRows(
   }
   if (card.id === 'junbiki') rows.push(['OK', `${counts.ok} (${pct(counts.ok)})`]);
   if (card.id === 'lineRepair') rows.push(['Repair', `${counts.repair} (${pct(counts.repair)})`]);
-  if (lastStop) rows.push(['Line stop', `${lastStop.problem} · ${lastStop.start}–${lastStop.end}`]);
+  if (lastStop) rows.push(['Line stop', `${lastStop.problem} · ${stopRange(lastStop)}`]);
   rows.push(['Next', card.next]);
   return rows;
 }

@@ -181,3 +181,15 @@ button.tag:hover { border-color: var(--accent-red); }
   font-size: 10px;
   color: var(--text-secondary);
 }
+
+/* tablets and phones: the overlay panels are gone and the stations sit close
+   together, so the live cards would pile up on each other and the KPI strip;
+   keep the name tags (they open the station card) and drop the cards */
+@media (max-width: 1100px) {
+  .pin { display: none; }
+}
+
+/* phones: smaller name tags so neighbouring stations overlap less */
+@media (max-width: 600px) {
+  .tagPin > * { zoom: 0.8; }
+}

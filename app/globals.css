@@ -35,10 +35,11 @@
 
 /* Smaller or shorter screens zoom them down, so they keep the same share: a laptop
    at 125-150 % Windows scaling has a ~1280x560 to 1536x730 viewport under the
-   browser bar and the taskbar, and the panels would crowd the 3D line. */
-@media (max-width: 1440px), (max-height: 760px) { :root { --ui-zoom: 0.85; } }
-@media (max-width: 1300px), (max-height: 660px) { :root { --ui-zoom: 0.75; } }
-@media (max-height: 580px) { :root { --ui-zoom: 0.65; } }
+   browser bar and the taskbar, and the panels would crowd the 3D line. Only above
+   1100 px: narrower (tablet, phone) shows the KPI strip alone, at full size. */
+@media (min-width: 1101px) and (max-width: 1440px), (min-width: 1101px) and (max-height: 760px) { :root { --ui-zoom: 0.85; } }
+@media (min-width: 1101px) and (max-width: 1300px), (min-width: 1101px) and (max-height: 660px) { :root { --ui-zoom: 0.75; } }
+@media (min-width: 1101px) and (max-height: 580px) { :root { --ui-zoom: 0.65; } }
 @media (min-width: 1800px) and (min-height: 1000px) { :root { --ui-zoom: 1.2; } }
 @media (min-width: 2400px) and (min-height: 1300px) { :root { --ui-zoom: 1.6; } }
 @media (min-width: 3200px) and (min-height: 1800px) { :root { --ui-zoom: 2.2; } }

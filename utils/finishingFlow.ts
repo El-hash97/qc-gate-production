@@ -55,13 +55,17 @@ export const STATIONS: readonly Station[] = [
 
 // Station segments of the Blender timeline (24 fps). A block entering a
 // segment replays the recorded block path over [from, to] while the clips
-// listed (operator rigs, hoists, grippers) replay the same frames, so the block
-// always rides on whatever carries it. One block per segment at a time.
+// listed (operator rigs, hoists, grippers) replay the same frames, so the
+// block always rides on whatever carries it. One block per segment at a time.
+// `remap` (optional, absolute frames) plays a clip's keyframe window from
+// elsewhere on the timeline across [from, to] instead — for motion recorded
+// outside the segment the block actually travels through.
 export interface Segment {
   id: string;
   from: number;
   to: number;
   clips: readonly string[];
+  remap?: Readonly<Record<string, readonly [number, number]>>;
 }
 
 export const ANIM_FPS = 24;
@@ -71,8 +75,26 @@ export const SEGMENTS: readonly Segment[] = [
   { id: 'hsb05', from: 301, to: 551, clips: ['Hoist HSB', 'metarig.003', 'Cylinder.117'] },
   { id: 'hsb06', from: 551, to: 676, clips: ['Hoist HSB.002', 'metarig.015', 'Cylinder.104'] },
   { id: 'grinding', from: 676, to: 801, clips: ['Cylinder.099', 'metarig.005'] },
-  // Hanten → Final → QC Gate 1 → QC Gate 2, where the outcome is decided
-  { id: 'line', from: 801, to: 976, clips: ['Cube.097'] },
+  // Hanten → Final → QC Gate 1 → QC Gate 2, where the outcome is decided.
+  // The operators and fixtures at these posts were recorded moving at other
+  // timeline moments (58–102, 994–1094, 1082–1162, 1198–1270), not while a
+  // block passes the gates, so their keyframe windows are remapped here: one
+  // pass of the recorded motion plays across the segment.
+  {
+    id: 'line', from: 801, to: 976,
+    clips: ['Cube.097', 'metarig.002', 'metarig.006', 'metarig.007', 'metarig.012', 'metarig.009', 'metarig.011', 'Cube.132', 'Cylinder.100', 'HANTEN VISUAL.002'],
+    remap: {
+      'metarig.002': [878, 1146],
+      'metarig.006': [60, 101],
+      'metarig.007': [60, 101],
+      'metarig.009': [60, 101],
+      'metarig.011': [1082, 1094],
+      'metarig.012': [1142, 1162],
+      'Cube.132': [1199, 1269],
+      'Cylinder.100': [1066, 1094],
+      'HANTEN VISUAL.002': [994, 1010],
+    },
+  },
   // OK only: Spray Booth → round the corner → hoist into the Junbiki rack
   { id: 'toJunbiki', from: 1351, to: 1660, clips: ['motorreductor.002', 'motorreductor.025'] },
 ];
@@ -137,6 +159,9 @@ export const TRUCK_DOCK: Vec2 = b(-85, -348);
 
 // BC block as modelled in the Blender file: 47.5 x 37.1 x 33.6 cm (L x W x H).
 export const BLOCK_SIZE = [0.475, 0.336, 0.371] as const;
+// BC 2TR mesh (public/models/bc-2tr.stl, exported from the user's Blender
+// block asset): replaces the placeholder box on every block path.
+export const BLOCK_URL = '/models/bc-2tr.stl';
 
 // Tuning knobs (seconds, floor units per second). Station tempo comes from
 // SEGMENTS; BLOCK_SPEED only covers the off-record moves (NG drop, repair return).

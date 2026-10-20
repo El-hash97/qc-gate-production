@@ -1,5 +1,5 @@
 import type { HourlySnapshot, HourWindow, LineStop } from '@/lib/types';
-import { toMinutes } from '@/utils/lineStop';
+import { toMinutes, hhmmNow } from '@/utils/lineStop';
 
 // Seconds per piece when nothing is set. Block Cylinder runs at 50 s, which is
 // the 72 pcs/hour the shift is measured against.
@@ -60,9 +60,15 @@ export function hourCapacity(cycleTimeSec: number): number {
 // minutes, filtered by category) and lineStopsByHour (collects the stop
 // itself, every category) so both split a stop the same way. Empty array for
 // an unparseable start/end.
-function hourOverlaps(stop: LineStop): { hour: string; minutes: number }[] {
+//
+// A stop without an end time is still going on: its end is the minute of
+// `now`, so the minutes it eats count per hour as they happen and move ahead
+// with the clock. With `now: null` (an archived shift — there is no clock)
+// such a stop would never end, so it books nothing; Selesai stamps the real
+// end on the live shift anyway.
+function hourOverlaps(stop: LineStop, now: Date | null = new Date()): { hour: string; minutes: number }[] {
   const start = toMinutes(stop.start);
-  const rawEnd = toMinutes(stop.end);
+  const rawEnd = toMinutes(stop.end ?? (now ? hhmmNow(now) : ''));
   if (start === null || rawEnd === null) return [];
   const end = rawEnd >= start ? rawEnd : rawEnd + 1440;
   const out: { hour: string; minutes: number }[] = [];
@@ -75,15 +81,17 @@ function hourOverlaps(stop: LineStop): { hour: string; minutes: number }[] {
 }
 
 // Minutes lost to line stops of one category, split into the hours they
-// actually fell in and keyed like the hourly snapshots ("07:00").
+// actually fell in and keyed like the hourly snapshots ("07:00"). `now` is
+// what an ongoing stop (no end yet) is measured against.
 function lineStopMinutesByHour(
   stops: LineStop[],
   category: LineStop['category'],
+  now: Date | null = new Date(),
 ): Record<string, number> {
   const out: Record<string, number> = {};
   for (const stop of stops) {
     if (stop.category !== category) continue;
-    for (const { hour, minutes } of hourOverlaps(stop)) {
+    for (const { hour, minutes } of hourOverlaps(stop, now)) {
       out[hour] = (out[hour] ?? 0) + minutes;
     }
   }
@@ -93,10 +101,14 @@ function lineStopMinutesByHour(
 // Which line stops (any category) overlap each hour, keyed like the hourly
 // snapshots ("07:00"). A stop from 07:50 to 08:20 appears under both 07:00
 // and 08:00 — for the Hourly table's Item Problem / Countermeasure columns.
-export function lineStopsByHour(stops: LineStop[] = []): Record<string, LineStop[]> {
+// `now` is what an ongoing stop (no end yet) is measured against.
+export function lineStopsByHour(
+  stops: LineStop[] = [],
+  now: Date | null = new Date(),
+): Record<string, LineStop[]> {
   const out: Record<string, LineStop[]> = {};
   for (const stop of stops) {
-    for (const { hour } of hourOverlaps(stop)) {
+    for (const { hour } of hourOverlaps(stop, now)) {
       (out[hour] ??= []).push(stop);
     }
   }
@@ -105,13 +117,19 @@ export function lineStopsByHour(stops: LineStop[] = []): Record<string, LineStop
 
 // Minutes lost to AV line stops, per hour. AV is triggered purely by these
 // stops now — not by production falling short of Plan — mirroring PE exactly.
-export function avMinutesByHour(stops: LineStop[] = []): Record<string, number> {
-  return lineStopMinutesByHour(stops, 'AV');
+export function avMinutesByHour(
+  stops: LineStop[] = [],
+  now: Date | null = new Date(),
+): Record<string, number> {
+  return lineStopMinutesByHour(stops, 'AV', now);
 }
 
 // Minutes lost to PE line stops, per hour.
-export function peMinutesByHour(stops: LineStop[] = []): Record<string, number> {
-  return lineStopMinutesByHour(stops, 'PE');
+export function peMinutesByHour(
+  stops: LineStop[] = [],
+  now: Date | null = new Date(),
+): Record<string, number> {
+  return lineStopMinutesByHour(stops, 'PE', now);
 }
 
 function currentHourKey(now: Date): string {
@@ -213,8 +231,8 @@ export function shiftOee(
   const hours = Object.keys(hourlyData);
   if (hours.length === 0) return ZERO;
 
-  const avByHour = avMinutesByHour(stops);
-  const peByHour = peMinutesByHour(stops);
+  const avByHour = avMinutesByHour(stops, now);
+  const peByHour = peMinutesByHour(stops, now);
 
   let produced = 0;
   let ok = 0;

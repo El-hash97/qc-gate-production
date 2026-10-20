@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import type { EntryLog, ProductionState, ProductLine } from '@/lib/types';
 import { PRODUCT_LINE_COLOR, PRODUCT_LINE_LABELS } from '@/lib/types';
 import { findPic } from '@/utils/constants';
-import { lineStopMinutes, toMinutes } from '@/utils/lineStop';
+import { stopDuration, hhmmNow, toMinutes } from '@/utils/lineStop';
 import { getGrandTotal, getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import type { RateScope } from '@/utils/rates';
 
@@ -261,10 +261,11 @@ function startHour(start: string): string | null {
 }
 
 function lineStopTable(ws: ExcelJS.Worksheet, state: ProductionState): void {
+  const now = new Date();
   const prefix: Cell[] = [dateCell(state.date), state.shift, jamShift(state), state.operator || null, picName(state)];
   const rows: Cell[][] = (state.lineStops ?? []).map((stop) => [
-    ...prefix, startHour(stop.start), stop.start, stop.end, stop.category, CATEGORY_LABEL[stop.category] ?? stop.category,
-    lineStopMinutes(stop.start, stop.end), stop.problem, stop.countermeasure || null,
+    ...prefix, startHour(stop.start), stop.start, stop.end ?? hhmmNow(now), stop.category, CATEGORY_LABEL[stop.category] ?? stop.category,
+    stopDuration(stop, now), stop.problem, stop.countermeasure || null,
   ]);
   titleBar(ws, 'Line Stop', TOYOTA_RED);
   addTable(ws, 'LineStop', TOYOTA_RED, LINE_STOP_COLUMNS, rows, [...prefix, ...Array(WIDTH - prefix.length).fill(null)]);

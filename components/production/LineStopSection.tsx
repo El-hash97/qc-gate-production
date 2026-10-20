@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ClockTimeInput } from '@/components/ui/ClockTimeInput';
 import type { LineStop } from '@/lib/types';
-import { lineStopMinutes, formatDuration } from '@/utils/lineStop';
+import { stopDuration, stopLabel, formatDuration, hhmmNow } from '@/utils/lineStop';
 import { WORKFLOW_CARDS, stationTitle } from '@/utils/workflowCards';
 import type { StationId } from '@/utils/finishingFlow';
 import styles from './LineStop.module.css';
@@ -22,13 +22,24 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
   const [countermeasure, setCountermeasure] = useState('');
   const [category, setCategory] = useState<LineStop['category']>('AV');
   const [station, setStation] = useState<StationId | ''>('');
+  // duration of ongoing stops is measured against a ticking clock; null until
+  // mounted so SSR and first paint don't disagree with the client's clock
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
-  const canAdd = start !== '' && end !== '' && problem.trim() !== '';
+  // Jam selesai is optional: a stop is usually still running when it's logged.
+  const canAdd = start !== '' && problem.trim() !== '';
 
   function add() {
     if (!canAdd) return;
     onChange([...stops, {
-      start, end, problem: problem.trim(), countermeasure: countermeasure.trim(), category,
+      start,
+      ...(end ? { end } : {}),
+      problem: problem.trim(), countermeasure: countermeasure.trim(), category,
       ...(category === 'AV' && station ? { station } : {}),
     }]);
     setStart('');
@@ -41,6 +52,12 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
 
   function remove(index: number) {
     onChange(stops.filter((_, i) => i !== index));
+  }
+
+  // Selesai: stamp the line stop's missing end with the clock right now —
+  // the moment the operator closes the row is the moment the line ran again.
+  function finish(index: number) {
+    onChange(stops.map((s, i) => (i === index ? { ...s, end: hhmmNow() } : s)));
   }
 
   return (
@@ -60,7 +77,7 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
           <ClockTimeInput value={start} ariaLabel="Jam Mulai" onChange={setStart} />
         </div>
         <div className={styles.group}>
-          <span className={styles.label}>Jam Selesai</span>
+          <span className={styles.label}>Jam Selesai <em className={styles.optional}>(opsional)</em></span>
           <ClockTimeInput value={end} ariaLabel="Jam Selesai" onChange={setEnd} />
         </div>
         <label className={styles.group}>
@@ -114,12 +131,23 @@ export function LineStopSection({ stops, onChange }: LineStopSectionProps) {
       ) : (
         <div className={styles.list}>
           {stops.map((s, i) => (
-            <div key={i} className={styles.row}>
-              <span className={styles.rowTime}>{s.start}–{s.end}</span>
-              <span>({formatDuration(lineStopMinutes(s.start, s.end))})</span>
+            <div key={i} className={styles.row} data-ongoing={!s.end || undefined}>
+              <span className={styles.rowTime}>{stopLabel(s)}</span>
+              <span>({now ? formatDuration(stopDuration(s, now)) : '…'})</span>
               <span className={styles.rowProblem}>{s.problem}</span>
               <span className={styles.rowCountermeasure}>{s.countermeasure || '—'}</span>
               <span className={styles.badge}>{s.category}{s.station && ` · ${stationTitle(s.station)}`}</span>
+              {!s.end && (
+                <button
+                  type="button"
+                  className={styles.finishBtn}
+                  onClick={() => finish(i)}
+                  aria-label="Selesai line stop"
+                  title="Catat jam selesai line stop dengan jam sekarang"
+                >
+                  Selesai
+                </button>
+              )}
               <button
                 type="button"
                 className={styles.removeBtn}

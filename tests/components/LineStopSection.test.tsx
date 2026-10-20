@@ -64,10 +64,50 @@ describe('LineStopSection', () => {
     expect(screen.queryByRole('combobox', { name: 'Station' })).toBeNull();
   });
 
-  it('keeps Tambah disabled until both times are picked', async () => {
+  it('keeps Tambah disabled until a start time and problem are picked', async () => {
     render(<LineStopSection stops={[]} onChange={vi.fn()} />);
     await userEvent.type(screen.getByPlaceholderText('Problem line stop'), 'Mesin macet');
     expect(screen.getByRole('button', { name: 'Tambah' })).toBeDisabled();
+    // a stop without Jam Selesai is fine: the start time + problem is enough
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jam Mulai' }), '730');
+    await userEvent.type(screen.getByPlaceholderText('Problem line stop'), '?');
+    expect(screen.getByRole('button', { name: 'Tambah' })).toBeEnabled();
+  });
+
+  it('adds a stop with no end time when Jam Selesai is left empty, and closes it with Selesai', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<LineStopSection stops={[]} onChange={onChange} />);
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Jam Mulai' }), '730');
+    await userEvent.type(screen.getByPlaceholderText('Problem line stop'), 'Hoist macet');
+    await userEvent.click(screen.getByRole('button', { name: 'Tambah' }));
+
+    const stops = [{ start: '07:30', problem: 'Hoist macet', countermeasure: '', category: 'AV' as const }];
+    expect(onChange).toHaveBeenCalledWith(stops);
+
+    // the open stop shows a Selesai button that stamps the clock right then;
+    // fake Date only (setTimeout stays real so userEvent keeps ticking) so
+    // the recorded end is deterministic
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 9, 19, 8, 15));
+      rerender(<LineStopSection stops={stops} onChange={onChange} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Selesai line stop' }));
+      expect(onChange).toHaveBeenLastCalledWith([
+        { start: '07:30', end: '08:15', problem: 'Hoist macet', countermeasure: '', category: 'AV' },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers no Selesai button on a stop that already has an end time', () => {
+    render(<LineStopSection
+      stops={[{ start: '07:30', end: '08:00', problem: 'Mesin macet', category: 'AV' }]}
+      onChange={vi.fn()}
+    />);
+    expect(screen.queryByRole('button', { name: 'Selesai line stop' })).toBeNull();
+    expect(screen.getByText('07:30–08:00')).toBeInTheDocument();
   });
 
   it('does not wrap a clock picker in a native <label> (jam/menit "mental" regression)', () => {

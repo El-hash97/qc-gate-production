@@ -1,13 +1,17 @@
 import type { LineStop } from '@/lib/types';
-import { lineStopMinutes, totalLineStopMinutes, formatDuration } from '@/utils/lineStop';
+import { stopDuration, stopLabel, totalLineStopMinutes, formatDuration } from '@/utils/lineStop';
 import { stationTitle } from '@/utils/workflowCards';
 import summary from './DefectRepairSummary.module.css';
 import styles from './LineStop.module.css';
 
-export function LineStopTable({ stops = [] }: { stops?: LineStop[] }) {
+export function LineStopTable({ stops = [], now = null }: { stops?: LineStop[]; now?: Date | null }) {
   if (stops.length === 0) {
     return <div className={summary.empty}>Belum ada line stop</div>;
   }
+
+  // An archived record has no `now`: its stops are all closed, so the clock
+  // only backgrounds an ongoing stop's duration (if any slipped through).
+  const clock = now ?? new Date();
 
   return (
     <table className={styles.table}>
@@ -17,11 +21,11 @@ export function LineStopTable({ stops = [] }: { stops?: LineStop[] }) {
       <tbody>
         {stops.map((s, i) => (
           <tr key={i}>
-            <td>{s.start}–{s.end}</td>
+            <td>{stopLabel(s)}</td>
             <td>{s.problem}</td>
             <td>{s.countermeasure || '—'}</td>
             <td><span className={styles.badge}>{s.category}{s.station && ` · ${stationTitle(s.station)}`}</span></td>
-            <td>{formatDuration(lineStopMinutes(s.start, s.end))}</td>
+            <td>{formatDuration(stopDuration(s, clock))}</td>
           </tr>
         ))}
       </tbody>
@@ -29,7 +33,7 @@ export function LineStopTable({ stops = [] }: { stops?: LineStop[] }) {
         <tfoot>
           <tr>
             <td colSpan={4}>Total Line Stop</td>
-            <td>{formatDuration(totalLineStopMinutes(stops))}</td>
+            <td>{formatDuration(totalLineStopMinutes(stops, clock))}</td>
           </tr>
         </tfoot>
       )}

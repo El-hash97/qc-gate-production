@@ -102,6 +102,35 @@
   color: var(--accent-orange);
 }
 
+.optional {
+  font-style: normal;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+/* a stop still going on: pulse the row so it isn't forgotten */
+.row[data-ongoing] .rowTime { color: var(--accent-orange); }
+
+.finishBtn {
+  border: 1px solid var(--accent-green, #22c55e);
+  background: transparent;
+  color: var(--accent-green, #22c55e);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 99px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.finishBtn:hover {
+  background: var(--accent-green, #22c55e);
+  color: #fff;
+}
+
 .removeBtn {
   border: none;
   background: transparent;

@@ -39,4 +39,11 @@ describe('LineStopTable', () => {
     expect(screen.getByText('Total Line Stop')).toBeInTheDocument();
     expect(screen.getByText('1j 45m')).toBeInTheDocument();
   });
+
+  it('an ongoing stop (no end yet) shows an open interval and counts to `now`', () => {
+    const now = new Date('2026-10-19T08:30:00');
+    render(<LineStopTable stops={[{ start: '08:00', problem: 'Belum kelar', category: 'PE' }]} now={now} />);
+    expect(screen.getByText('08:00–…')).toBeInTheDocument();
+    expect(screen.getByText('30m')).toBeInTheDocument();
+  });
 });

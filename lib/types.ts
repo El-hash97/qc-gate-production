@@ -63,7 +63,11 @@ export interface EntryLog {
 // RQ (rate/quality).
 export interface LineStop {
   start: string;
-  end: string;
+  // Missing (or '') while the stop is still going on: the operator logs the
+  // stop without an end time and closes it later with the list's Selesai
+  // button, which stamps the clock then. Ongoing stops count against OEE and
+  // the /overview visualization up to the current minute.
+  end?: string;
   problem: string;
   // Optional for back-compat — stops logged before this field existed have none.
   countermeasure?: string;

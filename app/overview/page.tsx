@@ -61,7 +61,7 @@ export default function OverviewPage() {
         {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} lineStop={lineStop} />}
         {!running && <div className={styles.overlay}>Production has not started</div>}
         {/* station figures always use the light artwork, even in dark mode */}
-        {stopsAt && <LineStopDialog title={stationTitle(stopsAt)} stops={stopsOf(state?.lineStops, stopsAt)} active={lineStop} onClose={() => setStopsAt(null)} />}
+        {stopsAt && <LineStopDialog title={stationTitle(stopsAt)} stops={stopsOf(state?.lineStops, stopsAt)} active={lineStop} now={now} onClose={() => setStopsAt(null)} />}
         {detail && <StationCard detail={detail} theme="light" onClose={() => setOpen(null)} />}
       </div>
     </div>

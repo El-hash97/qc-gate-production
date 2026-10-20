@@ -10,6 +10,8 @@ import {
 const stop = (start: string, end: string, category: LineStop['category']): LineStop =>
   ({ start, end, problem: 'x', category });
 
+const clock = (hhmm: string) => new Date(`2026-10-19T${hhmm}:00`);
+
 describe('hourCapacity', () => {
   it('turns a 50-second cycle time into 72 pcs per hour', () => {
     expect(hourCapacity(50)).toBe(72);
@@ -82,6 +84,16 @@ describe('peMinutesByHour', () => {
 
   it('skips malformed and zero-length stops', () => {
     expect(peMinutesByHour([stop('oops', '07:20', 'PE'), stop('08:00', '08:00', 'PE')])).toEqual({});
+  });
+
+  it('an ongoing stop (no end yet) books the minutes since its start, hour-split', () => {
+    // started 07:50, still going at 08:10 — 10 min in each hour
+    expect(peMinutesByHour([{ start: '07:50', problem: 'x', category: 'PE' }], clock('08:10')))
+      .toEqual({ '07:00': 10, '08:00': 10 });
+  });
+
+  it('an archived record (now = null) books nothing for a stop that never ended', () => {
+    expect(peMinutesByHour([{ start: '07:50', problem: 'x', category: 'PE' }], null)).toEqual({});
   });
 
   it('handles no stops at all', () => {

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import type { LineStop } from '@/lib/types';
-import { formatDuration, lineStopMinutes, totalLineStopMinutes } from '@/utils/lineStop';
+import { formatDuration, stopLabel, stopDuration, totalLineStopMinutes } from '@/utils/lineStop';
 import { stationTitle } from '@/utils/workflowCards';
 import styles from './LineStopDialog.module.css';
 
@@ -12,12 +12,14 @@ interface Props {
   stops: readonly LineStop[];
   // the stop going on now, if any
   active: LineStop | null;
+  // the ticking clock: an ongoing stop (no end yet) is measured against it
+  now: Date;
   onClose: () => void;
 }
 
 // Pop-up opened from a station board that carries line stops: that station's stops, newest
 // first, with the station name.
-export function LineStopDialog({ title, stops, active, onClose }: Props) {
+export function LineStopDialog({ title, stops, active, now, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -30,7 +32,7 @@ export function LineStopDialog({ title, stops, active, onClose }: Props) {
         <header className={styles.head}>
           <h2 className={styles.title}>{title ? `${title} · Line Stop` : 'Line Stop'}</h2>
           <span className={styles.sum}>
-            {stops.length} stop · {formatDuration(totalLineStopMinutes([...stops]))}
+            {stops.length} stop · {formatDuration(totalLineStopMinutes([...stops], now))}
           </span>
           <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>×</button>
         </header>
@@ -46,7 +48,7 @@ export function LineStopDialog({ title, stops, active, onClose }: Props) {
                   <span className={styles.cat}>{s.category}</span>
                 </div>
                 <div className={styles.time}>
-                  {s.start}–{s.end} · {formatDuration(lineStopMinutes(s.start, s.end))}
+                  {stopLabel(s)} · {formatDuration(stopDuration(s, now))}
                 </div>
                 <dl className={styles.facts}>
                   <div><dt>Problem</dt><dd>{s.problem}</dd></div>

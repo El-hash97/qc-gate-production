@@ -172,14 +172,14 @@ export function ProductionDashboardView({
     // Semua: only hours with actual production or a line stop — avoids 13 empty
     // zero rows when camshaft/crankshaft only run 1-2 specific hours.
     const merged = mergeHourly(state.hourlyData, state.hourlyDataShaft);
-    const byHour = lineStopsByHour(state.lineStops);
+    const byHour = lineStopsByHour(state.lineStops, now);
     const filtered: typeof merged = {};
     for (const [hour, snap] of Object.entries(merged)) {
       const total = snap.ok + snap.repair + snap.ng;
       if (total > 0 || (byHour[hour]?.length ?? 0) > 0) filtered[hour] = snap;
     }
     return filtered;
-  }, [view, state.hourlyData, state.hourlyDataShaft, state.hourlyDataCam, state.hourlyDataCrank, state.shiftTime, state.lineStops]);
+  }, [view, state.hourlyData, state.hourlyDataShaft, state.hourlyDataCam, state.hourlyDataCrank, state.shiftTime, state.lineStops, now]);
   const entryLogs = useMemo(() => {
     if (view === 'all') return state.entryLogs;
     if (view === 'bc') return state.entryLogs.filter((log) => (log.group ?? 'bc') === 'bc');
@@ -193,7 +193,7 @@ export function ProductionDashboardView({
   const lineStops = state.lineStops ?? [];
   // Keyed on state.lineStops itself (not the `?? []` fallback, a fresh array
   // every render) so an unchanged poll doesn't recompute it.
-  const stopsByHour = useMemo(() => lineStopsByHour(state.lineStops), [state.lineStops]);
+  const stopsByHour = useMemo(() => lineStopsByHour(state.lineStops, now), [state.lineStops, now]);
 
   // OEE needs a cycle time to measure availability against. The B/C cycle time
   // drives every product (Camshaft and Crankshaft derive theirs from it by
@@ -233,8 +233,8 @@ export function ProductionDashboardView({
   }, [hourlyData, stopsByHour]);
 
   const oeeByHour = useMemo(() => {
-    const avByHour = avMinutesByHour(state.lineStops);
-    const peByHour = peMinutesByHour(state.lineStops);
+    const avByHour = avMinutesByHour(state.lineStops, now);
+    const peByHour = peMinutesByHour(state.lineStops, now);
     const out: Record<string, OeeBreakdown> = {};
     for (const [hour, snapshot] of Object.entries(hourlyData)) {
       if (!touchedHours.has(hour)) continue;
@@ -436,7 +436,7 @@ export function ProductionDashboardView({
         {!hidden.has('lineStop') && (
           <section className={`${styles.panel} ${styles.spanList} ${styles.hTrend} ${styles.lineStopPanel}`}>
             <div className={styles.panelTitle}>Line Stop</div>
-            <div className={styles.scrollBody}><LineStopTable stops={lineStops} /></div>
+            <div className={styles.scrollBody}><LineStopTable stops={lineStops} now={now} /></div>
           </section>
         )}
 

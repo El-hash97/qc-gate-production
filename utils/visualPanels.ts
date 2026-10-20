@@ -6,7 +6,7 @@ import {
 } from '@/utils/oee';
 import { hoursForShiftTime } from '@/utils/shiftHours';
 import { pareto } from '@/utils/charts';
-import { toMinutes } from '@/utils/lineStop';
+import { toMinutes, hhmmNow } from '@/utils/lineStop';
 
 // Everything the Visualisasi overlay panels show, for Block Cylinder (lines 1+2)
 // only — the same scope as the 3D line. Mirrors the dashboard's B/C view.
@@ -35,9 +35,10 @@ const top = (data: Record<string, number>, n = 5) => {
   return p.labels.slice(0, n).map((label, i) => ({ label, count: p.counts[i] }));
 };
 
-function stopMinutes(stop: LineStop): number {
+function stopMinutes(stop: LineStop, now: Date): number {
   const a = toMinutes(stop.start);
-  const b = toMinutes(stop.end);
+  // ongoing stop (no end yet): counts up to the minute of `now`
+  const b = toMinutes(stop.end ?? hhmmNow(now));
   if (a === null || b === null) return 0;
   return b >= a ? b - a : b + 24 * 60 - a; // past midnight
 }
@@ -55,7 +56,7 @@ export function panelData(state: ProductionState, now: Date): PanelData {
   for (const h of Object.keys(base).sort()) if (!hours.includes(h)) hours.push(h);
   const windows = state.hourlyWindow ?? {};
   const capacity = hourCapacity(state.cycleTimeBc || DEFAULT_CYCLE_TIME_SEC);
-  const stopsByHour = lineStopsByHour(state.lineStops);
+  const stopsByHour = lineStopsByHour(state.lineStops, now);
   const snap = (h: string): HourlySnapshot => base[h] ?? { ok: 0, repair: 0, ng: 0 };
   const hourly = hours.map((hour) => {
     const s = snap(hour);
@@ -77,7 +78,7 @@ export function panelData(state: ProductionState, now: Date): PanelData {
   const etaMin = remaining > 0 && pace > 0 ? Math.round(remaining / pace) : null;
 
   const stopMin = { AV: 0, PE: 0, RQ: 0 };
-  for (const s of state.lineStops ?? []) stopMin[s.category] += stopMinutes(s);
+  for (const s of state.lineStops ?? []) stopMin[s.category] += stopMinutes(s, now);
 
   const bcLogs = (state.entryLogs ?? []).filter((log) => (log.group ?? 'bc') === 'bc');
   return {

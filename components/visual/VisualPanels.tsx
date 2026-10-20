@@ -7,6 +7,7 @@ import type { PanelData } from '@/utils/visualPanels';
 import { WORKFLOW_CARDS, stepState } from '@/utils/workflowCards';
 import type { LineStop } from '@/lib/types';
 import { SEGMENTS, segmentSeconds, type StationId } from '@/utils/finishingFlow';
+import { stopLabel } from '@/utils/lineStop';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import styles from './VisualPanels.module.css';
 
@@ -232,7 +233,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
                     <span className={styles.stepName}>
                       {card.title}
                       {state === 'lineStop' && lineStop && (
-                        <small className={styles.stepStop}>{lineStop.problem} · {lineStop.start}–{lineStop.end}</small>
+                        <small className={styles.stepStop}>{lineStop.problem} · {stopLabel(lineStop)}</small>
                       )}
                     </span>
                     {seg !== undefined && <span className={styles.stepCt}>{segmentSeconds(SEGMENTS[seg]).toFixed(1)} s</span>}
@@ -316,7 +317,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
               {d.lastStop && (
                 <li data-kind="stop">
                   <span className={styles.alertIcon}>■</span>
-                  <span className={styles.alertText}>Line stop {d.lastStop.start}–{d.lastStop.end} · {d.lastStop.problem}</span>
+                  <span className={styles.alertText}>Line stop {stopLabel(d.lastStop)} · {d.lastStop.problem}</span>
                   <b>{d.lastStop.category}</b>
                 </li>
               )}

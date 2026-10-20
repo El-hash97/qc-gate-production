@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TRUCK_DOCK, type Counts, type StationId } from '@/utils/finishingFlow';
 import type { Sim } from '@/utils/finishingSim';
 import type { LineStop } from '@/lib/types';
+import { stopLabel } from '@/utils/lineStop';
 import { PINS, pinReadouts, stationPinPos, type PinId } from '@/utils/stationPinData';
 import styles from './stationPins.module.css';
 
@@ -127,7 +128,7 @@ export function createTags(
       for (const t of tags) {
         const stopped = stop?.station === t.id;
         t.el.toggleAttribute('data-stop', stopped);
-        const note = stopped ? `${stop.problem} · ${stop.start}–${stop.end}` : '';
+        const note = stopped ? `${stop.problem} · ${stopLabel(stop)}` : '';
         if (t.note.textContent !== note) t.note.textContent = note;
         if (!visible && !t.badge && !stopped) {
           t.el.style.display = 'none';

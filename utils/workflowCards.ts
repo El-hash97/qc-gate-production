@@ -1,3 +1,4 @@
+import type { LineStop } from '@/lib/types';
 import { SEGMENTS, segmentSeconds, type Counts, type StationId } from './finishingFlow';
 
 // One workflow board per process, standing on the empty floor beside the line
@@ -66,6 +67,8 @@ export function cardRows(
   running: boolean,
   busy: readonly boolean[],
   stop: StationId | null = null,
+  // the latest line stop logged at this station, if any
+  lastStop: LineStop | null = null,
 ): [string, string][] {
   const rows: [string, string][] = [];
   const state = stepState(card, running, busy, stop);
@@ -79,6 +82,7 @@ export function cardRows(
   }
   if (card.id === 'junbiki') rows.push(['OK', `${counts.ok} (${pct(counts.ok)})`]);
   if (card.id === 'lineRepair') rows.push(['Repair', `${counts.repair} (${pct(counts.repair)})`]);
+  if (lastStop) rows.push(['Line stop', `${lastStop.problem} · ${lastStop.start}–${lastStop.end}`]);
   rows.push(['Next', card.next]);
   return rows;
 }

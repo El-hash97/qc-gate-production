@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lineStopMinutes, totalLineStopMinutes, formatDuration, activeStationStop } from '@/utils/lineStop';
+import { lineStopMinutes, totalLineStopMinutes, formatDuration, activeStationStop, stopsAt } from '@/utils/lineStop';
 
 describe('lineStopMinutes', () => {
   it('returns the gap in minutes for a same-day stop', () => {
@@ -57,5 +57,15 @@ describe('activeStationStop', () => {
     const b = stop('10:10', '10:40', { station: 'hsb05' });
     expect(activeStationStop([stop('10:00', '11:00', { station: undefined }), stop('10:00', '11:00', { category: 'PE' })], at('10:15'))).toBeNull();
     expect(activeStationStop([a, b], at('10:15'))).toBe(b);
+  });
+});
+
+describe('stopsAt', () => {
+  it('keeps only the stops logged at that station, in order', () => {
+    const a = { start: '08:00', end: '08:10', problem: 'a', category: 'AV' as const, station: 'qc1' as const };
+    const b = { ...a, station: 'hsb05' as const };
+    const c = { ...a, start: '09:00' };
+    expect(stopsAt([a, b, c], 'qc1')).toEqual([a, c]);
+    expect(stopsAt(undefined, 'qc1')).toEqual([]);
   });
 });

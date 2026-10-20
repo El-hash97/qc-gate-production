@@ -14,11 +14,12 @@ import { createStationAnim } from './stationAnim';
 import { activeRange } from '@/utils/animRange';
 import { stationDetail } from '@/utils/stationDetails';
 import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
-import { createLineStopBoard, createWorkflowBoards } from './workflowBoards';
+import { createWorkflowBoards } from './workflowBoards';
 import { createPins, createTags } from './stationPins';
 import { PINS, type PinId } from '@/utils/stationPinData';
 import type { Theme } from '@/hooks/useTheme';
 import type { LineStop } from '@/lib/types';
+import { stopsAt } from '@/utils/lineStop';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
   raw: 0x9ca3af, ok: 0x22c55e, repair: 0xf59e0b, ng: 0xdc2626,
@@ -98,10 +99,10 @@ interface Props {
   labels?: boolean;
   // AV line stop at a station going on now: the line halts there
   lineStop?: LineStop | null;
-  // every line stop of the shift (the board at the end of the row lists them)
+  // every line stop of the shift: a station's board shows its latest one
   lineStops?: LineStop[];
-  // the line stop board was clicked
-  onSelectLineStops?: () => void;
+  // a station's board was clicked (only boards that carry a line stop)
+  onSelectLineStops?: (id: StationId) => void;
 }
 
 
@@ -328,26 +329,27 @@ export default function FinishingLine3D({
     // workflow boards on the empty floor east of the line, Baritori end to Line Repair
     const boards = createWorkflowBoards(WORKFLOW_CARDS, 15.5, -3, 3.1);
     scene.add(boards.group);
-    // ...and the line stop board after the last one
-    const stopBoard = createLineStopBoard(15.5, -3 + WORKFLOW_CARDS.length * 3.1);
-    scene.add(stopBoard.group);
-    // click (not drag) on it opens the details; the pointer shows it is clickable
+    // click (not drag) on a board that carries a line stop opens the details;
+    // the pointer shows it is clickable
     const ray = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    const overStopBoard = (e: PointerEvent) => {
+    const stopBoardAt = (e: PointerEvent): StationId | null => {
       const r = renderer.domElement.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
-      return ray.intersectObject(stopBoard.face).length > 0;
+      const hit = ray.intersectObjects(boards.faces.map((f) => f.face))[0];
+      const id = boards.faces.find((f) => f.face === hit?.object)?.id ?? null;
+      return id && stopsAt(live.current.lineStops, id).length > 0 ? id : null;
     };
     let down: [number, number] | null = null;
     const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
     const onUp = (e: PointerEvent) => {
       const moved = down ? Math.hypot(e.clientX - down[0], e.clientY - down[1]) : Infinity;
       down = null;
-      if (moved < 5 && overStopBoard(e)) stopsClicked.current?.();
+      const id = moved < 5 ? stopBoardAt(e) : null;
+      if (id) stopsClicked.current?.(id);
     };
-    const onMove = (e: PointerEvent) => { renderer.domElement.style.cursor = overStopBoard(e) ? 'pointer' : ''; };
+    const onMove = (e: PointerEvent) => { renderer.domElement.style.cursor = stopBoardAt(e) ? 'pointer' : ''; };
     renderer.domElement.addEventListener('pointerdown', onDown);
     renderer.domElement.addEventListener('pointerup', onUp);
     renderer.domElement.addEventListener('pointermove', onMove);
@@ -506,8 +508,7 @@ export default function FinishingLine3D({
       const c = live.current.counts;
       const busy = sim.segments.map((seg) => seg.busy !== null);
       const stopAt = live.current.lineStop?.station ?? null;
-      stopBoard.draw(live.current.lineStops ?? [], live.current.lineStop, boardTheme);
-      boards.draw((card) => cardRows(card, c, live.current.running, busy, stopAt), boardTheme);
+      boards.draw((card) => cardRows(card, c, live.current.running, busy, stopAt, stopsAt(live.current.lineStops, card.id).at(-1) ?? null), boardTheme);
       const busyKey = busy.join();
       if (busyKey !== lastBusy) {
         lastBusy = busyKey;

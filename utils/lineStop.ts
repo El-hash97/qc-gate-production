@@ -21,6 +21,11 @@ export function toMinutes(hhmm: string): number | null {
   return h * 60 + min;
 }
 
+// Line stops logged at `station` (oldest first).
+export function stopsAt(stops: LineStop[] = [], station: string): LineStop[] {
+  return stops.filter((s) => s.station === station);
+}
+
 export function totalLineStopMinutes(stops: LineStop[]): number {
   return stops.reduce((sum, s) => sum + lineStopMinutes(s.start, s.end), 0);
 }

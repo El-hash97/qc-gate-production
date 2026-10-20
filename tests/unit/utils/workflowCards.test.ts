@@ -32,4 +32,10 @@ describe('workflow cards', () => {
     expect(cardRows(card('hsb06'), counts, true, busy, 'hsb05')).toContainEqual(['Status', 'Waiting']);
     expect(cardRows(card('final'), counts, true, busy)).not.toContainEqual(expect.arrayContaining(['Status']));
   });
+
+  it('print the latest line stop of a station on its own board', () => {
+    const stop = { start: '09:00', end: '09:45', problem: 'Lampu mati', category: 'AV' as const, station: 'qc1' as const };
+    expect(cardRows(card('qc1'), counts, true, [], 'qc1', stop)).toContainEqual(['Line stop', 'Lampu mati · 09:00–09:45']);
+    expect(cardRows(card('qc1'), counts, true, [])).not.toContainEqual(expect.arrayContaining(['Line stop']));
+  });
 });

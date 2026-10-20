@@ -7,15 +7,17 @@ import { stationTitle } from '@/utils/workflowCards';
 import styles from './LineStopDialog.module.css';
 
 interface Props {
+  // the station whose board was clicked (heads the pop-up)
+  title?: string;
   stops: readonly LineStop[];
   // the stop going on now, if any
   active: LineStop | null;
   onClose: () => void;
 }
 
-// Pop-up opened from the line stop board: every stop of the shift, newest
-// first, with the station it happened at.
-export function LineStopDialog({ stops, active, onClose }: Props) {
+// Pop-up opened from a station board that carries line stops: that station's stops, newest
+// first, with the station name.
+export function LineStopDialog({ title, stops, active, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -26,7 +28,7 @@ export function LineStopDialog({ stops, active, onClose }: Props) {
     <div className={styles.backdrop} onClick={onClose}>
       <section className={styles.card} role="dialog" aria-label="Line stop details" onClick={(e) => e.stopPropagation()}>
         <header className={styles.head}>
-          <h2 className={styles.title}>Line Stop</h2>
+          <h2 className={styles.title}>{title ? `${title} · Line Stop` : 'Line Stop'}</h2>
           <span className={styles.sum}>
             {stops.length} stop · {formatDuration(totalLineStopMinutes([...stops]))}
           </span>

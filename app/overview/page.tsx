@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
+import { useLineStopHistory } from '@/hooks/useLineStopHistory';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
@@ -14,6 +15,7 @@ import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
 import { panelData } from '@/utils/visualPanels';
 import { activeStationStop, stopsAt as stopsOf } from '@/utils/lineStop';
 import { stationTitle } from '@/utils/workflowCards';
+import { stationCounts, withLiveStops } from '@/utils/stopHistory';
 import styles from './page.module.css';
 
 const FinishingLine3D = dynamic(() => import('@/components/visual/FinishingLine3D'), {
@@ -40,6 +42,14 @@ export default function OverviewPage() {
   }, []);
   const panels = useMemo(() => (state ? panelData(state, now) : null), [state, now]);
   const lineStop = useMemo(() => activeStationStop(state?.lineStops, now), [state, now]);
+  // last 30 days of line stops: archived shifts + the one running now. Per
+  // machine, 3+ turns it orange and 10+ red.
+  const { data: archived } = useLineStopHistory();
+  const stops30 = useMemo(
+    () => withLiveStops(archived ?? [], state?.lineStops, state?.date, now),
+    [archived, state?.lineStops, state?.date, now],
+  );
+  const stopCounts = useMemo(() => stationCounts(stops30, now), [stops30, now]);
   // Workflow row: fly the camera there, and open the station card if it has one.
   const goTo = (id: StationId) => {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
@@ -57,11 +67,11 @@ export default function OverviewPage() {
         <FinishingLine3D counts={counts} running={running} theme={theme} onSelectStation={setOpen}
           onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()}
           labels={panelModes.mode('labels') !== 'hidden'} lineStop={lineStop}
-          lineStops={state?.lineStops} onSelectLineStops={setStopsAt} />
+          lineStops={stops30} stopCounts={stopCounts} onSelectLineStops={setStopsAt} />
         {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} lineStop={lineStop} />}
         {!running && <div className={styles.overlay}>Production has not started</div>}
         {/* station figures always use the light artwork, even in dark mode */}
-        {stopsAt && <LineStopDialog title={stationTitle(stopsAt)} stops={stopsOf(state?.lineStops, stopsAt)} active={lineStop} now={now} onClose={() => setStopsAt(null)} />}
+        {stopsAt && <LineStopDialog title={stationTitle(stopsAt)} stops={stopsOf(stops30, stopsAt)} active={lineStop} now={now} onClose={() => setStopsAt(null)} />}
         {detail && <StationCard detail={detail} theme="light" onClose={() => setOpen(null)} />}
       </div>
     </div>

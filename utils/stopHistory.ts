@@ -5,6 +5,8 @@ import { stopDuration } from '@/utils/lineStop';
 // shift's own date: a night-shift stop after midnight stays on that date).
 export interface DatedStop extends LineStop {
   date: string;
+  // from the shift running now (not archived yet)
+  live?: boolean;
 }
 
 // A machine turns orange / red from this many line stops within the window.
@@ -34,7 +36,7 @@ export function withLiveStops(
   archived: readonly DatedStop[], live: readonly LineStop[] | undefined, liveDate: string | undefined, today: Date,
 ): DatedStop[] {
   const date = liveDate || ymd(today);
-  return [...archived, ...(live ?? []).map((s) => ({ ...s, date }))];
+  return [...archived, ...(live ?? []).map((s) => ({ ...s, date, live: true }))];
 }
 
 export function stopsInRange(stops: readonly DatedStop[], days: number, today: Date): DatedStop[] {

@@ -38,4 +38,9 @@ describe('workflow cards', () => {
     expect(cardRows(card('qc1'), counts, true, [], 'qc1', stop)).toContainEqual(['Line stop', 'Lampu mati · 09:00–09:45']);
     expect(cardRows(card('qc1'), counts, true, [])).not.toContainEqual(expect.arrayContaining(['Line stop']));
   });
+
+  it('print the 30-day line stop count of a station on its board, only when it has any', () => {
+    expect(cardRows(card('qc1'), counts, true, [], null, null, 4)).toContainEqual(['Stops · 30 days', '4×']);
+    expect(cardRows(card('qc1'), counts, true, [], null, null, 0).map(([l]) => l)).not.toContain('Stops · 30 days');
+  });
 });

@@ -61,6 +61,9 @@ const STATUS: Record<StepState, string> = {
   stopped: 'Stopped', lineStop: 'Line stop', busy: 'Processing', wait: 'Waiting', run: 'Running',
 };
 
+// Label of the 30-day line stop count row (the board colours it by level).
+export const STOPS_30D = 'Stops · 30 days';
+
 // The data rows printed under a card's description.
 export function cardRows(
   card: WorkflowCard,
@@ -70,6 +73,8 @@ export function cardRows(
   stop: StationId | null = null,
   // the latest line stop logged at this station, if any
   lastStop: LineStop | null = null,
+  // line stops at this station in the last 30 days
+  stopCount = 0,
 ): [string, string][] {
   const rows: [string, string][] = [];
   const state = stepState(card, running, busy, stop);
@@ -84,6 +89,7 @@ export function cardRows(
   if (card.id === 'junbiki') rows.push(['OK', `${counts.ok} (${pct(counts.ok)})`]);
   if (card.id === 'lineRepair') rows.push(['Repair', `${counts.repair} (${pct(counts.repair)})`]);
   if (lastStop) rows.push(['Line stop', `${lastStop.problem} · ${stopLabel(lastStop)}`]);
+  if (stopCount > 0) rows.push([STOPS_30D, `${stopCount}×`]);
   rows.push(['Next', card.next]);
   return rows;
 }

@@ -20,6 +20,7 @@ import { PINS, type PinId } from '@/utils/stationPinData';
 import type { Theme } from '@/hooks/useTheme';
 import type { LineStop } from '@/lib/types';
 import { stopsAt } from '@/utils/lineStop';
+import { stopLevel } from '@/utils/stopHistory';
 
 const BLOCK_COLORS: Record<BlockColor, number> = {
   raw: 0x9ca3af, ok: 0x22c55e, repair: 0xf59e0b, ng: 0xdc2626,
@@ -99,8 +100,11 @@ interface Props {
   labels?: boolean;
   // AV line stop at a station going on now: the line halts there
   lineStop?: LineStop | null;
-  // every line stop of the shift: a station's board shows its latest one
+  // the last 30 days of line stops (archived shifts + this one): a station's
+  // board shows its latest one and is clickable when it has any
   lineStops?: LineStop[];
+  // line stops per station in those 30 days: 3+ turns the machine orange, 10+ red
+  stopCounts?: Record<string, number>;
   // a station's board was clicked (only boards that carry a line stop)
   onSelectLineStops?: (id: StationId) => void;
 }
@@ -253,7 +257,7 @@ function makeTruck(): THREE.Group {
 
 export default function FinishingLine3D({
   counts, running, theme, onSelectStation, onBusyChange, focus, pins, labels = true, lineStop = null,
-  lineStops, onSelectLineStops,
+  lineStops, stopCounts, onSelectLineStops,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const select = useRef(onSelectStation);
@@ -267,8 +271,8 @@ export default function FinishingLine3D({
   const shownPins = new Set<PinId>(pins ?? PINS.map((p) => p.id));
   const station = lineStop?.station;
   const hold = useMemo(() => (station ? stationHold(station) : null), [station]);
-  const live = useRef({ counts, running, pins: shownPins, labels, lineStop, hold, lineStops });
-  live.current = { counts, running, pins: shownPins, labels, lineStop, hold, lineStops };
+  const live = useRef({ counts, running, pins: shownPins, labels, lineStop, hold, lineStops, stopCounts });
+  live.current = { counts, running, pins: shownPins, labels, lineStop, hold, lineStops, stopCounts };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
   const [noWebGL, setNoWebGL] = useState(false);
 
@@ -329,6 +333,25 @@ export default function FinishingLine3D({
     // workflow boards on the empty floor east of the line, Baritori end to Line Repair
     const boards = createWorkflowBoards(WORKFLOW_CARDS, 15.5, -3, 3.1);
     scene.add(boards.group);
+    // A floor ring and a faint column around every machine with 3+ (orange) or
+    // 10+ (red) line stops in the last 30 days; shown/coloured each frame.
+    const HALO = { orange: 0xf59e0b, red: 0xdc2626 } as const;
+    const halos = STATIONS.filter((s) => WORKFLOW_CARDS.some((c) => c.id === s.id)).map((s) => {
+      const group = new THREE.Group();
+      const mats = [0.55, 0.16].map((opacity) => new THREE.MeshBasicMaterial({
+        color: HALO.orange, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false,
+      }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.45, 48), mats[0]);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.05;
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, 2.4, 48, 1, true), mats[1]);
+      column.position.y = 1.2;
+      group.add(ring, column);
+      group.position.set(s.pos[0], 0, s.pos[1]);
+      group.visible = false;
+      scene.add(group);
+      return { id: s.id, group, mats };
+    });
     // click (not drag) on a board that carries a line stop opens the details;
     // the pointer shows it is clickable
     const ray = new THREE.Raycaster();
@@ -538,7 +561,17 @@ export default function FinishingLine3D({
       const c = live.current.counts;
       const busy = sim.segments.map((seg) => seg.busy !== null);
       const stopAt = live.current.lineStop?.station ?? null;
-      boards.draw((card) => cardRows(card, c, live.current.running, busy, stopAt, stopsAt(live.current.lineStops, card.id).at(-1) ?? null), boardTheme);
+      const counts30 = live.current.stopCounts ?? {};
+      boards.draw(
+        (card) => cardRows(card, c, live.current.running, busy, stopAt, stopsAt(live.current.lineStops, card.id).at(-1) ?? null, counts30[card.id] ?? 0),
+        boardTheme,
+        (card) => stopLevel(counts30[card.id] ?? 0),
+      );
+      for (const h of halos) {
+        const level = stopLevel(counts30[h.id] ?? 0);
+        h.group.visible = level !== 'ok';
+        if (level !== 'ok') h.mats.forEach((m) => m.color.setHex(HALO[level]));
+      }
       const busyKey = busy.join();
       if (busyKey !== lastBusy) {
         lastBusy = busyKey;

@@ -14,7 +14,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(560px, 100%);
+  width: min(640px, 100%);
   max-height: 100%;
   padding: 18px;
   background: var(--bg-card);
@@ -25,8 +25,51 @@
 }
 
 .head { display: flex; align-items: baseline; gap: 10px; }
-.title { margin: 0; font-size: 18px; }
-.sum { flex: 1; font-size: 12px; color: var(--text-secondary); }
+.title { margin: 0; flex: 1; font-size: 18px; }
+
+/* how many stops in 30 days: neutral / orange (3+) / red (10+) */
+.level {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.level[data-level='orange'] { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.level[data-level='red'] { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+.filter { display: flex; align-items: center; gap: 6px; }
+.filter button {
+  padding: 3px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.filter button[data-on] { background: var(--accent-red); border-color: var(--accent-red); color: #fff; }
+.sum { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+
+/* one bar per day; the date sits under it */
+.chart {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 130px;
+  padding: 14px 0 0 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+.peak { position: absolute; left: 0; top: 0; font-size: 10px; color: var(--text-secondary); }
+.day { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.col { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.bar { width: 100%; max-width: 22px; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--accent-red); }
+.bar[data-empty] { background: var(--border-color); }
+.val { font-size: 10px; font-weight: 700; line-height: 1.2; color: var(--text-primary); }
+.date { height: 14px; font-size: 9px; line-height: 14px; text-align: center; white-space: nowrap; color: var(--text-secondary); overflow: visible; }
 
 .close {
   border: 0;

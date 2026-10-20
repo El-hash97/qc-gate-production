@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Theme } from '@/hooks/useTheme';
-import type { WorkflowCard } from '@/utils/workflowCards';
+import { STOPS_30D, type WorkflowCard } from '@/utils/workflowCards';
+import type { StopLevel } from '@/utils/stopHistory';
 
 // Standing workflow boards on the empty floor beside the line: one per process
 // in flow order along +z, faces turned to the line (-x), arrows on the floor
@@ -16,6 +17,8 @@ const COLORS: Record<Theme, { bg: string; ink: string; muted: string; rule: stri
   light: { bg: '#ffffff', ink: '#1b1e28', muted: '#59616f', rule: '#e3e6ec', chip: '#f3f4f6' },
 };
 const ACCENT = '#eb0a1e';
+// header band of a machine with 3+ (orange) / 10+ (red) line stops in 30 days
+const LEVEL: Record<Exclude<StopLevel, 'ok'>, string> = { orange: '#f59e0b', red: '#dc2626' };
 
 function fit(g: CanvasRenderingContext2D, text: string, width: number): string {
   if (g.measureText(text).width <= width) return text;
@@ -71,8 +74,8 @@ function makeFrame() {
 function makeBoard(card: WorkflowCard, step: number, total: number) {
   const { group, g, texture, face } = makeFrame();
   let drawn = '';
-  const draw = (rows: [string, string][], theme: Theme) => {
-    const key = theme + JSON.stringify(rows);
+  const draw = (rows: [string, string][], theme: Theme, level: StopLevel) => {
+    const key = theme + level + JSON.stringify(rows);
     if (key === drawn) return;
     drawn = key;
     const c = COLORS[theme];
@@ -80,20 +83,26 @@ function makeBoard(card: WorkflowCard, step: number, total: number) {
     g.fillRect(0, 0, W, H);
     g.fillStyle = ACCENT;
     g.fillRect(0, 0, 14, H);
+    const lc = level === 'ok' ? null : LEVEL[level];
+    if (lc) {
+      g.fillStyle = lc;
+      g.fillRect(0, 0, W, 136);
+    }
+    g.fillStyle = lc ? '#ffffff' : ACCENT;
     // step disc + title
     g.beginPath();
     g.arc(92, 88, 46, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#ffffff';
+    g.fillStyle = lc ?? '#ffffff';
     g.font = 'bold 44px sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(String(step), 92, 90);
     g.textAlign = 'left';
-    g.fillStyle = c.ink;
+    g.fillStyle = lc ? '#ffffff' : c.ink;
     g.font = 'bold 58px sans-serif';
     g.fillText(card.title, 160, 80);
-    g.fillStyle = c.muted;
+    g.fillStyle = lc ? '#ffffff' : c.muted;
     g.font = '600 26px sans-serif';
     g.textAlign = 'right';
     g.fillText(`STEP ${step} / ${total}`, W - 40, 80);
@@ -119,7 +128,7 @@ function makeBoard(card: WorkflowCard, step: number, total: number) {
       g.fillText(label.toUpperCase(), 64, y + (rowH - 6) / 2);
       // a line stop at this station: its description and time, in red
       const stop = label === 'Line stop';
-      g.fillStyle = stop || value === 'Line stop' ? ACCENT : label === 'Status' && value === 'Processing' ? '#16a34a' : c.ink;
+      g.fillStyle = label === STOPS_30D && lc ? lc : stop || value === 'Line stop' ? ACCENT : label === 'Status' && value === 'Processing' ? '#16a34a' : c.ink;
       g.font = stop ? 'bold 28px sans-serif' : 'bold 34px sans-serif';
       g.textAlign = 'right';
       g.fillText(stop ? fit(g, value, 600) : value, W - 64, y + (rowH - 6) / 2);
@@ -154,7 +163,7 @@ export function createWorkflowBoards(cards: readonly WorkflowCard[], x: number, 
     group,
     // the board faces, for picking (which station's board was clicked)
     faces: boards.map((b, i) => ({ id: cards[i].id, face: b.face })),
-    draw: (rows: (card: WorkflowCard) => [string, string][], theme: Theme) =>
-      boards.forEach((b, i) => b.draw(rows(cards[i]), theme)),
+    draw: (rows: (card: WorkflowCard) => [string, string][], theme: Theme, level: (card: WorkflowCard) => StopLevel) =>
+      boards.forEach((b, i) => b.draw(rows(cards[i]), theme, level(cards[i]))),
   };
 }

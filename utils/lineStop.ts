@@ -22,7 +22,7 @@ export function toMinutes(hhmm?: string): number | null {
 }
 
 // Line stops logged at `station` (oldest first).
-export function stopsAt(stops: LineStop[] = [], station: string): LineStop[] {
+export function stopsAt<T extends LineStop>(stops: readonly T[] = [], station: string): T[] {
   return stops.filter((s) => s.station === station);
 }
 

@@ -4,7 +4,7 @@
   --gap: 8px;
   --side: 210px;
   --top: 86px;
-  --bottom-h: 132px;
+  --bottom-h: 156px;
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -417,7 +417,7 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 3px;
+  gap: 2px;
   font-size: 11px;
 }
 
@@ -425,7 +425,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 6px;
+  padding: 2px 6px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--bg-primary) 22%, transparent);
 }

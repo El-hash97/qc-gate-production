@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import {
-  BLOCK_SIZE, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, BLOCK_URL, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
   ANIM_FPS, SEGMENTS, type Counts, type StationId,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
-import { createStationAnim } from './stationAnim';
-import { activeRange } from '@/utils/animRange';
+import { createStationAnim, type StationClip } from './stationAnim';
 import { stationDetail } from '@/utils/stationDetails';
 import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
 import { createWorkflowBoards } from './workflowBoards';
@@ -333,31 +333,36 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
       });
       scene.add(gltf.scene);
       // One clip per moving object on the Blender timeline. Station clips are
-      // driven by the simulation; the remaining operators (rigs) loop their own
-      // motion back-to-back, other machines keep the shared loop length.
+      // driven by the simulation (and hold still where no block passes);
+      // operators away from the block path — no segment owns their rig — stay
+      // frozen, and the remaining machines keep the shared loop length.
       if (gltf.animations.length) {
         mixer = new THREE.AnimationMixer(gltf.scene);
         const loop = Math.max(...gltf.animations.map((c) => c.duration));
         const m = mixer;
-        stations = SEGMENTS.map((seg) => createStationAnim(
-          m,
-          gltf.animations.filter((c) => seg.clips.includes(c.name)),
-          (seg.from - 1) / ANIM_FPS,
-        ));
+        stations = SEGMENTS.map((seg) => {
+          const segSec = (seg.to - seg.from) / ANIM_FPS;
+          const specs: StationClip[] = [];
+          for (const n of seg.clips) {
+            const clip = gltf.animations.find((c) => c.name === n);
+            if (!clip) continue;
+            const win = seg.remap?.[n];
+            if (!win) {
+              specs.push(clip);
+              continue;
+            }
+            // replay the clip's recorded keyframe window across the segment
+            const from = (win[0] - 1) / ANIM_FPS;
+            const span = (win[1] - win[0]) / ANIM_FPS;
+            specs.push({ clip, map: (t: number) => from + (t / segSec) * span });
+          }
+          return createStationAnim(m, specs, (seg.from - 1) / ANIM_FPS);
+        });
         for (const clip of gltf.animations) {
           if (SEGMENTS.some((seg) => seg.clips.includes(clip.name))) continue;
-          let play = clip;
-          const range = clip.name.startsWith('metarig')
-            ? activeRange(clip.tracks.map((t) => ({ times: t.times, values: t.values, size: t.getValueSize() })))
-            : null;
-          if (range) {
-            const [from, to] = range;
-            const tracks = clip.tracks.map((t) => t.clone().trim(from, to).shift(-from));
-            play = new THREE.AnimationClip(clip.name, to - from, tracks);
-          } else {
-            clip.duration = loop;
-          }
-          mixer.clipAction(play).play();
+          if (clip.name.startsWith('metarig')) continue;
+          clip.duration = loop;
+          mixer.clipAction(clip).play();
         }
       }
     });
@@ -385,10 +390,35 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
     });
     scene.add(truck);
 
-    const blockGeo = new THREE.BoxGeometry(...BLOCK_SIZE);
+    const blockBoxGeo = new THREE.BoxGeometry(...BLOCK_SIZE);
     const blockMats = Object.fromEntries(
       Object.entries(BLOCK_COLORS).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, clippingPlanes: outside })]),
     ) as Record<BlockColor, THREE.MeshStandardMaterial>;
+    // The visible block is the user's BC 2TR mesh (asset/BC 2TR.stl). It is
+    // re-seated onto the placeholder box's footprint [length, height, width]
+    // in scene axes, so everything on top of it — the recorded track
+    // quaternions, forklift forks, pallet stacks — keeps working. The box
+    // stays in place until (or unless) the STL is ready.
+    let blockGeo: THREE.BufferGeometry = blockBoxGeo;
+    let blockStlGeo: THREE.BufferGeometry | null = null;
+    new STLLoader().load(BLOCK_URL, (stlGeo) => {
+      if (disposed) {
+        stlGeo.dispose();
+        return;
+      }
+      stlGeo.computeBoundingBox();
+      const raw = new THREE.Vector3().subVectors(stlGeo.boundingBox!.max, stlGeo.boundingBox!.min);
+      // Raw STL (Blender axes): length on z, height on y, width on x;
+      // rotate the length onto scene x and sit it right side up (the 4
+      // pocket holes on top), then stretch each axis to BLOCK_SIZE.
+      stlGeo.center();
+      stlGeo.rotateY(Math.PI / 2);
+      stlGeo.rotateX(Math.PI);
+      stlGeo.scale(BLOCK_SIZE[0] / raw.z, BLOCK_SIZE[1] / raw.y, BLOCK_SIZE[2] / raw.x);
+      blockStlGeo = stlGeo;
+      blockGeo = stlGeo;
+      for (const m of meshes.values()) m.geometry = stlGeo;
+    });
     const meshes = new Map<number, THREE.Mesh>();
 
     applyTheme.current = (t) => {
@@ -505,7 +535,8 @@ export default function FinishingLine3D({ counts, running, theme, onSelectStatio
         const mat = (obj as THREE.Mesh).material;
         if (mat) (Array.isArray(mat) ? mat : [mat]).forEach((m) => m.dispose());
       });
-      blockGeo.dispose();
+      blockBoxGeo.dispose();
+      blockStlGeo?.dispose();
       Object.values(blockMats).forEach((m) => m.dispose());
       renderer.dispose();
       callouts.dispose();

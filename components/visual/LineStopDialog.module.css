@@ -24,7 +24,7 @@
   color: var(--text-primary);
 }
 
-.head { display: flex; align-items: baseline; gap: 10px; }
+.head { flex: none; display: flex; align-items: baseline; gap: 10px; }
 .title { margin: 0; flex: 1; font-size: 18px; }
 
 /* how many stops in 30 days: neutral / orange (3+) / red (10+) */
@@ -39,7 +39,7 @@
 .level[data-level='orange'] { background: #f59e0b; border-color: #f59e0b; color: #fff; }
 .level[data-level='red'] { background: #dc2626; border-color: #dc2626; color: #fff; }
 
-.filter { display: flex; align-items: center; gap: 6px; }
+.filter { flex: none; display: flex; align-items: center; gap: 6px; }
 .filter button {
   padding: 3px 10px;
   border: 1px solid var(--border-color);
@@ -59,6 +59,7 @@
   display: flex;
   align-items: stretch;
   gap: 2px;
+  flex: none;
   height: 130px;
   padding: 14px 0 0 18px;
   border-bottom: 1px solid var(--border-color);
@@ -88,6 +89,7 @@
   list-style: none;
   display: grid;
   gap: 8px;
+  min-height: 80px;
   overflow: auto;
 }
 

@@ -338,13 +338,15 @@ export default function FinishingLine3D({
     const HALO = { orange: 0xf59e0b, red: 0xdc2626 } as const;
     const halos = STATIONS.filter((s) => WORKFLOW_CARDS.some((c) => c.id === s.id)).map((s) => {
       const group = new THREE.Group();
-      const mats = [0.55, 0.16].map((opacity) => new THREE.MeshBasicMaterial({
-        color: HALO.orange, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false,
+      // the ring ignores depth so the machine's frame can't hide it; the column is a faint glow
+      const mats = [0.85, 0.22].map((opacity, i) => new THREE.MeshBasicMaterial({
+        color: HALO.orange, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, depthTest: i === 1,
       }));
-      const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.45, 48), mats[0]);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.3, 48), mats[0]);
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.05;
-      const column = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, 2.4, 48, 1, true), mats[1]);
+      ring.renderOrder = 10;
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 2.4, 48, 1, true), mats[1]);
       column.position.y = 1.2;
       group.add(ring, column);
       group.position.set(s.pos[0], 0, s.pos[1]);

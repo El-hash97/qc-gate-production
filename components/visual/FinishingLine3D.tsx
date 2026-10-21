@@ -333,27 +333,9 @@ export default function FinishingLine3D({
     // workflow boards on the empty floor east of the line, Baritori end to Line Repair
     const boards = createWorkflowBoards(WORKFLOW_CARDS, 15.5, -3, 3.1);
     scene.add(boards.group);
-    // A floor ring and a faint column around every machine with 3+ (orange) or
-    // 10+ (red) line stops in the last 30 days; shown/coloured each frame.
+    // Machines with 3+ (orange) or 10+ (red) line stops in the last 30 days get
+    // their body tinted (see `machines` below).
     const HALO = { orange: 0xf59e0b, red: 0xdc2626 } as const;
-    const halos = STATIONS.filter((s) => WORKFLOW_CARDS.some((c) => c.id === s.id)).map((s) => {
-      const group = new THREE.Group();
-      // the ring ignores depth so the machine's frame can't hide it; the column is a faint glow
-      const mats = [0.85, 0.22].map((opacity, i) => new THREE.MeshBasicMaterial({
-        color: HALO.orange, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, depthTest: i === 1,
-      }));
-      const ring = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.3, 48), mats[0]);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.05;
-      ring.renderOrder = 10;
-      const column = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 2.4, 48, 1, true), mats[1]);
-      column.position.y = 1.2;
-      group.add(ring, column);
-      group.position.set(s.pos[0], 0, s.pos[1]);
-      group.visible = false;
-      scene.add(group);
-      return { id: s.id, group, mats };
-    });
     // click (not drag) on a board that carries a line stop opens the details;
     // the pointer shows it is clickable
     const ray = new THREE.Raycaster();
@@ -603,11 +585,6 @@ export default function FinishingLine3D({
         boardTheme,
         (card) => stopLevel(counts30[card.id] ?? 0),
       );
-      for (const h of halos) {
-        const level = stopLevel(counts30[h.id] ?? 0);
-        h.group.visible = level !== 'ok';
-        if (level !== 'ok') h.mats.forEach((m) => m.color.setHex(HALO[level]));
-      }
       for (const mc of machines) {
         const level = stopLevel(counts30[mc.id] ?? 0);
         if (tinted.get(mc.id) === level) continue;

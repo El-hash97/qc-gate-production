@@ -19,7 +19,7 @@ STATIONS = {
     'spray': (-5, -295), 'junbiki': (-89, -295), 'lineRepair': (164, -391),
 }
 RADIUS = 22     # a piece belongs to the nearest station within this distance (Blender units)
-MAX_SIZE = 40   # larger pieces (floor, fences, walls, long conveyors) stay in Layout
+MAX_SIZE = 65   # larger pieces (floor, fences, walls, long conveyors) stay in Layout
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)

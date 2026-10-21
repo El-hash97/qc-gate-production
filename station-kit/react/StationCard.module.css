@@ -67,6 +67,21 @@
   border: 0;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  height: min(calc(62vh / var(--ui-zoom, 1)), 640px);
+  background: #000;
+  object-fit: contain;
+}
+
 .play {
   align-self: center;
   padding: 8px 18px;

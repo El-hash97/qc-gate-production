@@ -14,6 +14,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/baritori-light.svg', dark: '/stations/baritori-dark.svg' },
     live: '/stations/baritori-live.html',
     play: '/stations/baritori-3d.html',
+    video: '/videos/baritori.mp4',
     description: [
       'The raw block stands on a cradle on the carriage at the mouth of the deburring booth, and the carriage runs it in through the timber portal before the lift door drops behind it.',
       'Inside, an air chisel on a gantry slide chips the casting flash off the parting line one face at a time, and the turntable turns the block a quarter turn between faces.',
@@ -32,6 +33,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/hsb05-light.svg', dark: '/stations/hsb05-dark.svg' },
     live: '/stations/hsb05-live.html',
     play: '/stations/hsb05-3d.html',
+    video: '/videos/hsb05.mp4',
     description: [
       'The monorail hoist picks the cast block off the in conveyor on a C-hook hanger and carries it through the left door into the octagonal blast chamber.',
       'With both doors shut, turbine wheels throw steel shot at the turning block to strip sand, scale and burrs from every face, while the dust collector draws the spent media out through the roof duct.',
@@ -50,6 +52,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/hsb06-light.svg', dark: '/stations/hsb06-dark.svg' },
     live: '/stations/hsb06-live.html',
     play: '/stations/hsb06-3d.html',
+    video: '/videos/hsb06.mp4',
     description: [
       'The operator steers a pillar jib manipulator that takes the block from the loading stand in through the left door and sets it on the rotary table.',
       'With both lift doors down, the table carries the block the long way round, past two blast wheels that throw steel shot into the pockets and core holes the first machine could not reach.',

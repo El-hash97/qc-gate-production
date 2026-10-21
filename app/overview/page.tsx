@@ -4,11 +4,13 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useLineStopHistory } from '@/hooks/useLineStopHistory';
+import { useBlocksProduced } from '@/hooks/useBlocksProduced';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
-import { getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
+import { getGrandTotal, getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import { isRunning, type Counts, type StationId } from '@/utils/finishingFlow';
 import { stationDetail } from '@/utils/stationDetails';
+import { withBlockCount } from '@/utils/blockCount';
 import { StationCard } from '@/station-kit/react/StationCard';
 import { LineStopDialog } from '@/components/visual/LineStopDialog';
 import { VisualPanels, usePanelModes } from '@/components/visual/VisualPanels';
@@ -28,7 +30,6 @@ export default function OverviewPage() {
   const { theme } = useTheme();
   const [open, setOpen] = useState<StationId | null>(null);
   const [stopsAt, setStopsAt] = useState<StationId | null>(null);
-  const detail = open ? stationDetail(open) : null;
   const [busy, setBusy] = useState<boolean[]>([]);
   // Guests read the same view, without the display settings.
   const { authed } = useAuth();
@@ -55,6 +56,12 @@ export default function OverviewPage() {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
     if (stationDetail(id)) setOpen(id);
   };
+
+  // Baritori's card shows the blocks produced: archived shifts + the one running now
+  const { data: archivedBlocks } = useBlocksProduced();
+  const liveBlocks = state ? getGrandTotal(state, 'bc') : 0;
+  const base = open ? stationDetail(open) : null;
+  const detail = base && open === 'baritori' && archivedBlocks !== undefined ? withBlockCount(base, archivedBlocks + liveBlocks) : base;
 
   const counts: Counts = state
     ? { ok: getOkTotal(state, 'bc'), repair: getRepairTotal(state, 'bc'), ng: getNgTotal(state, 'bc') }

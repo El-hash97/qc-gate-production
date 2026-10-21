@@ -160,6 +160,22 @@
   color: var(--text-secondary, #59616f);
 }
 
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 4px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary, #1f2430);
+}
+
+.notice[data-level='danger'] {
+  border-left-color: #dc2626;
+  background: rgba(220, 38, 38, 0.14);
+}
+
 .specs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

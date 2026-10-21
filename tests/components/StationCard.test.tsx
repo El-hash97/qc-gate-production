@@ -141,4 +141,9 @@ describe('StationCard', () => {
     render(<StationCard detail={{ ...hsb05, play: undefined }} theme="light" onClose={() => {}} />);
     expect(screen.queryByRole('button', { name: /play/i })).toBeNull();
   });
+
+  it('shows a notice under the description when the station has one', () => {
+    render(<StationCard detail={{ ...hsb05, notice: { level: 'warn', text: 'Nearing the limit' } }} theme="light" onClose={() => {}} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Nearing the limit');
+  });
 });

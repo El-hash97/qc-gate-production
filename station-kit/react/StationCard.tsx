@@ -16,6 +16,8 @@ export interface StationDetail {
   // interactive 3D machine page (station-kit/machine), opened by Play
   play?: string;
   description: string[];
+  // highlighted line under the description, e.g. a count that is nearing its limit
+  notice?: { level: 'warn' | 'danger'; text: string };
   specs: { label: string; value: string }[];
 }
 
@@ -77,6 +79,9 @@ export function StationCard({ detail, theme, onClose }: Props) {
           {detail.description.map((para) => (
             <p key={para} className={styles.para}>{para}</p>
           ))}
+          {detail.notice && (
+            <p className={styles.notice} data-level={detail.notice.level} role="alert">{detail.notice.text}</p>
+          )}
           <dl className={styles.specs}>
             {detail.specs.map((spec) => (
               <div key={spec.label} className={styles.spec}>

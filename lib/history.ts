@@ -158,3 +158,12 @@ export async function restoreHistoryToCurrent(id: number): Promise<ProductionSta
   if (!fresh) throw new Error('production_state row missing after restore');
   return fresh;
 }
+
+// Blocks (BC 1TR + BC 2TR: OK + repair + NG) of every archived shift, summed
+// in SQL so it counts the whole history rather than a page of it.
+export async function getBlocksProduced(): Promise<number> {
+  const rows = (await sql`
+    SELECT COALESCE(SUM(ok1 + repair1 + ng1 + ok2 + repair2 + ng2), 0)::int AS total FROM history
+  `) as { total: number }[];
+  return rows[0]?.total ?? 0;
+}

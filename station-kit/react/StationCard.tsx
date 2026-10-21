@@ -16,8 +16,8 @@ export interface StationDetail {
   // interactive 3D machine page (station-kit/machine), opened by Play
   play?: string;
   description: string[];
-  // highlighted line under the description, e.g. a count that is nearing its limit
-  notice?: { level: 'warn' | 'danger'; text: string };
+  // running count shown as a bar above the specs: turns amber at `warnAt` and red at `max`
+  meter?: { label: string; value: number; max: number; warnAt: number; unit: string };
   specs: { label: string; value: string }[];
 }
 
@@ -25,6 +25,28 @@ interface Props {
   detail: StationDetail;
   theme: Theme;
   onClose: () => void;
+}
+
+function Meter({ label, value, max, warnAt, unit }: NonNullable<StationDetail['meter']>) {
+  const level = value >= max ? 'danger' : value >= warnAt ? 'warn' : 'ok';
+  const n = (v: number) => v.toLocaleString('en-US');
+  return (
+    <div className={styles.meter} data-level={level}>
+      <div className={styles.meterHead}>
+        <span>{label}</span>
+        <b>{n(value)} / {n(max)} {unit}</b>
+      </div>
+      <div className={styles.meterTrack} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}>
+        <div className={styles.meterFill} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+        <i className={styles.meterTick} style={{ left: `${(warnAt / max) * 100}%` }} />
+      </div>
+      {level !== 'ok' && (
+        <div className={styles.meterNote}>
+          {level === 'warn' ? `${n(max - value)} ${unit} to the limit — a part may be damaged, inspect it` : 'Over the limit — inspect for a worn or broken part'}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Detail card for one station: its isometric figure (or, after Play, its 3D machine)
@@ -79,9 +101,7 @@ export function StationCard({ detail, theme, onClose }: Props) {
           {detail.description.map((para) => (
             <p key={para} className={styles.para}>{para}</p>
           ))}
-          {detail.notice && (
-            <p className={styles.notice} data-level={detail.notice.level} role="alert">{detail.notice.text}</p>
-          )}
+          {detail.meter && <Meter {...detail.meter} />}
           <dl className={styles.specs}>
             {detail.specs.map((spec) => (
               <div key={spec.label} className={styles.spec}>

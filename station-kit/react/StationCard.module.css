@@ -160,20 +160,56 @@
   color: var(--text-secondary, #59616f);
 }
 
-.notice {
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border-left: 4px solid #f59e0b;
-  background: rgba(245, 158, 11, 0.14);
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--text-primary, #1f2430);
+.meter {
+  --meter: #16a34a;
+  display: grid;
+  gap: 6px;
 }
 
-.notice[data-level='danger'] {
-  border-left-color: #dc2626;
-  background: rgba(220, 38, 38, 0.14);
+.meter[data-level='warn'] { --meter: #f59e0b; }
+.meter[data-level='danger'] { --meter: #dc2626; }
+
+.meterHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary, #59616f);
+}
+
+.meterHead b {
+  color: var(--text-primary, #1f2430);
+  font-variant-numeric: tabular-nums;
+}
+
+.meterTrack {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(127, 127, 127, 0.22);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 7px;
+  background: var(--meter);
+  transition: width 0.6s ease;
+}
+
+/* the warning point */
+.meterTick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.meterNote {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--meter);
 }
 
 .specs {

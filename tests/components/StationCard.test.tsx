@@ -142,8 +142,26 @@ describe('StationCard', () => {
     expect(screen.queryByRole('button', { name: /play/i })).toBeNull();
   });
 
-  it('shows a notice under the description when the station has one', () => {
-    render(<StationCard detail={{ ...hsb05, notice: { level: 'warn', text: 'Nearing the limit' } }} theme="light" onClose={() => {}} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Nearing the limit');
+  describe('meter', () => {
+    const meter = (value: number) => ({ ...hsb05, meter: { label: 'Blocks produced', value, max: 32400, warnAt: 32000, unit: 'pcs' } });
+    const level = () => screen.getByRole('meter').closest('[data-level]')!.getAttribute('data-level');
+
+    it('shows the count against the limit as a bar, with no note while it is fine', () => {
+      render(<StationCard detail={meter(12000)} theme="light" onClose={() => {}} />);
+      expect(screen.getByText('12,000 / 32,400 pcs')).toBeInTheDocument();
+      expect(screen.getByRole('meter')).toHaveAttribute('aria-valuenow', '12000');
+      expect(level()).toBe('ok');
+      expect(screen.queryByText(/inspect/i)).not.toBeInTheDocument();
+    });
+
+    it('turns amber from the warning point and red at the limit', () => {
+      const { unmount } = render(<StationCard detail={meter(32000)} theme="light" onClose={() => {}} />);
+      expect(level()).toBe('warn');
+      expect(screen.getByText(/400 pcs to the limit/)).toBeInTheDocument();
+      unmount();
+      render(<StationCard detail={meter(33000)} theme="light" onClose={() => {}} />);
+      expect(level()).toBe('danger');
+      expect(screen.getByText(/Over the limit/)).toBeInTheDocument();
+    });
   });
 });

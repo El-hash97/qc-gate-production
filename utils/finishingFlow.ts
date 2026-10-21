@@ -28,6 +28,8 @@ export interface Station {
 
 // GLB placement: Blender units are 10 cm, its floor sits at z = -5.6.
 export const MODEL_URL = '/models/finishing-line.glb';
+// Same plant with `Layout` cut into one node per machine (MC_<station>) by scripts/split-layout.py
+export const MODEL_SPLIT_URL = '/models/finishing-line-split.glb';
 export const MODEL_SCALE = 0.1;
 export const MODEL_LIFT = 0.56;
 

@@ -7,7 +7,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import {
-  BLOCK_SIZE, BLOCK_URL, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
+  BLOCK_SIZE, BLOCK_URL, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_SPLIT_URL, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
   ANIM_FPS, SEGMENTS, stationHold, type Counts, type StationId,
 } from '@/utils/finishingFlow';
 import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
@@ -387,10 +387,42 @@ export default function FinishingLine3D({
     // Clips owned by a station segment move with that station's block.
     let stations: ReturnType<typeof createStationAnim>[] = [];
     const draco = new DRACOLoader().setDecoderPath('/draco/');
+    // Per-machine copies of the plant geometry; each machine's materials are its own so one can be tinted.
+    const machines: { id: string; mats: { m: THREE.MeshStandardMaterial; color: THREE.Color; emissive: THREE.Color }[] }[] = [];
+    const tinted = new Map<string, string>();
+    // the animated model's flat `Layout` gives way once the split plant is in
+    let animated: THREE.Object3D | null = null;
+    const hideFlat = () => {
+      const flat = machines.length ? animated?.getObjectByName('Layout') : null;
+      if (flat) flat.visible = false;
+    };
+    new GLTFLoader().setDRACOLoader(draco).load(MODEL_SPLIT_URL, (gltf) => {
+      if (disposed) return;
+      gltf.scene.scale.setScalar(MODEL_SCALE);
+      gltf.scene.position.y = MODEL_LIFT;
+      gltf.scene.traverse((obj) => {
+        const id = obj.name.startsWith('MC_') ? obj.name.slice(3) : null;
+        if (!id) return;
+        const mats: (typeof machines)[number]['mats'] = [];
+        obj.traverse((o) => {
+          if (!(o instanceof THREE.Mesh)) return;
+          o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((m: THREE.MeshStandardMaterial) => {
+            const c = m.clone();
+            mats.push({ m: c, color: c.color.clone(), emissive: c.emissive.clone() });
+            return c;
+          });
+        });
+        machines.push({ id, mats });
+      });
+      scene.add(gltf.scene);
+      hideFlat();
+    });
     new GLTFLoader().setDRACOLoader(draco).load(MODEL_URL, (gltf) => {
       if (disposed) return;
       gltf.scene.scale.setScalar(MODEL_SCALE);
       gltf.scene.position.y = MODEL_LIFT;
+      animated = gltf.scene;
+      hideFlat();
       // skinned operators move outside their bind-pose bounds
       gltf.scene.traverse((obj) => {
         if (obj instanceof THREE.SkinnedMesh) obj.frustumCulled = false;
@@ -573,6 +605,20 @@ export default function FinishingLine3D({
         const level = stopLevel(counts30[h.id] ?? 0);
         h.group.visible = level !== 'ok';
         if (level !== 'ok') h.mats.forEach((m) => m.color.setHex(HALO[level]));
+      }
+      for (const mc of machines) {
+        const level = stopLevel(counts30[mc.id] ?? 0);
+        if (tinted.get(mc.id) === level) continue;
+        tinted.set(mc.id, level);
+        const tint = new THREE.Color(level === 'ok' ? 0 : HALO[level]);
+        for (const t of mc.mats) {
+          t.m.color.copy(t.color);
+          t.m.emissive.copy(t.emissive);
+          if (level !== 'ok') {
+            t.m.color.lerp(tint, 0.7);
+            t.m.emissive.copy(tint).multiplyScalar(0.25);
+          }
+        }
       }
       const busyKey = busy.join();
       if (busyKey !== lastBusy) {

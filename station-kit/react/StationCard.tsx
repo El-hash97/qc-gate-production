@@ -15,6 +15,8 @@ export interface StationDetail {
   live?: string;
   // interactive 3D machine page (station-kit/machine), opened by Play
   play?: string;
+  // real-footage mp4 (served from /public/videos), played in place of the figure by the Play video button
+  video?: string;
   description: string[];
   // running count shown as a bar above the specs: turns amber at `warnAt` and red at `max`
   meter?: { label: string; value: number; max: number; warnAt: number; unit: string; onReset?: () => void };
@@ -53,7 +55,9 @@ function Meter({ label, value, max, warnAt, unit, onReset }: NonNullable<Station
 // Detail card for one station: its isometric figure (or, after Play, its 3D machine)
 // beside the process description. Renders as an overlay filling its positioned parent.
 export function StationCard({ detail, theme, onClose }: Props) {
-  const [playing, setPlaying] = useState(false);
+  // what fills the figure area: the picture, the 3D machine or the real video
+  const [mode, setMode] = useState<'picture' | '3d' | 'video'>('picture');
+  const toggle = (m: '3d' | 'video') => setMode((cur) => (cur === m ? 'picture' : m));
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -66,7 +70,7 @@ export function StationCard({ detail, theme, onClose }: Props) {
     <div className={styles.backdrop} data-testid="station-card-backdrop" onClick={onClose}>
       <div
         className={styles.card}
-        data-playing={playing || undefined}
+        data-playing={mode !== 'picture' || undefined}
         role="dialog"
         aria-modal="true"
         aria-label={`${detail.title} ${detail.subtitle}`}
@@ -74,7 +78,10 @@ export function StationCard({ detail, theme, onClose }: Props) {
       >
         <div className={styles.media}>
           <div className={styles.figure} data-theme={theme}>
-            {playing && detail.play ? (
+            {mode === 'video' && detail.video ? (
+              // preload none: the file is fetched only once Play video is pressed
+              <video className={styles.video} src={detail.video} controls autoPlay playsInline preload="none" title={`${detail.title} video`} />
+            ) : mode === '3d' && detail.play ? (
               <iframe className={styles.machine} src={detail.play} title={`${detail.title} 3D`} allow="fullscreen" />
             ) : detail.live ? (
               <iframe className={styles.live} src={`${detail.live}?theme=${theme}`} title={`${detail.title} ${detail.subtitle} cycle`} />
@@ -83,10 +90,19 @@ export function StationCard({ detail, theme, onClose }: Props) {
               <img src={detail.image[theme]} alt={`${detail.title} ${detail.subtitle}`} />
             )}
           </div>
-          {detail.play && (
-            <button type="button" className={styles.play} onClick={() => setPlaying((p) => !p)}>
-              {playing ? '◼ Back to picture' : '▶ Play 3D'}
-            </button>
+          {(detail.play || detail.video) && (
+            <div className={styles.actions}>
+              {detail.play && (
+                <button type="button" className={styles.play} onClick={() => toggle('3d')}>
+                  {mode === '3d' ? '◼ Back to picture' : '▶ Play 3D'}
+                </button>
+              )}
+              {detail.video && (
+                <button type="button" className={styles.play} onClick={() => toggle('video')}>
+                  {mode === 'video' ? '◼ Back to picture' : '▶ Play video'}
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className={styles.text}>

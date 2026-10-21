@@ -174,4 +174,40 @@ describe('StationCard', () => {
       expect(screen.getByText(/Over the limit/)).toBeInTheDocument();
     });
   });
+
+  describe('Play video', () => {
+    const withVideo = { ...hsb05, video: '/videos/hsb05.mp4' };
+
+    it('has no video button for a station without a video', () => {
+      render(<StationCard detail={hsb05} theme="light" onClose={() => {}} />);
+      expect(screen.queryByRole('button', { name: /Play video/ })).not.toBeInTheDocument();
+    });
+
+    it('sits beside Play 3D and plays the video in place of the figure, fetched only on press', () => {
+      const { container } = render(<StationCard detail={withVideo} theme="light" onClose={() => {}} />);
+      expect(screen.getByRole('button', { name: /Play 3D/ })).toBeInTheDocument();
+      expect(container.querySelector('video')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /Play video/ }));
+      const video = container.querySelector('video')!;
+      expect(video).toHaveAttribute('src', '/videos/hsb05.mp4');
+      expect(video).toHaveAttribute('preload', 'none');
+      expect(video.autoplay).toBe(true);
+      expect(video.controls).toBe(true);
+      expect(video.loop).toBe(false);
+      expect(screen.queryByTitle(/cycle/)).not.toBeInTheDocument();
+    });
+
+    it('goes back to the picture, and swaps with the 3D machine', () => {
+      const { container } = render(<StationCard detail={withVideo} theme="light" onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: /Play video/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Play 3D/ }));
+      expect(container.querySelector('video')).toBeNull();
+      expect(screen.getByTitle(/HSB05 3D/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Play video/ }));
+      expect(screen.queryByTitle(/HSB05 3D/)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Back to picture/ }));
+      expect(container.querySelector('video')).toBeNull();
+      expect(screen.getByTitle(/cycle/)).toBeInTheDocument();
+    });
+  });
 });

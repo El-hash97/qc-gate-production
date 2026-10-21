@@ -32,7 +32,10 @@ const PLINTH: Record<Theme, number> = { dark: 0x262a38, light: 0x9ca3af };
 
 // The building around the layout (metres, scene axes). The floor fills it; the
 // camera stays inside it. The truck gate is in the west wall, in line with the dock.
-const ROOM = { x0: -19, x1: 21, z0: -6, z1: 44, h: 12, t: 0.3 };
+// h = wall height: kept low (half the 12 m hall) so the line shows over them.
+const ROOM = { x0: -19, x1: 21, z0: -6, z1: 44, h: 6, t: 0.3 };
+// Camera start/fly height, independent of the (low) walls.
+const CAM_Y = 11.5;
 const GATE = { z: TRUCK_DOCK[1], w: 4.4, h: 4.6 };
 
 // Four walls with a concrete plinth, and a truck gate (steel frame, rolled-up
@@ -295,7 +298,7 @@ export default function FinishingLine3D({
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
     // Looks down the line from the Baritori end, like the reference video,
     // from high in the building's corner.
-    camera.position.set(-17, ROOM.h - 0.5, 2);
+    camera.position.set(-17, CAM_Y, 2);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(-1, 0, 17);
     controls.enableDamping = true;
@@ -307,7 +310,7 @@ export default function FinishingLine3D({
     // roof, so the camera itself may rise above the walls and zoom out past
     // them — but outside the walls only from above (see the frame loop).
     const roomMin = new THREE.Vector3(ROOM.x0 + 0.6, 1, ROOM.z0 + 0.6);
-    const roomMax = new THREE.Vector3(ROOM.x1 - 0.6, ROOM.h - 0.5, ROOM.z1 - 0.6);
+    const roomMax = new THREE.Vector3(ROOM.x1 - 0.6, CAM_Y, ROOM.z1 - 0.6);
     // Camera flight to a station: same viewing direction, 12 m out; grabbing
     // the camera cancels it.
     let fly: { target: THREE.Vector3; pos: THREE.Vector3 } | null = null;

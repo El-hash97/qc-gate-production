@@ -406,11 +406,13 @@ export default function FinishingLine3D({
         const mats: (typeof machines)[number]['mats'] = [];
         obj.traverse((o) => {
           if (!(o instanceof THREE.Mesh)) return;
-          o.material = (Array.isArray(o.material) ? o.material : [o.material]).map((m: THREE.MeshStandardMaterial) => {
+          // keep the material's shape: a lone material must not become an array (no draw groups)
+          const own = (m: THREE.MeshStandardMaterial) => {
             const c = m.clone();
             mats.push({ m: c, color: c.color.clone(), emissive: c.emissive.clone() });
             return c;
-          });
+          };
+          o.material = Array.isArray(o.material) ? o.material.map(own) : own(o.material);
         });
         machines.push({ id, mats });
       });

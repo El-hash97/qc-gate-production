@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
 import { useLineStopHistory } from '@/hooks/useLineStopHistory';
-import { useBlocksProduced } from '@/hooks/useBlocksProduced';
+import { useBlocksProduced, useResetBlockCounter } from '@/hooks/useBlocksProduced';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { getGrandTotal, getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
@@ -57,11 +57,18 @@ export default function OverviewPage() {
     if (stationDetail(id)) setOpen(id);
   };
 
-  // Baritori's card shows the blocks produced: archived shifts + the one running now
-  const { data: archivedBlocks } = useBlocksProduced();
+  // Baritori's card counts the blocks produced since the last reset: archived
+  // shifts + the one running now. Logged-in users can reset it (new part fitted).
+  const { data: blockCounter } = useBlocksProduced();
+  const resetCounter = useResetBlockCounter();
   const liveBlocks = state ? getGrandTotal(state, 'bc') : 0;
   const base = open ? stationDetail(open) : null;
-  const detail = base && open === 'baritori' && archivedBlocks !== undefined ? withBlockCount(base, archivedBlocks + liveBlocks) : base;
+  const onResetBlocks = authed && !resetCounter.isPending
+    ? () => { if (window.confirm('Reset the block counter to 0? Do this after the worn part has been replaced.')) resetCounter.mutate(); }
+    : undefined;
+  const detail = base && open === 'baritori' && blockCounter
+    ? withBlockCount(base, Math.max(0, blockCounter.archived + liveBlocks - blockCounter.baseline), onResetBlocks)
+    : base;
 
   const counts: Counts = state
     ? { ok: getOkTotal(state, 'bc'), repair: getRepairTotal(state, 'bc'), ng: getNgTotal(state, 'bc') }

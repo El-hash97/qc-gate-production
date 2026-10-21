@@ -154,6 +154,16 @@ describe('StationCard', () => {
       expect(screen.queryByText(/inspect/i)).not.toBeInTheDocument();
     });
 
+    it('offers a Reset button only when it is given a handler', () => {
+      const onReset = vi.fn();
+      const { unmount } = render(<StationCard detail={meter(100)} theme="light" onClose={() => {}} />);
+      expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
+      unmount();
+      render(<StationCard detail={{ ...hsb05, meter: { ...meter(100).meter, onReset } }} theme="light" onClose={() => {}} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+      expect(onReset).toHaveBeenCalledTimes(1);
+    });
+
     it('turns amber from the warning point and red at the limit', () => {
       const { unmount } = render(<StationCard detail={meter(32000)} theme="light" onClose={() => {}} />);
       expect(level()).toBe('warn');

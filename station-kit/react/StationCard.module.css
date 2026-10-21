@@ -171,6 +171,7 @@
 
 .meterHead {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   font-size: 13px;
@@ -178,8 +179,24 @@
 }
 
 .meterHead b {
+  margin-left: auto;
   color: var(--text-primary, #1f2430);
   font-variant-numeric: tabular-nums;
+}
+
+.meterReset {
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary, #59616f);
+  cursor: pointer;
+}
+
+.meterReset:hover {
+  color: var(--text-primary, #1f2430);
 }
 
 .meterTrack {

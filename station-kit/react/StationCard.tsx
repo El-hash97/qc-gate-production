@@ -17,7 +17,7 @@ export interface StationDetail {
   play?: string;
   description: string[];
   // running count shown as a bar above the specs: turns amber at `warnAt` and red at `max`
-  meter?: { label: string; value: number; max: number; warnAt: number; unit: string };
+  meter?: { label: string; value: number; max: number; warnAt: number; unit: string; onReset?: () => void };
   specs: { label: string; value: string }[];
 }
 
@@ -27,7 +27,7 @@ interface Props {
   onClose: () => void;
 }
 
-function Meter({ label, value, max, warnAt, unit }: NonNullable<StationDetail['meter']>) {
+function Meter({ label, value, max, warnAt, unit, onReset }: NonNullable<StationDetail['meter']>) {
   const level = value >= max ? 'danger' : value >= warnAt ? 'warn' : 'ok';
   const n = (v: number) => v.toLocaleString('en-US');
   return (
@@ -35,6 +35,7 @@ function Meter({ label, value, max, warnAt, unit }: NonNullable<StationDetail['m
       <div className={styles.meterHead}>
         <span>{label}</span>
         <b>{n(value)} / {n(max)} {unit}</b>
+        {onReset && <button type="button" className={styles.meterReset} onClick={onReset}>Reset</button>}
       </div>
       <div className={styles.meterTrack} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}>
         <div className={styles.meterFill} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />

@@ -247,6 +247,14 @@ CREATE TABLE IF NOT EXISTS display_settings (
   saved_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Block count at which the Baritori block counter was last reset (the counter
+-- shows total produced minus this). See lib/blockCounter.ts.
+CREATE TABLE IF NOT EXISTS counter_baselines (
+  key       TEXT PRIMARY KEY,
+  value     INTEGER NOT NULL DEFAULT 0,
+  saved_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 INSERT INTO production_state (id, saved_at)
 VALUES (1, now())
 ON CONFLICT (id) DO NOTHING;

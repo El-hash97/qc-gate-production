@@ -301,9 +301,11 @@ export default function FinishingLine3D({
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2.2;
     controls.minDistance = 6;
-    controls.maxDistance = 40;
+    controls.maxDistance = 80;
     controls.update();
-    // The camera (and what it orbits) never leaves the building.
+    // What the camera orbits stays inside the building. The building has no
+    // roof, so the camera itself may rise above the walls and zoom out past
+    // them — but outside the walls only from above (see the frame loop).
     const roomMin = new THREE.Vector3(ROOM.x0 + 0.6, 1, ROOM.z0 + 0.6);
     const roomMax = new THREE.Vector3(ROOM.x1 - 0.6, ROOM.h - 0.5, ROOM.z1 - 0.6);
     // Camera flight to a station: same viewing direction, 12 m out; grabbing
@@ -614,7 +616,12 @@ export default function FinishingLine3D({
       controls.update();
       controls.target.x = THREE.MathUtils.clamp(controls.target.x, roomMin.x, roomMax.x);
       controls.target.z = THREE.MathUtils.clamp(controls.target.z, roomMin.z, roomMax.z);
-      camera.position.clamp(roomMin, roomMax);
+      // No roof: inside the walls' footprint the camera may go as high as it
+      // likes; outside it, it stays above the wall tops so it never looks
+      // through a wall from the side.
+      const p = camera.position;
+      const inside = p.x > roomMin.x && p.x < roomMax.x && p.z > roomMin.z && p.z < roomMax.z;
+      p.y = Math.max(p.y, inside ? roomMin.y : ROOM.h + 1);
       renderer.render(scene, camera);
       callouts.update(camera, sim, c, live.current.running, live.current.pins, ROOM.x0);
       nameTags.update(camera, live.current.labels, c, live.current.lineStop);

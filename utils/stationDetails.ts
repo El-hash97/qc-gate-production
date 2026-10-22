@@ -71,6 +71,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/grinding-light.svg', dark: '/stations/grinding-dark.svg' },
     live: '/stations/grinding-live.html',
     play: '/stations/grinding-3d.html',
+    video: '/videos/grinding.mp4',
     description: [
       'The operator brings the blasted block over from HSB06 on a hanging manipulator and into an open booth with a large grinding wheel on each side wall.',
       'The block is pressed against the right wheel and then the left, so the gate and riser stubs left by casting are ground flush and the block sits true on the machining fixtures.',

@@ -11,7 +11,7 @@ describe('StationCard', () => {
     expect(screen.getByRole('dialog', { name: /HSB05/ })).toBeInTheDocument();
     expect(screen.getByTitle(/HSB05 Hanger Shot Blast cycle/)).toHaveAttribute('src', '/stations/hsb05-live.html?theme=dark');
     expect(screen.getByText(/Hanger Shot Blast/)).toBeInTheDocument();
-    expect(screen.getByText(/monorail hoist picks the cast block/)).toBeInTheDocument();
+    expect(screen.getByText(/di-shot blast menggunakan steel ball/)).toBeInTheDocument();
     expect(screen.getByText('Cycle time')).toBeInTheDocument();
   });
 

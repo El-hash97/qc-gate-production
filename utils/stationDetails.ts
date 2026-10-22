@@ -6,7 +6,8 @@ export type { StationDetail };
 // Detail card content per station: an isometric figure (built by
 // station-kit/figure/stations/<id>.mjs, one SVG per theme), an optional 3D machine
 // (station-kit/machine/stations/<id>-3d.html) and a short description.
-// Placeholder copy for review; every station on the line and Line Repair have cards.
+// Descriptions come from public/KETERANGAN POST FINISHING.txt (Line Repair
+// is not in it and keeps its placeholder copy).
 export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   baritori: {
     title: 'Baritori',
@@ -16,9 +17,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/baritori-3d.html',
     video: '/videos/baritori.mp4',
     description: [
-      'The raw block stands on a cradle on the carriage at the mouth of the deburring booth, and the carriage runs it in through the timber portal before the lift door drops behind it.',
-      'Inside, an air chisel on a gantry slide chips the casting flash off the parting line one face at a time, and the turntable turns the block a quarter turn between faces.',
-      'The door lifts, the carriage brings the block back out, a kicker tips it over onto the roller conveyor, and it turns away along the line to HSB05.',
+      'Post yang berfungsi untuk cleaning sisa pasir block cylinder dari proses Barashi (Moulding), dengan cara digetarkan pada pressure tertentu.',
     ],
     specs: [
       { label: 'Cycle time', value: '12.5 s' },
@@ -35,9 +34,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/hsb05-3d.html',
     video: '/videos/hsb05.mp4',
     description: [
-      'The monorail hoist picks the cast block off the in conveyor on a C-hook hanger and carries it through the left door into the octagonal blast chamber.',
-      'With both doors shut, turbine wheels throw steel shot at the turning block to strip sand, scale and burrs from every face, while the dust collector draws the spent media out through the roof duct.',
-      'When the cycle ends the doors open, the hoist carries the block out through the right door onto the out conveyor to HSB06, and comes back empty for the next one.',
+      'Post yang berfungsi untuk cleaning sisa pasir dari proses Baritori dengan cara di-shot blast menggunakan steel ball.',
     ],
     specs: [
       { label: 'Cycle time', value: '10.4 s' },
@@ -54,9 +51,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/hsb06-3d.html',
     video: '/videos/hsb06.mp4',
     description: [
-      'The operator steers a pillar jib manipulator that takes the block from the loading stand in through the left door and sets it on the rotary table.',
-      'With both lift doors down, the table carries the block the long way round, past two blast wheels that throw steel shot into the pockets and core holes the first machine could not reach.',
-      'At the right door the manipulator lifts the block out onto the output stand, on its way to Grinding.',
+      'Post yang berfungsi untuk cleaning sisa pasir dari proses Baritori dengan cara di-shot blast menggunakan steel ball.',
     ],
     specs: [
       { label: 'Cycle time', value: '5.2 s' },
@@ -73,9 +68,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/grinding-3d.html',
     video: '/videos/grinding.mp4',
     description: [
-      'The operator brings the blasted block over from HSB06 on a hanging manipulator and into an open booth with a large grinding wheel on each side wall.',
-      'The block is pressed against the right wheel and then the left, so the gate and riser stubs left by casting are ground flush and the block sits true on the machining fixtures.',
-      'A wooden screen and a mesh guard keep the sparks in the booth, and the block goes on to Hanten MC.',
+      'Post yang berfungsi untuk menggerinda sisa bari dari proses Baritori dengan sistem auto.',
     ],
     specs: [
       { label: 'Cycle time', value: '5.2 s' },
@@ -91,9 +84,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     live: '/stations/hanten-live.html',
     play: '/stations/hanten-3d.html',
     description: [
-      'The block rolls in deck down under a mesh guard and stops inside a cage of two big rings that ride on support rollers.',
-      'A clamp bar comes down on it and a geared motor turns the cage 180° about the line axis, so the deck face comes up for finishing; a holding brake keeps it there while the clamp lifts.',
-      'The block rolls out deck up on the conveyor towards Final Process, and the empty cage turns back for the next one.',
+      'Post yang berfungsi untuk mengeluarkan sisa steel ball yang masuk dari proses HSB dengan cara diputar 180 derajat sebanyak 3x.',
     ],
     specs: [
       { label: 'Turn', value: '180° in about 1.6 s' },
@@ -110,9 +101,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/final-3d.html',
     video: '/videos/final-proses.mp4',
     description: [
-      'The block stops in a cage in the line, inside an open booth with a light on the back wall and a hose rail overhead.',
-      'The operator touches up edges with the tools from the green rack, then turns the block a quarter at a time with the red index lever and blows every face with an air gun, so no loose shot rides on to machining.',
-      'The loose shot drops through the grating into the tray, and the clean block rolls on to QC Gate 1.',
+      'Post yang berfungsi untuk cleaning bari area Cope dan Oilpan, juga melakukan cek keseluruhan sebelum masuk ke Quality Gate.',
     ],
     specs: [
       { label: 'Air', value: '6 bar, Ø2.5 mm nozzle' },
@@ -129,9 +118,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/qc1-3d.html',
     video: '/videos/qc-gate1.mp4',
     description: [
-      'The block stops on a turntable between two portal frames, under an LED light bar, and is turned a quarter at a time so every outside face comes round to the inspector.',
-      'Each face is compared with the limit samples on the side table for cracks and porosity, under a task lamp that keeps at least 1,000 lux on the surface being judged.',
-      'Checked blocks roll on to QC Gate 2 for the final judgement.',
+      'Post yang berfungsi melakukan pengecekan surface luar (Front, Drag, Rear, Cope).',
     ],
     specs: [
       { label: 'Light on the face', value: '≥ 1,000 lux' },
@@ -148,9 +135,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/qc2-3d.html',
     video: '/videos/qc-gate2.mp4',
     description: [
-      'Each block turns once in a cage in the line for its last look, and the inspector gives it one of three judgements, recorded in this QC Gate app.',
-      'OK blocks run straight on to the Spray Booth; a pusher sends Repair blocks onto a side transfer towards Line Repair, and NG blocks are tipped into the NG box. An andon stack shows each verdict.',
-      'The share judged OK is the shift\'s first-pass yield, the number the dashboard tracks.',
+      'Post yang berfungsi untuk melakukan pengecekan area dalam (Headment, lubang bore, Oilpan) dan memastikan produk bebas dari defect untuk dikirim ke next proses (final judgement).',
     ],
     specs: [
       { label: 'Judgements', value: 'OK / Repair / NG' },
@@ -166,9 +151,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     play: '/stations/spray-3d.html',
     video: '/videos/spray-booth.mp4',
     description: [
-      'The OK block comes in from QC Gate 2, turns the corner inside the booth and stops under the spray portal.',
-      'Five nozzles fed by the pump mist rust-preventive oil onto the top, both long sides and both ends, so the bare machined iron leaves with a thin film on every face; the overspray drips back into the oil tank under the rollers.',
-      'The oiled block rolls out through the side of the booth to Junbiki.',
+      'Post yang berfungsi untuk melakukan pengecatan terhadap block cylinder yang berguna untuk mencegah area surface block cylinder terkena karat.',
     ],
     specs: [
       { label: 'Nozzles', value: '5, 12 mL/min each' },
@@ -183,9 +166,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/junbiki-light.svg', dark: '/stations/junbiki-dark.svg' },
     play: '/stations/junbiki-3d.html',
     description: [
-      'The oiled block comes in from the Spray Booth alongside a three-level gravity flow rack and runs onto the carriage of a traversing lift.',
-      'The lift travels along the rack front to the lane of the block\'s delivery lot, raises it to the top level and runs it in. The lane falls gently, so the block rolls on its own past braking rollers to the back of the queue.',
-      'When a lot is complete it goes out from the far end of the lane onto the truck.',
+      'Post yang berfungsi untuk melakukan delivery hasil block cylinder yang "OK" ke dalam Junbiki (store PPC) untuk siap kirim ke next proses (Machining Sunter 1).',
     ],
     specs: [
       { label: 'Rack', value: '3 levels, lanes 5.9 m' },

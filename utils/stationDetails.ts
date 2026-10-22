@@ -108,6 +108,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/final-light.svg', dark: '/stations/final-dark.svg' },
     live: '/stations/final-live.html',
     play: '/stations/final-3d.html',
+    video: '/videos/final-proses.mp4',
     description: [
       'The block stops in a cage in the line, inside an open booth with a light on the back wall and a hose rail overhead.',
       'The operator touches up edges with the tools from the green rack, then turns the block a quarter at a time with the red index lever and blows every face with an air gun, so no loose shot rides on to machining.',
@@ -126,6 +127,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/qc1-light.svg', dark: '/stations/qc1-dark.svg' },
     live: '/stations/qc1-live.html',
     play: '/stations/qc1-3d.html',
+    video: '/videos/qc-gate1.mp4',
     description: [
       'The block stops on a turntable between two portal frames, under an LED light bar, and is turned a quarter at a time so every outside face comes round to the inspector.',
       'Each face is compared with the limit samples on the side table for cracks and porosity, under a task lamp that keeps at least 1,000 lux on the surface being judged.',
@@ -144,6 +146,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     image: { light: '/stations/qc2-light.svg', dark: '/stations/qc2-dark.svg' },
     live: '/stations/qc2-live.html',
     play: '/stations/qc2-3d.html',
+    video: '/videos/qc-gate2.mp4',
     description: [
       'Each block turns once in a cage in the line for its last look, and the inspector gives it one of three judgements, recorded in this QC Gate app.',
       'OK blocks run straight on to the Spray Booth; a pusher sends Repair blocks onto a side transfer towards Line Repair, and NG blocks are tipped into the NG box. An andon stack shows each verdict.',
@@ -161,6 +164,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     subtitle: 'Rust-preventive Oil',
     image: { light: '/stations/spray-light.svg', dark: '/stations/spray-dark.svg' },
     play: '/stations/spray-3d.html',
+    video: '/videos/spray-booth.mp4',
     description: [
       'The OK block comes in from QC Gate 2, turns the corner inside the booth and stops under the spray portal.',
       'Five nozzles fed by the pump mist rust-preventive oil onto the top, both long sides and both ends, so the bare machined iron leaves with a thin film on every face; the overspray drips back into the oil tank under the rollers.',

@@ -421,13 +421,25 @@
 .hour[data-now] .hourLabel { color: var(--text-primary); font-weight: 700; }
 
 /* ---- health ---- */
+/* Line health fills its bottom-row tile: content centred in it, both ways
+   (spanning the body's 8px bottom padding too, so top and bottom gaps match). */
+.health {
+  height: calc(100% + 8px);
+  margin-bottom: -8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
 .healthRow {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 12px;
-  margin-bottom: 6px;
 }
+
+.healthSub { text-align: center; }
 
 /* ---- alerts ---- */
 .alerts {

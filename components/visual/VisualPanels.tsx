@@ -295,20 +295,22 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
           </div>
         </Panel>
         <Panel {...p('health')}>
-          <div className={styles.healthRow}>
-            <div className={styles.big}>{Math.round(d.oee.oee * 100)}%<small> OEE</small></div>
-            <ul className={styles.factors}>
-              {([['AV', d.oee.av], ['PE', d.oee.pe], ['RQ', d.oee.rq]] as const).map(([k, v]) => (
-                <li key={k}>
-                  <span>{k}</span>
-                  <span className={styles.barTrack}><span className={styles.okBg} style={{ width: `${v * 100}%` }} /></span>
-                  <b>{Math.round(v * 100)}%</b>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className={styles.kpiSub}>
-            Line stop: AV {d.stopMin.AV} min · PE {d.stopMin.PE} min · RQ {d.stopMin.RQ} min
+          <div className={styles.health}>
+            <div className={styles.healthRow}>
+              <div className={styles.big}>{Math.round(d.oee.oee * 100)}%<small> OEE</small></div>
+              <ul className={styles.factors}>
+                {([['AV', d.oee.av], ['PE', d.oee.pe], ['RQ', d.oee.rq]] as const).map(([k, v]) => (
+                  <li key={k}>
+                    <span>{k}</span>
+                    <span className={styles.barTrack}><span className={styles.okBg} style={{ width: `${v * 100}%` }} /></span>
+                    <b>{Math.round(v * 100)}%</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={`${styles.kpiSub} ${styles.healthSub}`}>
+              Line stop: AV {d.stopMin.AV} min · PE {d.stopMin.PE} min · RQ {d.stopMin.RQ} min
+            </div>
           </div>
         </Panel>
         <Panel {...p('alerts')}>

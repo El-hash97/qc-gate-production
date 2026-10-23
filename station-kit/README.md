@@ -9,6 +9,8 @@ station-kit/
   blender/render-station-ref.py   render acuan + daftar objek di sekitar satu stasiun
   figure/iso-kit.mjs              kit gambar isometrik (skill anatomy, MIT)
   figure/stations/<id>.mjs        satu script per stasiun → <id>-light.svg + <id>-dark.svg
+                                  (+ <id>-live.html bila gambarnya bergerak, lihat 2b)
+  figure/live-kit.mjs             halaman gambar bergerak bersama (spray, junbiki, repair)
   machine/lab-kit.js              kit mesin 3D (skill machine, MIT)
   machine/template.html           titik awal halaman 3D stasiun baru
   machine/stations/<id>-3d.html   source halaman 3D per stasiun (kit masih berupa link)

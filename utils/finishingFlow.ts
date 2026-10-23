@@ -100,6 +100,7 @@ export const SEGMENTS: readonly Segment[] = [
   // OK only: Spray Booth → round the corner → hoist into the Junbiki rack
   { id: 'toJunbiki', from: 1351, to: 1660, clips: ['motorreductor.002', 'motorreductor.025'] },
 ];
+export const HSB06_SEGMENT = 2;
 export const QC2_SEGMENT = 4;
 export const JUNBIKI_SEGMENT = 5;
 
@@ -151,9 +152,27 @@ export const FORKLIFT_OUT: readonly Leg[] = [
   { to: b(138, -391) },
   { to: REPAIR_DROP },
 ];
-export const FORKLIFT_BACK: readonly Leg[] = [
+// Repaired blocks go back into the line at HSB06: the forklift takes them up
+// the empty east side, round the head of the line past Baritori, down the
+// west side and onto the low pallet beside Grinding (the stand at Blender
+// (-35, -92), top ~0.42 m), forks pointing east. From there each block is
+// fed into HSB06 when it is free.
+export const REWORK_PALLET: Vec2 = b(-35, -92);
+export const REWORK_PALLET_TOP = 0.42;
+export const FORKLIFT_TO_PALLET: readonly Leg[] = [
   { to: b(136, -391), reverse: true },
-  { to: b(72, -300) },
+  { to: b(70, -340) },
+  { to: b(70, 40) },
+  { to: b(-60, 40) },
+  { to: b(-60, -92) },
+  // forks (FORK_AHEAD = 11.5 units) over the pallet
+  { to: b(-46.5, -92) },
+];
+export const FORKLIFT_FROM_PALLET: readonly Leg[] = [
+  { to: b(-60, -92), reverse: true },
+  { to: b(-60, 40) },
+  { to: b(70, 40) },
+  { to: b(70, -300) },
   { to: b(48, -263) },
   { to: FORKLIFT_HOME },
 ];
@@ -170,6 +189,8 @@ export const BLOCK_URL = '/models/bc-2tr.stl';
 export const BLOCK_SPEED = 1.2;
 export const FORKLIFT_SPEED = 2;
 export const REPAIR_TIME_S = 4;
+// how long a repaired block sits on the pallet by Grinding before HSB06 takes it
+export const REWORK_DWELL_S = 2;
 // NG pallet: deck height, and how many blocks it shows (2 x 2 a layer, 3 layers);
 // past that the oldest block makes room for the newest.
 export const NG_PALLET_TOP = 0.15;

@@ -6,9 +6,15 @@
 // Stations are the SEGMENTS of the Blender timeline: one block per station,
 // replaying the recorded path; a finished block waits in its station until
 // the next one is free, and Baritori only releases a block when it is empty.
+//
+// Repair blocks leave QC Gate 2 by forklift for Line Repair; once repaired
+// the forklift drops them on the pallet beside Grinding, they re-enter the
+// line at HSB06, skip Grinding straight to Hanten MC and are re-inspected at
+// QC Gate 2 (OK goes on to Junbiki, NG to the NG pallet).
 import {
-  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BACK, FORKLIFT_BATCH, FORKLIFT_HOME, FORKLIFT_OUT,
-  FORKLIFT_SPEED, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT, REPAIR_STUB, REPAIR_TIME_S, SEGMENTS,
+  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_FROM_PALLET, FORKLIFT_HOME, FORKLIFT_OUT,
+  FORKLIFT_SPEED, FORKLIFT_TO_PALLET, HSB06_SEGMENT, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT,
+  REPAIR_STUB, REPAIR_TIME_S, REWORK_DWELL_S, REWORK_PALLET, REWORK_PALLET_TOP, SEGMENTS,
   TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
   pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
   type Counts, type Hold, type Leg, type Outcome, type Quat, type Vec2,
@@ -17,7 +23,7 @@ import {
 export type Vec3 = [number, number, number];
 export type BlockColor = 'raw' | Outcome;
 export type Phase =
-  | 'seg' | 'ng' | 'toPallet' | 'atPallet' | 'onForklift' | 'toQc2' | 'waitOk'
+  | 'seg' | 'ng' | 'toPallet' | 'atPallet' | 'onForklift' | 'onReworkPallet' | 'toHsb06' | 'toHanten'
   | 'waitJunbiki' | 'loaded' | 'binned';
 
 export interface Block {
@@ -33,9 +39,13 @@ export interface Block {
   seg: number;
   t: number;
   quat: Quat | null;
+  // repaired and back on the line: re-inspected (not re-decided) at QC Gate 2
+  rework: boolean;
+  // start/end height of an off-record glide (phases 'toHsb06', 'toHanten')
+  glideY: [number, number];
 }
 
-export type ForkliftState = 'idle' | 'toRepair' | 'repairing' | 'toGate' | 'unloading';
+export type ForkliftState = 'idle' | 'toRepair' | 'repairing' | 'toPallet' | 'unloading' | 'returning';
 
 export interface Sim {
   blocks: Block[];
@@ -61,13 +71,16 @@ const HALF = BLOCK / 2;
 // Cargo floor height of the box truck drawn by the renderer.
 export const TRUCK_BED_Y = 1.05;
 
-// Fork heights: level with the stub conveyor to pick/drop at QC Gate 2, low
-// while driving, level with the repair bench top while repairing.
+// Fork heights: level with the stub conveyor to pick at QC Gate 2, low while
+// driving, level with the repair bench top while repairing, level with the
+// pallet beside Grinding to set the repaired blocks down.
 export const FORK_STUB_Y = BELT_Y - HALF;
 export const FORK_CARRY_Y = 0.3;
 export const FORK_BENCH_Y = 0.78;
+export const FORK_PALLET_Y = REWORK_PALLET_TOP;
 const FORK_TARGET: Record<ForkliftState, number> = {
-  idle: FORK_STUB_Y, toRepair: FORK_CARRY_Y, repairing: FORK_BENCH_Y, toGate: FORK_CARRY_Y, unloading: FORK_STUB_Y,
+  idle: FORK_STUB_Y, toRepair: FORK_CARRY_Y, repairing: FORK_BENCH_Y,
+  toPallet: FORK_CARRY_Y, unloading: FORK_PALLET_Y, returning: FORK_CARRY_Y,
 };
 const FORK_LIFT_SPEED = 0.4;
 // blocks ride this far ahead of the forklift's centre
@@ -149,11 +162,34 @@ function travel(b: Block, dt: number): boolean {
   return done;
 }
 
+// Reserves segment k for a block that is still on its way in (pallet → HSB06,
+// HSB06 → Hanten), so nothing else enters it meanwhile.
+function claim(sim: Sim, b: Block, k: number): boolean {
+  if (sim.segments[k].busy !== null) return false;
+  sim.segments[k] = { busy: b.id, t: 0 };
+  return true;
+}
+
+// Off-record move between two 3D points; the height eases between them.
+function glide(b: Block, phase: Phase, from: Vec3, to: Vec3): void {
+  send(b, phase, [[from[0], from[2]], [to[0], to[2]]]);
+  b.glideY = [from[1], to[1]];
+}
+
+function glideStep(b: Block, dt: number): boolean {
+  b.dist += BLOCK_SPEED * dt;
+  const [[ax, az], [bx, bz]] = b.path;
+  const k = Math.min(1, b.dist / (Math.hypot(bx - ax, bz - az) || 1));
+  const [y0, y1] = b.glideY;
+  b.pos = [ax + (bx - ax) * k, y0 + (y1 - y0) * k, az + (bz - az) * k];
+  return k >= 1;
+}
+
 function spawn(sim: Sim): void {
   if (sim.segments[0].busy !== null) return;
   const b: Block = {
-    id: sim.nextId++, color: 'raw', phase: 'waitOk', path: [], dist: 0, timer: 0, slot: 0,
-    pos: trackAt(SEGMENTS[0].from).pos, seg: 0, t: 0, quat: null,
+    id: sim.nextId++, color: 'raw', phase: 'seg', path: [], dist: 0, timer: 0, slot: 0,
+    pos: trackAt(SEGMENTS[0].from).pos, seg: 0, t: 0, quat: null, rework: false, glideY: [0, 0],
   };
   sim.blocks.push(b);
   enter(sim, b, 0);
@@ -214,20 +250,23 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number, 
     }
   } else if (f.state === 'repairing') {
     if (forksReady && !(hold && 'repair' in hold)) f.timer -= dt;
-    if (f.timer <= 0) f.state = 'toGate';
-  } else if (f.state === 'toGate') {
-    if (drive(f, FORKLIFT_BACK, dt)) f.state = 'unloading';
-  } else if (forksReady) {
-    // Back at the stub end: re-inspect every repaired block, roll it to QC Gate 2.
+    if (f.timer <= 0) f.state = 'toPallet';
+  } else if (f.state === 'toPallet') {
+    if (drive(f, FORKLIFT_TO_PALLET, dt)) f.state = 'unloading';
+  } else if (f.state === 'unloading') {
+    // forks down on the pallet beside Grinding: the repaired blocks stay there
+    // (still orange) until HSB06 takes them back into the line
+    if (!forksReady) return;
     for (const id of f.load) {
       const b = sim.blocks.find((x) => x.id === id);
       if (!b) continue;
-      const o = pickReinspect(counts, rand());
-      b.color = o;
-      if (o === 'ng') send(b, 'ng', [REPAIR_STUB, ...routePoints('ng')]);
-      else send(b, 'toQc2', [REPAIR_STUB, stationPos('qc2')]);
+      b.phase = 'onReworkPallet';
+      b.rework = true;
+      b.timer = REWORK_DWELL_S;
     }
     f.load = [];
+    f.state = 'returning';
+  } else if (drive(f, FORKLIFT_FROM_PALLET, dt)) {
     f.state = 'idle';
   }
 }
@@ -249,24 +288,46 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
         b.phase = 'waitJunbiki';
         b.quat = null;
       } else if (b.seg === QC2_SEGMENT) {
-        // QC Gate 2: decide once, then wait here until the next leg is free
-        if (b.color === 'raw') b.color = pickOutcome(counts, rand());
+        // QC Gate 2: decide once (a repaired block is re-inspected: OK or NG),
+        // then wait here until the next leg is free
+        if (b.rework) {
+          b.color = pickReinspect(counts, rand());
+          b.rework = false;
+        } else if (b.color === 'raw') b.color = pickOutcome(counts, rand());
         if (b.color === 'ok') enter(sim, b, JUNBIKI_SEGMENT);
         else {
           leaveSegment(sim, b);
           if (b.color === 'repair') send(b, 'toPallet', [stationPos('qc2'), REPAIR_STUB]);
           else send(b, 'ng', routePoints('ng'));
         }
+      } else if (b.rework && b.seg === HSB06_SEGMENT) {
+        // re-blasted: skip Grinding, straight to Hanten MC once its segment is free
+        if (claim(sim, b, QC2_SEGMENT)) {
+          sim.segments[HSB06_SEGMENT].busy = null;
+          glide(b, 'toHanten', trackAt(seg.to).pos, trackAt(SEGMENTS[QC2_SEGMENT].from).pos);
+        }
       } else {
         enter(sim, b, b.seg + 1);
       }
       break;
     }
-    case 'toQc2':
-      if (travel(b, dt)) b.phase = 'waitOk';
+    case 'onReworkPallet': {
+      // set down first, then first come first served: the oldest block on the pallet feeds HSB06
+      b.timer -= dt;
+      const first = sim.blocks.find((o) => o.phase === 'onReworkPallet');
+      if (first === b && b.timer <= 0 && claim(sim, b, HSB06_SEGMENT)) {
+        glide(b, 'toHsb06', b.pos, trackAt(SEGMENTS[HSB06_SEGMENT].from).pos);
+      }
       break;
-    case 'waitOk':
-      enter(sim, b, JUNBIKI_SEGMENT);
+    }
+    case 'toHsb06':
+    case 'toHanten':
+      if (glideStep(b, dt)) {
+        // the segment was claimed when the move started: ride it from the top
+        b.seg = b.phase === 'toHsb06' ? HSB06_SEGMENT : QC2_SEGMENT;
+        b.phase = 'seg';
+        b.t = 0;
+      }
       break;
     case 'ng':
       if (travel(b, dt)) {
@@ -292,12 +353,17 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
 function layout(sim: Sim): void {
   let pallet = 0;
   let queue = 0;
+  let rework = 0;
   const [ngX, ngZ] = stationPos('ngBox');
   const end = trackAt(SEGMENTS[JUNBIKI_SEGMENT].to).pos;
   for (const b of sim.blocks) {
     if (b.phase === 'atPallet') {
       // waiting at the end of the stub conveyor (stacked if more than one)
       b.pos = [REPAIR_STUB[0], BELT_Y + BLOCK * pallet++, REPAIR_STUB[1]];
+    } else if (b.phase === 'onReworkPallet') {
+      // side by side along the pallet beside Grinding
+      b.pos = [REWORK_PALLET[0] + (rework++ - 1) * 0.55, REWORK_PALLET_TOP + HALF, REWORK_PALLET[1]];
+      b.quat = [0, 0, 0, 1];
     } else if (b.phase === 'onForklift') {
       const f = sim.forklift;
       const i = f.load.indexOf(b.id);

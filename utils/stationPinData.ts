@@ -39,8 +39,9 @@ const FORKLIFT_TEXT: Record<Sim['forklift']['state'], string> = {
   idle: 'Standby at QC Gate 2',
   toRepair: 'Heading to Line Repair',
   repairing: 'At Line Repair',
-  toGate: 'Returning to QC Gate 2',
-  unloading: 'Unloading at QC Gate 2',
+  toPallet: 'Taking repaired blocks to HSB06',
+  unloading: 'Unloading at the pallet by Grinding',
+  returning: 'Returning to QC Gate 2',
 };
 const TRUCK_TEXT: Record<Sim['truck']['state'], string> = {
   docked: 'Loading at Junbiki',

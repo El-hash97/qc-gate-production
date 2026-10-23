@@ -148,6 +148,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Spray Booth',
     subtitle: 'Rust-preventive Oil',
     image: { light: '/stations/spray-light.svg', dark: '/stations/spray-dark.svg' },
+    live: '/stations/spray-live.html',
     play: '/stations/spray-3d.html',
     video: '/videos/spray-booth.mp4',
     description: [
@@ -164,6 +165,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Junbiki',
     subtitle: 'Sequenced Staging',
     image: { light: '/stations/junbiki-light.svg', dark: '/stations/junbiki-dark.svg' },
+    live: '/stations/junbiki-live.html',
     play: '/stations/junbiki-3d.html',
     description: [
       'Post yang berfungsi untuk melakukan delivery hasil block cylinder yang "OK" ke dalam Junbiki (store PPC) untuk siap kirim ke next proses (Machining Sunter 1).',
@@ -179,6 +181,7 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
     title: 'Line Repair',
     subtitle: 'Rework Benches',
     image: { light: '/stations/repair-light.svg', dark: '/stations/repair-dark.svg' },
+    live: '/stations/repair-live.html',
     play: '/stations/repair-3d.html',
     description: [
       'Blocks judged Repair at QC Gate 2 come across the factory road on a pallet and wait behind the yellow safety fence.',

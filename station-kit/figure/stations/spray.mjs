@@ -4,14 +4,20 @@
 // QC Gate 2 turns 90 degrees and runs out towards Junbiki. Over the outgoing line stands the spray
 // portal with five nozzles (top, two side spray bars, two ends), the oil tank under it and the
 // pump behind it, feeding the manifold.
-//   node station-kit/figure/stations/spray.mjs [outDir]   →   <outDir>/spray-{light,dark}.svg
+// The live page runs the cycle of spray-3d.html: the block rolls in from QC Gate 2, round the corner and
+// under the portal, five nozzles coat its five faces (film eta Q / A per face), and it rolls on to Junbiki.
+//   node station-kit/figure/stations/spray.mjs [outDir]
+//     →   <outDir>/spray-{light,dark}.svg and <outDir>/spray-live.html (?theme=dark|light)
 //   (outDir defaults to public/stations, relative to where you run it)
+//   node station-kit/figure/stations/spray.mjs --check   runs the cycle model's self-check only
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as k from "../iso-kit.mjs";
+import { liveHtml } from "../live-kit.mjs";
 
-const OUT = resolve(process.argv[2] ?? "public/stations");
-mkdirSync(OUT, { recursive: true });
+const CHECK = process.argv.includes("--check");
+const OUT = resolve(process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "public/stations");
+if (!CHECK) mkdirSync(OUT, { recursive: true });
 const WIDTH = 600;
 const HEIGHT = 420;
 
@@ -210,8 +216,283 @@ const STYLE = `<style>
 const LABEL =
   "Station Spray Booth, rust-preventive oil: inside the booth the roller line from QC Gate 2 turns the corner and runs out towards Junbiki. The OK block stops under the spray portal, where five nozzles mist rust-preventive oil onto its top, both long sides and both ends. The pump behind the line feeds the nozzles from the oil tank under the rollers, which catches the overspray.";
 
-for (const theme of ["light", "dark"]) {
-  const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });
-  writeFileSync(join(OUT, `spray-${theme}.svg`), svg);
-  console.log(`wrote ${join(OUT, `spray-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
+// =============================================================================
+// The cycle, as in spray-3d.html. The model (sprStep, sprGo) and the moving pieces (sprScene and the builders
+// it calls) are plain functions over `k`, `P` and `M`; the live page gets their source with the kit inlined.
+// The still above is the approved drawing; the live page follows one block: in from QC Gate 2, round the
+// corner, under the portal, sprayed on five faces, out towards Junbiki.
+// =============================================================================
+const CYCLE = [["roll in", 1.4], ["corner", 1.5], ["to portal", 1.3], ["spray", 3], ["drip", 0.8], ["roll out", 1.8], ["next", 0.4]];
+const M = {
+  BLOCK,
+  CONV_Z,
+  CYCLE,
+  C,
+  R,
+  IN_Y,
+  OUT_X,
+  OUT_Y,
+  PX,
+  PW: PORTAL.w,
+  PD: PORTAL.d,
+  PTOP: PORTAL.top,
+  AXIS_Z,
+  PUMP,
+  // SI, as in the 3D page: Q a nozzle's flow (mL/min), ETA the share of the spray that lands, H_MIN the film the block must leave with (um)
+  Q_ML: 12,
+  ETA: 0.6,
+  H_MIN: 1.5,
+  CLOG: 0.2,
+  // face areas (m2): top, the two long sides, the two ends
+  AREA: [0.475 * 0.371, 0.475 * 0.336, 0.475 * 0.336, 0.336 * 0.371, 0.336 * 0.371],
+};
+
+const smooth01 = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+function sprState() {
+  return { step: 0, pt: 0, time: 3, broken: false, flow: 1, mist: 0, film: [0, 0, 0, 0, 0], clock: 0 };
+}
+
+// the spray step lasts as long as the slider says
+function sprDur(st) {
+  const [name, d] = M.CYCLE[st.step];
+  return name === "spray" ? st.time : d;
+}
+
+// um a second on face i: eta Q / A
+function sprRate(i, flow) {
+  return ((M.ETA * (M.Q_ML * (i === 0 ? flow : 1) * 1e-6)) / 60 / M.AREA[i]) * 1e6;
+}
+
+function sprFilmAfter(st) {
+  const flow = st.broken ? M.CLOG : 1;
+  return M.AREA.map((_, i) => sprRate(i, flow) * st.time);
+}
+
+function sprStep(st, dt) {
+  st.clock += dt;
+  st.pt += dt;
+  const [name] = M.CYCLE[st.step];
+  const spraying = name === "spray";
+  st.flow += ((st.broken ? M.CLOG : 1) - st.flow) * (1 - Math.exp(-dt / 0.6));
+  if (spraying) st.film = st.film.map((h, i) => h + sprRate(i, st.flow) * dt);
+  st.mist += ((spraying ? 1 : 0) - st.mist) * (1 - Math.exp(-dt / (spraying ? 0.12 : 0.25)));
+  if (st.pt >= sprDur(st)) {
+    st.step = (st.step + 1) % M.CYCLE.length;
+    st.pt = 0;
+    if (M.CYCLE[st.step][0] === "roll in") st.film = [0, 0, 0, 0, 0];
+  }
+}
+
+function sprGo(st, name) {
+  st.step = M.CYCLE.findIndex((c) => c[0] === name);
+  st.pt = 0;
+  st.flow = st.broken ? M.CLOG : 1;
+  st.mist = name === "spray" ? 1 : 0;
+  st.film = name === "drip" || name === "roll out" ? sprFilmAfter(st) : [0, 0, 0, 0, 0];
+}
+
+// where the block is (centre on the floor plan), which way it points, and how visible it is
+function sprPose(name, u) {
+  const e = u * u * (3 - 2 * u);
+  if (name === "roll in") return { x: 0, y: M.IN_Y[0] + 10 + (-M.IN_Y[0] - 10) * e, dx: 0, dy: 1, alpha: smooth01(0, 0.25, u) };
+  if (name === "corner") {
+    const t = u * (Math.PI / 2);
+    return { x: M.C[0] + Math.cos(t) * M.R, y: M.C[1] + Math.sin(t) * M.R, dx: -Math.sin(t), dy: Math.cos(t), alpha: 1 };
+  }
+  if (name === "to portal") return { x: M.C[0] + (M.PX - M.C[0]) * e, y: M.OUT_Y, dx: -1, dy: 0, alpha: 1 };
+  if (name === "spray" || name === "drip") return { x: M.PX, y: M.OUT_Y, dx: -1, dy: 0, alpha: 1 };
+  if (name === "roll out") return { x: M.PX + (M.OUT_X[1] + 15 - M.PX) * e, y: M.OUT_Y, dx: -1, dy: 0, alpha: 1 - smooth01(0.8, 1, u) };
+  return { x: 0, y: 0, dx: 0, dy: 1, alpha: 0 };
+}
+
+// the BC block, deck up, long axis along its heading; `wet` fades in the oiled look
+function sprBlock(p, wet) {
+  if (p.alpha <= 0.001) return "";
+  const { w, d, h } = M.BLOCK;
+  const z = M.CONV_Z;
+  const vx = -p.dy, vy = p.dx;
+  const T = ([a, b]) => [p.x + a * p.dx + b * vx, p.y + a * p.dy + b * vy];
+  const ring = k.ringOf({ x: -w / 2, y: -d / 2, w, d, r: 1 }, 2).map(T);
+  const bores = [0, 1, 2, 3].map((i) => k.ring(...T([-8 + i * 5.33, 0]), 2.2, z + h, P, 24)).join("");
+  const seam = (tone) => k.lineSvg(k.ringSeam(ring, z + 5, P), { tone });
+  let out = k.solidSvg(k.extrude(ring, z, h, P, { bevel: 0.6 }), { tone: "hi", crease: "lo", inner: seam("faint") }) + k.lineSvg(bores, { tone: "mid" });
+  if (wet > 0.01) {
+    const sheen = k.solidSvg(k.extrude(ring, z, h, P, { bevel: 0.6 }), { tone: "hi", crease: "lo", lit: true, inner: seam("lit") }) + k.lineSvg(bores, { tone: "lit" });
+    out += `<g opacity="${wet.toFixed(3)}">${sheen}</g>`;
+  }
+  return p.alpha >= 0.999 ? out : `<g opacity="${p.alpha.toFixed(3)}">${out}</g>`;
+}
+
+// a spray cone: droplets streaking down five lines from the nozzle to the face, `a` as strong as the spray
+function sprMist(from, to, spread, axes, a, clock, phase) {
+  if (a < 0.02) return "";
+  const p0 = k.iso(from, P);
+  const items = [];
+  let cone = "";
+  for (let i = -2; i <= 2; i++) {
+    const end = [...to];
+    for (const ax of axes) end[ax] += i * spread;
+    const p1 = k.iso(end, P);
+    cone += k.fadeLineSvg([p0, p1], { fade: [0, 0.7], tone: "mid" });
+    const q = (s) => [p0[0] + (p1[0] - p0[0]) * s, p0[1] + (p1[1] - p0[1]) * s];
+    for (const o of [0, 0.5]) {
+      const t = (((clock * 1.4 + i * 0.19 + phase + o) % 1) + 1) % 1;
+      items.push([k.pathOf([q(Math.max(0, t - 0.28)), q(t)]), Math.min(1, a * 1.3) * Math.sin(Math.PI * t)]);
+    }
+  }
+  return `<g opacity="${(a * 0.8).toFixed(2)}">${cone}</g>${k.fadedSvg(items, { tone: "hi" })}`;
+}
+
+// oil running up the manifold from the pump to the portal, while it sprays
+function sprFlow(st) {
+  if (st.mist < 0.02) return "";
+  const [x, y] = M.PUMP;
+  const px = x + 6;
+  const top = M.PTOP + 2;
+  const path = [[px, y, 37], [px, y, top], [M.PX - M.PW, y, top], [M.PX - M.PW, M.OUT_Y - M.PD, top]];
+  const lens = path.slice(1).map((q, i) => Math.hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
+  const total = lens.reduce((a, b) => a + b, 0);
+  const dots = [0, 1, 2, 3, 4].map((i) => {
+    let s = ((((st.clock * 0.45 + i / 5) % 1) + 1) % 1) * total;
+    let j = 0;
+    while (j < lens.length - 1 && s > lens[j]) s -= lens[j++];
+    const t = Math.min(1, s / lens[j]);
+    return k.iso(path[j].map((c, n) => c + (path[j + 1][n] - c) * t), P);
+  });
+  return `<g opacity="${st.mist.toFixed(2)}">${k.dotsSvg(dots, { size: 0.9, tone: "lit" })}</g>`;
+}
+
+// everything that moves, for a state
+function sprScene(st) {
+  const [name] = M.CYCLE[st.step];
+  const u = Math.min(1, st.pt / sprDur(st));
+  const pose = sprPose(name, u);
+  const wet = Math.min(1, Math.min(...st.film) / M.H_MIN);
+  const { PX: px, PW, PD, PTOP, OUT_Y: oy, AXIS_Z: az, BLOCK: b } = M;
+  const a = st.mist;
+  return {
+    name,
+    mistBack: sprMist([px - PW, oy, PTOP - 6], [px - b.w / 2, oy, az], 2.5, [1, 2], a, st.clock, 0.1)
+      + sprMist([px, oy - PD + 2, az], [px, oy - b.d / 2, az], 3.5, [0], a, st.clock, 0.45),
+    block: sprBlock(pose, wet),
+    mistFront: sprMist([px, oy, PTOP - 6], [px, oy, az + b.h / 2], 3.5, [0], a * st.flow, st.clock, 0.3)
+      + sprMist([px + PW, oy, PTOP - 6], [px + b.w / 2, oy, az], 2.5, [1], a, st.clock, 0.7)
+      + sprMist([px, oy + PD - 2, az], [px, oy + b.d / 2, az], 3.5, [0], a, st.clock, 0.2),
+    flow: sprFlow(st),
+  };
+}
+
+function sprReadout(st) {
+  const [name] = M.CYCLE[st.step];
+  const min = Math.min(...st.film);
+  const say = name === "spray" ? "spraying five faces" : name === "drip" ? "dripping off over the tank" : name === "roll out" ? "oiled: on to Junbiki" : name === "next" ? "next block" : name;
+  const dry = ["roll in", "corner", "to portal", "next"].includes(name);
+  const after = Math.min(...sprFilmAfter(st));
+  return `${say} · ${dry ? `${after.toFixed(1)} um on the thinnest face after ${st.time.toFixed(1)} s` : `thinnest film ${min.toFixed(1)} um`}`;
+}
+
+function sprNumbers(st) {
+  const f = sprFilmAfter(st);
+  const f1 = (x) => x.toFixed(1);
+  const used = ((4 + (st.broken ? M.CLOG : 1)) * M.Q_ML * st.time) / 60;
+  const top = st.broken ? `top ${f1(f[0])} um (nozzle clogged, ${Math.round(M.CLOG * 100)} % flow)` : `top ${f1(f[0])} um`;
+  return `${st.time.toFixed(1)} s spray: ${top}, sides ${f1(f[1])} um, ends ${f1(f[3])} um · minimum ${M.H_MIN} um · ${f1(used)} mL oil a block, ${f1(used * (1 - M.ETA))} mL back to the tank`;
+}
+
+// ---- self-check: a cycle visits every step in order, five faces are coated above the minimum at the default time, and a clogged top nozzle leaves the top bare
+{
+  const run = (broken) => {
+    const st = sprState();
+    st.broken = broken;
+    sprGo(st, "roll in");
+    const seen = [];
+    let atEnd = null;
+    for (let i = 0; i < 60 * 40 && !(seen.length > 1 && st.step === 0); i++) {
+      sprStep(st, 1 / 60);
+      const ph = M.CYCLE[st.step][0];
+      if (seen.at(-1) !== ph) {
+        if (ph === "drip") atEnd = [...st.film];
+        seen.push(ph);
+      }
+    }
+    return { seen, atEnd };
+  };
+  const ok = run(false);
+  const want = M.CYCLE.map((c) => c[0]);
+  if (JSON.stringify(ok.seen.slice(0, want.length)) !== JSON.stringify(want)) throw new Error(`cycle order ${ok.seen.join(" → ")}`);
+  if (Math.min(...ok.atEnd) < M.H_MIN) throw new Error(`film ${ok.atEnd.map((x) => x.toFixed(2))} under ${M.H_MIN} um at 3 s`);
+  const bad = run(true);
+  if (!(bad.atEnd[0] < M.H_MIN && Math.min(...bad.atEnd.slice(1)) >= M.H_MIN)) throw new Error(`clogged: ${bad.atEnd.map((x) => x.toFixed(2))}`);
+  console.log(`cycle check passed (${want.length} steps, thinnest film ${Math.min(...ok.atEnd).toFixed(2)} um, clogged top ${bad.atEnd[0].toFixed(2)} um)`);
+}
+
+// ---- the live drawing, with slots for the moving pieces --------------------------------
+function liveBody(f) {
+  const slot = (name, inner = "") => `<g data-slot="${name}">${inner}</g>`;
+  return [
+    floor(),
+    walls(),
+    pump(),
+    post(PX - PW, OUT_Y - PD),
+    post(PX + PW, OUT_Y - PD),
+    innerRail(),
+    tank(),
+    inRollers(),
+    cornerRollers(),
+    outRollers(),
+    sprayBar(OUT_Y - PD),
+    nozzle(PX, OUT_Y - PD + 1, AXIS_Z - 1.5),
+    slot("mistBack", f.mistBack),
+    slot("block", f.block),
+    slot("mistFront", f.mistFront),
+    outerRail(),
+    sprayBar(OUT_Y + PD),
+    nozzle(PX, OUT_Y + PD - 1, AXIS_Z - 1.5),
+    post(PX - PW, OUT_Y + PD),
+    post(PX + PW, OUT_Y + PD),
+    portalTop(),
+    slot("flow", f.flow),
+    nozzle(PX, OUT_Y, PORTAL.top - 6),
+    nozzle(PX - PW, OUT_Y, PORTAL.top - 6),
+    nozzle(PX + PW, OUT_Y, PORTAL.top - 6),
+  ];
+}
+
+function livePage() {
+  const st = sprState();
+  const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...liveBody(sprScene(st))] });
+  const label = (ph) => ph[0].toUpperCase() + ph.slice(1);
+  return liveHtml({
+    k,
+    title: "Spray Booth · rust-preventive oil cycle",
+    fig: "Spray Booth",
+    figTitle: "Rust-preventive oil cycle",
+    key: "spray",
+    svg,
+    slots: ["mistBack", "block", "mistFront", "flow"],
+    steps: CYCLE.filter(([ph]) => ph !== "next").map(([ph]) => [ph, label(ph)]),
+    controls: [
+      { kind: "range", key: "time", label: "Spray time", min: 0.5, max: 6, step: 0.5, value: 3, unit: "s", digits: 1 },
+      { kind: "toggle", key: "broken", label: "Top nozzle clogs" },
+    ],
+    header: `const P = ${JSON.stringify(P)};\nconst M = ${JSON.stringify(M)};`,
+    fns: [smooth01, sprState, sprDur, sprRate, sprFilmAfter, sprStep, sprGo, sprPose, sprBlock, sprMist, sprFlow, sprScene, sprReadout, sprNumbers],
+    model: { state: "sprState", step: "sprStep", go: "sprGo", dur: "sprDur", scene: "sprScene", readout: "sprReadout", numbers: "sprNumbers" },
+    still: ["spray", 0.85],
+  });
+}
+
+if (!CHECK) {
+  for (const theme of ["light", "dark"]) {
+    const svg = k.figureSvg({ width: WIDTH, height: HEIGHT, label: LABEL, body: [STYLE, ...body], standalone: theme });
+    writeFileSync(join(OUT, `spray-${theme}.svg`), svg);
+    console.log(`wrote ${join(OUT, `spray-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
+  }
+  const html = livePage();
+  writeFileSync(join(OUT, "spray-live.html"), html);
+  console.log(`wrote ${join(OUT, "spray-live.html")} (${(html.length / 1024).toFixed(0)} KB)`);
 }

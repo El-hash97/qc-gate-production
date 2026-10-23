@@ -97,29 +97,29 @@ describe('StationCard', () => {
     expect(screen.getByTitle(/QC Gate 2 3D/)).toHaveAttribute('src', '/stations/qc2-3d.html');
   });
 
-  it('has a Spray Booth card with its own figure and 3D machine', () => {
+  it('has a Spray Booth card with its running figure and 3D machine', () => {
     const spray = stationDetail('spray')!;
     render(<StationCard detail={spray} theme="light" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /Spray Booth/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/spray-light.svg');
+    expect(screen.getByTitle(/Spray Booth .* cycle/)).toHaveAttribute('src', '/stations/spray-live.html?theme=light');
     fireEvent.click(screen.getByRole('button', { name: /Play 3D/ }));
     expect(screen.getByTitle(/Spray Booth 3D/)).toHaveAttribute('src', '/stations/spray-3d.html');
   });
 
-  it('has a Junbiki card with its own figure and 3D machine', () => {
+  it('has a Junbiki card with its running figure and 3D machine', () => {
     const junbiki = stationDetail('junbiki')!;
     render(<StationCard detail={junbiki} theme="dark" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /Junbiki/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/junbiki-dark.svg');
+    expect(screen.getByTitle(/Junbiki .* cycle/)).toHaveAttribute('src', '/stations/junbiki-live.html?theme=dark');
     fireEvent.click(screen.getByRole('button', { name: /Play 3D/ }));
     expect(screen.getByTitle(/Junbiki 3D/)).toHaveAttribute('src', '/stations/junbiki-3d.html');
   });
 
-  it('has a Line Repair card with its own figure and 3D machine', () => {
+  it('has a Line Repair card with its running figure and 3D machine', () => {
     const repair = stationDetail('lineRepair')!;
     render(<StationCard detail={repair} theme="light" onClose={() => {}} />);
     expect(screen.getByRole('dialog', { name: /Line Repair/ })).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/stations/repair-light.svg');
+    expect(screen.getByTitle(/Line Repair .* cycle/)).toHaveAttribute('src', '/stations/repair-live.html?theme=light');
     fireEvent.click(screen.getByRole('button', { name: /Play 3D/ }));
     expect(screen.getByTitle(/Line Repair 3D/)).toHaveAttribute('src', '/stations/repair-3d.html');
   });

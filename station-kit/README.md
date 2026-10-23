@@ -67,6 +67,13 @@ bergerak mengikuti siklus halaman 3D, dengan tombol step, pause dan slider tekan
 Daftarkan dengan `live: '/stations/<id>-live.html'` di `utils/stationDetails.ts`; card
 menampilkannya sebagai pengganti gambar statis.
 
+Untuk station berikutnya tidak perlu menyalin halaman live-nya: `figure/live-kit.mjs`
+(`liveHtml`) memegang halaman, tombol step, slider, tombol toggle dan loop animasinya.
+Station cukup memberi gambar dengan slot (`<g data-slot="...">`), model siklus
+(`state` / `step` / `go` / `dur`) dan `scene(state)` yang mengisi slot. Contoh: `spray.mjs`
+(siklus + film oli), `junbiki.mjs` (lift + lane fisika) dan `repair.mjs` (antrean M/M/2).
+Semuanya punya `--check` untuk self-check modelnya.
+
 ### 3. Mesin 3D (tombol Play)
 
 ```bash

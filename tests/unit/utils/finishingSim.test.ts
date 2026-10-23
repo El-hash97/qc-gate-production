@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  FORK_BENCH_Y, FORK_CARRY_Y, FORK_PALLET_Y, FORK_STUB_Y, RETURN_S, createSim, step, stepReturn, type Sim,
+  FORK_BENCH_Y, FORK_CARRY_Y, FORK_FLOOR_Y, FORK_PALLET_Y, RETURN_S, createSim, dispatchRepair, repairWaiting, step,
+  stepReturn, type Sim,
 } from '@/utils/finishingSim';
 import {
   ANIM_FPS, FORKLIFT_HOME, FORKLIFT_TO_PALLET, HSB06_SEGMENT, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP,
-  QC2_SEGMENT, REPAIR_DROP, REWORK_PALLET, SEGMENTS, TRUCK_CAPACITY,
+  QC2_SEGMENT, REPAIR_BATCH, REPAIR_DROP, REWORK_PALLET, SEGMENTS, TRUCK_CAPACITY,
   segmentSeconds, stationHold, trackAt, type Counts, type Hold,
 } from '@/utils/finishingFlow';
 
@@ -12,8 +13,9 @@ const MAIN_S = SEGMENTS.slice(0, QC2_SEGMENT + 1).reduce((s, seg) => s + segment
 const OK_S = segmentSeconds(SEGMENTS[JUNBIKI_SEGMENT]);
 // slowest station paces the whole line
 const TAKT_S = Math.max(...SEGMENTS.map(segmentSeconds));
-// forklift round trip QC Gate 2 → Line Repair → pallet by Grinding → home, plus the rework pass
-const REWORK_S = 150;
+// a full yellow pallet (9 repair blocks), the forklift round trip QC Gate 2 →
+// Line Repair → stand by Grinding → home, plus the rework pass
+const REWORK_S = 340;
 
 // Advance in 0.1 s ticks; `watch` sees the sim after every tick.
 function run(sim: Sim, seconds: number, counts: Counts, rand: () => number, watch?: (s: Sim) => void, hold: Hold | null = null) {
@@ -111,6 +113,8 @@ describe('finishing simulation', () => {
     let sawBinnedAfter = false;
     run(sim, MAIN_S + REWORK_S, { ok: 0, repair: 1, ng: 1 }, rand, (s) => {
       const b = s.blocks.find((x) => x.id === 1);
+      // the only repair block: send the partial pallet by hand
+      if (b?.phase === 'atPallet') dispatchRepair(s);
       if (b?.phase === 'onForklift') sawForklift = true;
       if (sawForklift && b?.phase === 'binned') sawBinnedAfter = true;
     });
@@ -163,21 +167,22 @@ describe('forklift', () => {
   it('picks repair blocks at conveyor height, carries them ahead of it, repairs at the bench, sets them on the pallet by Grinding', () => {
     const sim = createSim();
     const seen = {
-      pickedAtStub: false, carriedAhead: false, benchAtDrop: false, palletDrop: false,
+      pickedOffFloor: false, carriedAhead: false, benchAtDrop: false, palletDrop: false,
       onPallet: false, northOfBaritori: false, backHome: false,
     };
     const lastLeg = FORKLIFT_TO_PALLET[FORKLIFT_TO_PALLET.length - 1].to;
     run(sim, MAIN_S + REWORK_S, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
       const f = s.forklift;
       const onForks = s.blocks.filter((b) => b.phase === 'onForklift');
-      if (f.state === 'toRepair' && onForks.length && !seen.pickedAtStub) {
-        // the first frame it drives off, the forks are still at conveyor height
-        seen.pickedAtStub = Math.abs(f.forkY - FORK_STUB_Y) < 0.05;
+      if (f.state === 'toRepair' && onForks.length && !seen.pickedOffFloor) {
+        // the first frame it drives off, the forks are still inside the pallet on the floor
+        seen.pickedOffFloor = Math.abs(f.forkY - FORK_FLOOR_Y) < 0.05;
       }
       if (f.state === 'toRepair' && f.forkY === FORK_CARRY_Y && onForks.length) {
         for (const b of onForks) {
           const ahead = (b.pos[0] - f.pos[0]) * Math.cos(f.heading) - (b.pos[2] - f.pos[1]) * Math.sin(f.heading);
-          expect(ahead).toBeGreaterThan(0.8);
+          // 3 x 3 on the pallet, which rides ahead of the forklift
+          expect(ahead).toBeGreaterThan(0.5);
           expect(b.pos[1]).toBeGreaterThan(f.forkY);
         }
         seen.carriedAhead = true;
@@ -200,7 +205,7 @@ describe('forklift', () => {
       }
     });
     expect(seen).toEqual({
-      pickedAtStub: true, carriedAhead: true, benchAtDrop: true, palletDrop: true,
+      pickedOffFloor: true, carriedAhead: true, benchAtDrop: true, palletDrop: true,
       onPallet: true, northOfBaritori: true, backHome: true,
     });
   });
@@ -208,12 +213,71 @@ describe('forklift', () => {
   it('turns to face where it drives (reversing keeps it facing the other way)', () => {
     const sim = createSim();
     let headingAtBench: number | null = null;
-    run(sim, MAIN_S + 60, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+    run(sim, MAIN_S + REWORK_S, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
       if (s.forklift.state === 'repairing' && headingAtBench === null) headingAtBench = s.forklift.heading;
     });
     // last leg drives east (+x) onto the bench: heading 0
     expect(headingAtBench).not.toBeNull();
     expect(Math.abs(Math.atan2(Math.sin(headingAtBench!), Math.cos(headingAtBench!)))).toBeLessThan(0.15);
+  });
+});
+
+describe('yellow repair pallet', () => {
+  it('waits for a full pallet of 9, never carries more, lays them out 3 x 3', () => {
+    const sim = createSim();
+    let maxWaiting = 0;
+    let loadOut = -1;
+    let spots = 0;
+    run(sim, MAIN_S + REWORK_S, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+      if (s.forklift.state === 'idle') maxWaiting = Math.max(maxWaiting, repairWaiting(s));
+      if (s.forklift.state === 'toRepair' && loadOut < 0) {
+        loadOut = s.forklift.load.length;
+        const onForks = s.blocks.filter((b) => b.phase === 'onForklift');
+        spots = new Set(onForks.map((b) => b.pos.map((v) => v.toFixed(3)).join())).size;
+      }
+    });
+    expect(loadOut).toBe(REPAIR_BATCH);
+    expect(spots).toBe(REPAIR_BATCH);
+    expect(maxWaiting).toBeLessThanOrEqual(REPAIR_BATCH);
+  });
+
+  it('sends a partial pallet on the manual button', () => {
+    const sim = createSim();
+    // block 1 is the only repair; every later block NG
+    const draws = [0.75];
+    let i = 0;
+    const rand = () => draws[i++] ?? 0;
+    let loadOut = -1;
+    run(sim, MAIN_S + 30, { ok: 0, repair: 1, ng: 1 }, rand, (s) => {
+      if (repairWaiting(s) === 1 && s.blocks.find((b) => b.id === 1)?.phase === 'atPallet') dispatchRepair(s);
+      if (s.forklift.state === 'toRepair' && loadOut < 0) loadOut = s.forklift.load.length;
+    });
+    expect(loadOut).toBe(1);
+    expect(sim.dispatch).toBe(false);
+  });
+
+  it('feeds HSB06 one block at a time, taking turns with production', () => {
+    const sim = createSim();
+    const hsb05 = segmentSeconds(SEGMENTS[HSB06_SEGMENT - 1]);
+    const entries: { rework: boolean; otherWaiting: boolean }[] = [];
+    let last: number | null = null;
+    run(sim, MAIN_S + REWORK_S + 120, { ok: 0, repair: 1, ng: 0 }, () => 0, (s) => {
+      const busy = s.segments[HSB06_SEGMENT].busy;
+      if (busy !== null && busy !== last) {
+        const b = s.blocks.find((x) => x.id === busy)!;
+        const reworkReady = s.blocks.some((x) => x.phase === 'onReworkPallet' && x.timer <= 0);
+        const prodWaiting = s.blocks.some((x) => x.phase === 'seg' && x.seg === HSB06_SEGMENT - 1 && x.t >= hsb05);
+        entries.push({ rework: b.rework, otherWaiting: b.rework ? prodWaiting : reworkReady });
+      }
+      last = busy;
+    });
+    const rework = entries.filter((e) => e.rework).length;
+    expect(rework).toBeGreaterThan(1);
+    expect(entries.length - rework).toBeGreaterThan(rework);
+    // never the same stream twice in a row while the other one was waiting
+    for (let k = 1; k < entries.length; k++) {
+      if (entries[k].rework === entries[k - 1].rework) expect(entries[k].otherWaiting).toBe(false);
+    }
   });
 });
 

@@ -8,9 +8,13 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import {
   BLOCK_SIZE, BLOCK_URL, FORKLIFT_HOME, MODEL_LIFT, MODEL_SCALE, MODEL_SPLIT_URL, MODEL_URL, NG_PALLET_TOP, STATIONS, TRUCK_DOCK,
-  ANIM_FPS, SEGMENTS, stationHold, type Counts, type StationId,
+  ANIM_FPS, PALLET_DECK, PALLET_SIZE, REPAIR_BATCH, REPAIR_PALLET, REWORK_PALLET, REWORK_PALLET_TOP, SEGMENTS,
+  stationHold, type Counts, type StationId,
 } from '@/utils/finishingFlow';
-import { TRUCK_BED_Y, createSim, step, type BlockColor } from '@/utils/finishingSim';
+import {
+  FORK_AHEAD, FORK_FLOOR_Y, HOME_HEADING, TRUCK_BED_Y, createSim, dispatchRepair, repairWaiting, step,
+  type BlockColor, type Sim,
+} from '@/utils/finishingSim';
 import { createStationAnim, type StationClip } from './stationAnim';
 import { stationDetail } from '@/utils/stationDetails';
 import { WORKFLOW_CARDS, cardRows } from '@/utils/workflowCards';
@@ -183,24 +187,29 @@ function makeForklift(): { group: THREE.Group; carriage: THREE.Group; wheels: TH
 
 // Box truck, cab facing -x, open rear doors facing +x. Local origin = centre of
 // the cargo floor footprint at ground level; cargo floor sits at TRUCK_BED_Y.
-// Red plastic pallet (1.2 x 1.0 m) the NG blocks are stacked on: slatted deck
-// on nine feet and three runners, deck top at NG_PALLET_TOP.
-function makePallet(): THREE.Group {
+// Plastic pallet: slatted deck on nine feet and three runners, deck top at
+// `top`, `w` along x by `d` across. Red 1.2 x 1.0 m for the NG blocks, yellow
+// 1.6 x 1.25 m for the repair blocks (3 x 3).
+function makePallet(
+  { color, edge, w, d, top }: { color: number; edge: number; w: number; d: number; top: number },
+): THREE.Group {
   const g = new THREE.Group();
-  const red = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.8 });
+  const red = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+  const dark = new THREE.MeshStandardMaterial({ color: edge, roughness: 0.8 });
   const box = (size: [number, number, number], pos: [number, number, number], m: THREE.Material) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), m);
     mesh.position.set(...pos);
     g.add(mesh);
   };
-  const top = NG_PALLET_TOP;
   // three runners on the floor, nine feet, five deck slats with gaps
-  for (const z of [-0.45, 0, 0.45]) box([1.2, 0.03, 0.1], [0, 0.015, z], dark);
-  for (const x of [-0.53, 0, 0.53]) {
-    for (const z of [-0.43, 0, 0.43]) box([0.14, top - 0.06, 0.14], [x, 0.03 + (top - 0.06) / 2, z], red);
+  const fx = w / 2 - 0.07;
+  const fz = d / 2 - 0.07;
+  for (const z of [-fz, 0, fz]) box([w, 0.03, 0.1], [0, 0.015, z], dark);
+  for (const x of [-fx, 0, fx]) {
+    for (const z of [-fz, 0, fz]) box([0.14, top - 0.06, 0.14], [x, 0.03 + (top - 0.06) / 2, z], red);
   }
-  for (let i = 0; i < 5; i++) box([1.2, 0.03, 0.16], [0, top - 0.015, -0.42 + i * 0.21], red);
+  const slat = d / 6.25;
+  for (let i = 0; i < 5; i++) box([w, 0.03, slat], [0, top - 0.015, -d / 2 + slat / 2 + i * (d - slat) / 4], red);
   return g;
 }
 
@@ -278,6 +287,9 @@ export default function FinishingLine3D({
   live.current = { counts, running, pins: shownPins, labels, lineStop, hold, lineStops, stopCounts };
   const applyTheme = useRef<(t: Theme) => void>(() => {});
   const [noWebGL, setNoWebGL] = useState(false);
+  // repair blocks on the yellow pallet at QC Gate 2 (0 while the forklift is out)
+  const [waitingRepair, setRepairWaiting] = useState(0);
+  const simRef = useRef<Sim | null>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -452,10 +464,21 @@ export default function FinishingLine3D({
       }
     });
 
-    const ngPallet = makePallet();
+    const ngPallet = makePallet({ color: 0xb91c1c, edge: 0x7f1d1d, w: 1.2, d: 1.0, top: NG_PALLET_TOP });
     const ngSpot = STATIONS.find((st) => st.id === 'ngBox')!.pos;
     ngPallet.position.set(ngSpot[0], 0, ngSpot[1]);
     scene.add(ngPallet);
+    // Yellow repair pallets: one at QC Gate 2 (a spare stands in while one is
+    // away), one on the forks while it carries a batch, one on the stand by
+    // Grinding while it still holds repaired blocks.
+    const yellow = () => makePallet({ color: 0xeab308, edge: 0xa16207, w: PALLET_SIZE[0], d: PALLET_SIZE[1], top: PALLET_DECK });
+    const collectPallet = yellow();
+    collectPallet.position.set(REPAIR_PALLET[0], 0, REPAIR_PALLET[1]);
+    collectPallet.rotation.y = HOME_HEADING;
+    const forkPallet = yellow();
+    const reworkPallet = yellow();
+    reworkPallet.position.set(REWORK_PALLET[0], REWORK_PALLET_TOP, REWORK_PALLET[1]);
+    scene.add(collectPallet, forkPallet, reworkPallet);
     // Station name tags (glass, like the pins); one with a detail card opens it.
     const nameTags = createTags(mount, STATIONS, (id) => stationDetail(id) !== null, (id) => select.current?.(id));
 
@@ -527,7 +550,9 @@ export default function FinishingLine3D({
     const callouts = createPins(mount);
 
     let sim = createSim();
+    simRef.current = sim;
     let lastBusy = '';
+    let lastWaiting = 0;
     let last = performance.now();
     let raf = 0;
     // requestAnimationFrame already pauses in hidden tabs; the dt clamp
@@ -542,7 +567,10 @@ export default function FinishingLine3D({
         sim.segments.forEach((seg, k) => stations[k]?.update(seg.busy, seg.t, dt));
         mixer?.update(dt);
       }
-      else if (sim.nextId > 1) sim = createSim();
+      else if (sim.nextId > 1) {
+        sim = createSim();
+        simRef.current = sim;
+      }
 
       const seen = new Set<number>();
       for (const b of sim.blocks) {
@@ -579,6 +607,17 @@ export default function FinishingLine3D({
       forklift.group.position.set(sim.forklift.pos[0], 0, sim.forklift.pos[1]);
       forklift.group.rotation.y = sim.forklift.heading;
       forklift.carriage.position.y = sim.forklift.forkY;
+      const f = sim.forklift;
+      forkPallet.visible = f.load.length > 0;
+      forkPallet.position.set(f.pos[0] + FORK_AHEAD * Math.cos(f.heading), f.forkY - FORK_FLOOR_Y, f.pos[1] - FORK_AHEAD * Math.sin(f.heading));
+      forkPallet.rotation.y = f.heading;
+      reworkPallet.visible = sim.blocks.some((b) => b.phase === 'onReworkPallet');
+      // manual-send button: blocks waiting on the yellow pallet, forklift home
+      const waiting = f.state === 'idle' && !sim.dispatch ? repairWaiting(sim) : 0;
+      if (waiting !== lastWaiting) {
+        lastWaiting = waiting;
+        setRepairWaiting(waiting);
+      }
       truck.position.x = TRUCK_DOCK[0] + sim.truck.offset;
 
       const c = live.current.counts;
@@ -673,5 +712,24 @@ export default function FinishingLine3D({
       </div>
     );
   }
-  return <div ref={mountRef} style={{ width: '100%', height: '100%' }} />;
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+      {/* A partial yellow pallet can go to Line Repair before it holds a full batch. */}
+      {waitingRepair > 0 && waitingRepair < REPAIR_BATCH && (
+        <button
+          type="button"
+          onClick={() => { if (simRef.current) dispatchRepair(simRef.current); }}
+          style={{
+            position: 'absolute', left: 16, bottom: 16, padding: '8px 14px', borderRadius: 8,
+            border: '1px solid #a16207', background: '#eab308', color: '#1f2937',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+          }}
+        >
+          Send to Line Repair ({waitingRepair}/{REPAIR_BATCH})
+        </button>
+      )}
+    </div>
+  );
 }

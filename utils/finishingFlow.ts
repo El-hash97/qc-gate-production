@@ -136,9 +136,20 @@ export const ROUTES = {
 };
 
 // Repair blocks are pushed from QC Gate 2 along the stub conveyor (as in the
-// recording) and wait at its end for the forklift, which parks facing it.
+// recording) and set down on the yellow pallet on the floor past its end,
+// 3 x 3 = one batch. The forklift parks facing it, forks under it.
 export const REPAIR_STUB: Vec2 = b(22, -263);
-export const FORKLIFT_HOME: Vec2 = b(35, -263);
+// clear of the operator figure standing at the stub end (Blender x 25..27)
+export const REPAIR_PALLET: Vec2 = b(36, -263);
+export const FORKLIFT_HOME: Vec2 = b(47.5, -263);
+// Blocks per yellow pallet: the forklift takes it to Line Repair (and on to
+// HSB06) once it is full, or earlier from the Overview's manual button.
+export const REPAIR_BATCH = 9;
+// Yellow pallet: deck top above its feet, footprint (along the forks x across)
+// and the 3 x 3 block pitch on the deck.
+export const PALLET_DECK = 0.15;
+export const PALLET_SIZE = [1.6, 1.25] as const;
+export const PALLET_PITCH = [0.52, 0.4] as const;
 // Where the forklift stops with its forks over the repair bench.
 export const REPAIR_DROP: Vec2 = b(150, -391);
 // Forklift legs; `reverse` = backing up (it keeps facing the other way).
@@ -147,7 +158,7 @@ export interface Leg {
   reverse?: boolean;
 }
 export const FORKLIFT_OUT: readonly Leg[] = [
-  { to: b(46, -263), reverse: true },
+  { to: b(57, -263), reverse: true },
   { to: b(72, -300) },
   { to: b(138, -391) },
   { to: REPAIR_DROP },
@@ -173,7 +184,7 @@ export const FORKLIFT_FROM_PALLET: readonly Leg[] = [
   { to: b(-60, 40) },
   { to: b(70, 40) },
   { to: b(70, -300) },
-  { to: b(48, -263) },
+  { to: b(60, -263) },
   { to: FORKLIFT_HOME },
 ];
 export const TRUCK_DOCK: Vec2 = b(-85, -348);
@@ -198,7 +209,6 @@ export const NG_PALLET_CAPACITY = 12;
 export const TRUCK_SPEED = 10;
 export const TRUCK_AWAY_OFFSET = -40;
 export const TRUCK_CAPACITY = 10;
-export const FORKLIFT_BATCH = 3;
 
 export function stationPos(id: StationId): Vec2 {
   const s = STATIONS.find((st) => st.id === id);

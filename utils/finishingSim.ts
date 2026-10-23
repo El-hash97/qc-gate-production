@@ -7,13 +7,15 @@
 // replaying the recorded path; a finished block waits in its station until
 // the next one is free, and Baritori only releases a block when it is empty.
 //
-// Repair blocks leave QC Gate 2 by forklift for Line Repair; once repaired
-// the forklift drops them on the pallet beside Grinding, they re-enter the
-// line at HSB06, skip Grinding straight to Hanten MC and are re-inspected at
-// QC Gate 2 (OK goes on to Junbiki, NG to the NG pallet).
+// Repair blocks collect on a yellow pallet at QC Gate 2; a full pallet (9, or
+// fewer on the manual button) goes by forklift to Line Repair and, repaired,
+// onto the stand beside Grinding. HSB06 takes them back one at a time, taking
+// turns with the production blocks from HSB05; they skip Grinding straight to
+// Hanten MC and are re-inspected at QC Gate 2 (OK on to Junbiki, NG to the NG pallet).
 import {
-  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_BATCH, FORKLIFT_FROM_PALLET, FORKLIFT_HOME, FORKLIFT_OUT,
+  ANIM_FPS, BLOCK_SIZE, BLOCK_SPEED, FORKLIFT_FROM_PALLET, FORKLIFT_HOME, FORKLIFT_OUT,
   FORKLIFT_SPEED, FORKLIFT_TO_PALLET, HSB06_SEGMENT, JUNBIKI_SEGMENT, NG_PALLET_CAPACITY, NG_PALLET_TOP, QC2_SEGMENT,
+  PALLET_DECK, PALLET_PITCH, REPAIR_BATCH, REPAIR_PALLET,
   REPAIR_STUB, REPAIR_TIME_S, REWORK_DWELL_S, REWORK_PALLET, REWORK_PALLET_TOP, SEGMENTS,
   TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
   pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
@@ -23,7 +25,7 @@ import {
 export type Vec3 = [number, number, number];
 export type BlockColor = 'raw' | Outcome;
 export type Phase =
-  | 'seg' | 'ng' | 'toPallet' | 'atPallet' | 'onForklift' | 'onReworkPallet' | 'toHsb06' | 'toHanten'
+  | 'seg' | 'ng' | 'toPallet' | 'dropping' | 'atPallet' | 'onForklift' | 'onReworkPallet' | 'toHsb06' | 'toHanten'
   | 'waitJunbiki' | 'loaded' | 'binned';
 
 export interface Block {
@@ -41,7 +43,7 @@ export interface Block {
   quat: Quat | null;
   // repaired and back on the line: re-inspected (not re-decided) at QC Gate 2
   rework: boolean;
-  // start/end height of an off-record glide (phases 'toHsb06', 'toHanten')
+  // start/end height of an off-record glide (phases 'dropping', 'toHsb06', 'toHanten')
   glideY: [number, number];
 }
 
@@ -61,6 +63,10 @@ export interface Sim {
   truck: { state: 'docked' | 'leaving' | 'returning'; offset: number; load: number };
   // NG blocks put on the pallet so far (picks the next pallet spot)
   ngPile: number;
+  // manual button: send the yellow pallet to Line Repair before it is full
+  dispatch: boolean;
+  // HSB06 alternates between a repaired block and a production block
+  hsb06Turn: 'rework' | 'line';
 }
 
 // Block centre height on the conveyors (Blender block z ≈ 6.2 above a -5.6 floor).
@@ -71,23 +77,24 @@ const HALF = BLOCK / 2;
 // Cargo floor height of the box truck drawn by the renderer.
 export const TRUCK_BED_Y = 1.05;
 
-// Fork heights: level with the stub conveyor to pick at QC Gate 2, low while
-// driving, level with the repair bench top while repairing, level with the
-// pallet beside Grinding to set the repaired blocks down.
-export const FORK_STUB_Y = BELT_Y - HALF;
+// Fork heights (top face): inside the yellow pallet lying on the floor to
+// pick it, low while driving, the pallet up at the repair bench while
+// repairing, the pallet set on the stand beside Grinding to unload. The
+// pallet's deck sits PALLET_DECK - FORK_FLOOR_Y above the forks.
+export const FORK_FLOOR_Y = 0.08;
 export const FORK_CARRY_Y = 0.3;
 export const FORK_BENCH_Y = 0.78;
-export const FORK_PALLET_Y = REWORK_PALLET_TOP;
+export const FORK_PALLET_Y = REWORK_PALLET_TOP + FORK_FLOOR_Y;
 const FORK_TARGET: Record<ForkliftState, number> = {
-  idle: FORK_STUB_Y, toRepair: FORK_CARRY_Y, repairing: FORK_BENCH_Y,
+  idle: FORK_FLOOR_Y, toRepair: FORK_CARRY_Y, repairing: FORK_BENCH_Y,
   toPallet: FORK_CARRY_Y, unloading: FORK_PALLET_Y, returning: FORK_CARRY_Y,
 };
 const FORK_LIFT_SPEED = 0.4;
-// blocks ride this far ahead of the forklift's centre
-const FORK_AHEAD = 1.15;
+// the pallet (and its blocks) ride this far ahead of the forklift's centre
+export const FORK_AHEAD = 1.15;
 const TURN_RATE = 1.6; // rad/s
 // Parked at home it faces the stub end (west).
-const HOME_HEADING = Math.PI;
+export const HOME_HEADING = Math.PI;
 
 export function createSim(): Sim {
   return {
@@ -96,10 +103,12 @@ export function createSim(): Sim {
     segments: SEGMENTS.map(() => ({ busy: null, t: 0 })),
     forklift: {
       state: 'idle', pos: [FORKLIFT_HOME[0], FORKLIFT_HOME[1]], heading: HOME_HEADING, leg: 0,
-      timer: 0, load: [], forkY: FORK_STUB_Y,
+      timer: 0, load: [], forkY: FORK_FLOOR_Y,
     },
     truck: { state: 'docked', offset: 0, load: 0 },
     ngPile: 0,
+    dispatch: false,
+    hsb06Turn: 'rework',
   };
 }
 
@@ -160,6 +169,43 @@ function travel(b: Block, dt: number): boolean {
   const { p, done } = pointAlong(b.path, b.dist);
   b.pos = [p[0], BELT_Y, p[1]];
   return done;
+}
+
+// Block centre on a 3 x 3 pallet deck: slot 0..8 per layer, `heading` = the
+// pallet's yaw (its long side along the forks), extra layers stack on top.
+export function palletSpot(center: Vec2, deckY: number, heading: number, slot: number): Vec3 {
+  const i = slot % REPAIR_BATCH;
+  const along = ((i % 3) - 1) * PALLET_PITCH[0];
+  const across = (Math.floor(i / 3) - 1) * PALLET_PITCH[1];
+  return [
+    center[0] + along * Math.cos(heading) + across * Math.sin(heading),
+    deckY + HALF + BLOCK * Math.floor(slot / REPAIR_BATCH),
+    center[1] - along * Math.sin(heading) + across * Math.cos(heading),
+  ];
+}
+
+function yaw(heading: number): Quat {
+  return [0, Math.sin(heading / 2), 0, Math.cos(heading / 2)];
+}
+
+// Repair blocks on (or being set down on) the yellow pallet at QC Gate 2.
+export function repairWaiting(sim: Sim): number {
+  return sim.blocks.filter((b) => b.phase === 'atPallet' || b.phase === 'dropping').length;
+}
+
+// Manual button: the forklift takes the yellow pallet as soon as it is home.
+export function dispatchRepair(sim: Sim): void {
+  if (repairWaiting(sim) > 0) sim.dispatch = true;
+}
+
+// HSB06 takes turns: neither stream waits behind the other.
+function productionWaiting(sim: Sim): boolean {
+  const hsb05 = SEGMENTS[HSB06_SEGMENT - 1];
+  return sim.blocks.some((b) => b.phase === 'seg' && b.seg === HSB06_SEGMENT - 1 && b.t >= segmentSeconds(hsb05));
+}
+
+function reworkReady(sim: Sim): boolean {
+  return sim.blocks.some((b) => b.phase === 'onReworkPallet' && b.timer <= 0);
 }
 
 // Reserves segment k for a block that is still on its way in (pallet → HSB06,
@@ -237,11 +283,22 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number, 
   f.forkY = Math.abs(target - f.forkY) <= lift ? target : f.forkY + Math.sign(target - f.forkY) * lift;
   const forksReady = f.forkY === target;
   if (f.state === 'idle') {
-    // forks wait level with the stub end, so loading is a straight slide
-    const waiting = sim.blocks.filter((b) => b.phase === 'atPallet').slice(0, FORKLIFT_BATCH);
-    if (waiting.length === 0 || !forksReady) return;
-    for (const b of waiting) b.phase = 'onForklift';
-    f.load = waiting.map((b) => b.id);
+    // forks inside the yellow pallet: lift it once it holds a full batch, or
+    // on the manual button, never while a block is still being set down
+    const onPallet = sim.blocks.filter((b) => b.phase === 'atPallet').sort((a, b) => a.slot - b.slot);
+    const settling = sim.blocks.some((b) => b.phase === 'dropping');
+    if (sim.dispatch && onPallet.length === 0 && !settling) sim.dispatch = false;
+    if (!forksReady || settling || (onPallet.length < REPAIR_BATCH && !sim.dispatch)) return;
+    const batch = onPallet.slice(0, REPAIR_BATCH);
+    // seen from the forks (facing west) the deck is turned half round: same spots
+    batch.forEach((b, i) => {
+      b.phase = 'onForklift';
+      b.slot = REPAIR_BATCH - 1 - i;
+    });
+    // anything past a full batch starts the next (spare) pallet
+    onPallet.slice(REPAIR_BATCH).forEach((b, i) => { b.slot = i; });
+    f.load = batch.map((b) => b.id);
+    sim.dispatch = false;
     f.state = 'toRepair';
   } else if (f.state === 'toRepair') {
     if (drive(f, FORKLIFT_OUT, dt)) {
@@ -257,13 +314,17 @@ function stepForklift(sim: Sim, dt: number, counts: Counts, rand: () => number, 
     // forks down on the pallet beside Grinding: the repaired blocks stay there
     // (still orange) until HSB06 takes them back into the line
     if (!forksReady) return;
-    for (const id of f.load) {
+    // the pallet stays on the stand; its blocks keep their spots on the deck
+    const used = sim.blocks.filter((x) => x.phase === 'onReworkPallet').map((x) => x.slot);
+    const base = used.length ? Math.max(...used) + 1 : 0;
+    f.load.forEach((id, i) => {
       const b = sim.blocks.find((x) => x.id === id);
-      if (!b) continue;
+      if (!b) return;
       b.phase = 'onReworkPallet';
       b.rework = true;
       b.timer = REWORK_DWELL_S;
-    }
+      b.slot = base + i;
+    });
     f.load = [];
     f.state = 'returning';
   } else if (drive(f, FORKLIFT_FROM_PALLET, dt)) {
@@ -306,6 +367,9 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
           sim.segments[HSB06_SEGMENT].busy = null;
           glide(b, 'toHanten', trackAt(seg.to).pos, trackAt(SEGMENTS[QC2_SEGMENT].from).pos);
         }
+      } else if (b.seg + 1 === HSB06_SEGMENT) {
+        // production into HSB06: wait a turn if a repaired block is ready
+        if (!(sim.hsb06Turn === 'rework' && reworkReady(sim)) && enter(sim, b, HSB06_SEGMENT)) sim.hsb06Turn = 'rework';
       } else {
         enter(sim, b, b.seg + 1);
       }
@@ -315,7 +379,9 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
       // set down first, then first come first served: the oldest block on the pallet feeds HSB06
       b.timer -= dt;
       const first = sim.blocks.find((o) => o.phase === 'onReworkPallet');
-      if (first === b && b.timer <= 0 && claim(sim, b, HSB06_SEGMENT)) {
+      const myTurn = !(sim.hsb06Turn === 'line' && productionWaiting(sim));
+      if (first === b && b.timer <= 0 && myTurn && claim(sim, b, HSB06_SEGMENT)) {
+        sim.hsb06Turn = 'line';
         glide(b, 'toHsb06', b.pos, trackAt(SEGMENTS[HSB06_SEGMENT].from).pos);
       }
       break;
@@ -338,7 +404,14 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
       }
       break;
     case 'toPallet':
-      if (travel(b, dt)) b.phase = 'atPallet';
+      if (travel(b, dt)) {
+        // off the stub end onto the next free spot of the yellow pallet
+        b.slot = repairWaiting(sim);
+        glide(b, 'dropping', b.pos, palletSpot(REPAIR_PALLET, PALLET_DECK, 0, b.slot));
+      }
+      break;
+    case 'dropping':
+      if (glideStep(b, dt)) b.phase = 'atPallet';
       break;
     default:
       break;
@@ -351,28 +424,24 @@ function stepBlock(sim: Sim, b: Block, dt: number, counts: Counts, rand: () => n
 
 // Parked phases take their position from where they are parked.
 function layout(sim: Sim): void {
-  let pallet = 0;
   let queue = 0;
-  let rework = 0;
   const [ngX, ngZ] = stationPos('ngBox');
   const end = trackAt(SEGMENTS[JUNBIKI_SEGMENT].to).pos;
   for (const b of sim.blocks) {
-    if (b.phase === 'atPallet') {
-      // waiting at the end of the stub conveyor (stacked if more than one)
-      b.pos = [REPAIR_STUB[0], BELT_Y + BLOCK * pallet++, REPAIR_STUB[1]];
+    if (b.phase === 'atPallet' || b.phase === 'dropping') {
+      // the yellow pallet at QC Gate 2 (a block being set down glides there)
+      // filled from the stub side (slot 0 = west, nearest the conveyor end)
+      if (b.phase === 'atPallet') b.pos = palletSpot(REPAIR_PALLET, PALLET_DECK, 0, b.slot);
+      b.quat = yaw(HOME_HEADING);
     } else if (b.phase === 'onReworkPallet') {
-      // side by side along the pallet beside Grinding
-      b.pos = [REWORK_PALLET[0] + (rework++ - 1) * 0.55, REWORK_PALLET_TOP + HALF, REWORK_PALLET[1]];
-      b.quat = [0, 0, 0, 1];
+      // the yellow pallet set on the stand beside Grinding (forks pointed east)
+      b.pos = palletSpot(REWORK_PALLET, REWORK_PALLET_TOP + PALLET_DECK, 0, b.slot);
+      b.quat = yaw(0);
     } else if (b.phase === 'onForklift') {
       const f = sim.forklift;
-      const i = f.load.indexOf(b.id);
-      b.pos = [
-        f.pos[0] + FORK_AHEAD * Math.cos(f.heading),
-        f.forkY + HALF + BLOCK * i,
-        f.pos[1] - FORK_AHEAD * Math.sin(f.heading),
-      ];
-      b.quat = null;
+      const center: Vec2 = [f.pos[0] + FORK_AHEAD * Math.cos(f.heading), f.pos[1] - FORK_AHEAD * Math.sin(f.heading)];
+      b.pos = palletSpot(center, f.forkY - FORK_FLOOR_Y + PALLET_DECK, f.heading, b.slot);
+      b.quat = yaw(f.heading);
     } else if (b.phase === 'waitJunbiki') {
       b.pos = [end[0], end[1], end[2] - 0.6 * queue++];
     } else if (b.phase === 'loaded') {

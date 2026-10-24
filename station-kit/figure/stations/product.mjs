@@ -7,8 +7,10 @@
 //   (outDir defaults to public/stations, relative to where you run it)
 //   node station-kit/figure/stations/product.mjs --check   mesh and frame-cost self-check only
 //
-// The mesh is station-kit/figure/mesh/bc-2tr-lite.stl: the 140,740-triangle scan thinned to 7,037 triangles in
-// Blender (Decimate, collapse, ratio 0.05). The 3D page loads public/models/bc-2tr-detail.stl (21 k triangles).
+// The meshes are the 140,740-triangle scan thinned in Blender: Laplacian smooth (8 passes, volume kept), planar
+// dissolve at 6 degrees (flat faces become single faces), then collapse to the target. bc-2tr-lite.stl, 11,000
+// triangles, draws the card and the stills; bc-2tr-mini.stl, 4,500, draws the panel. The 3D page loads
+// public/models/bc-2tr-detail.stl (21 k triangles, plain collapse).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,6 +50,8 @@ function meshOf(path) {
   return { p, f: Uint16Array.from(f), size: hi.map((h, a) => h - lo[a]) };
 }
 const SRC = meshOf(fileURLToPath(new URL("../mesh/bc-2tr-lite.stl", import.meta.url)));
+// the panel in the overview turns on the same thread as the 3D line, so it gets a lighter copy
+const MINI = meshOf(fileURLToPath(new URL("../mesh/bc-2tr-mini.stl", import.meta.url)));
 const mesh = { v: Float32Array.from(SRC.p, (n) => n / 10), f: SRC.f };
 const prep = C.prepare(mesh);
 const b64 = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString("base64");
@@ -71,13 +75,14 @@ if (CHECK) {
   const ms = (performance.now() - t0) / 20;
   console.log(`mesh ${mesh.v.length / 3} vertices, ${prep.n} faces, ${prep.edges.length} edges; ${ms.toFixed(1)} ms and ${(chars / 1024).toFixed(0)} KB a frame`);
   const bad = [];
-  if (prep.n < 5000 || prep.n > 12000) bad.push(`expected about 7,000 faces, got ${prep.n}`);
+  if (prep.n !== 11000) bad.push(`expected 11,000 faces, got ${prep.n}`);
+  if (MINI.f.length / 3 !== 4500) bad.push(`expected 4,500 faces in the panel mesh, got ${MINI.f.length / 3}`);
   const [length, depth, across] = SRC.size;
   if (Math.abs(length - 452) > 6 || Math.abs(depth - 296) > 6 || Math.abs(across - 368) > 8) bad.push(`size ${length.toFixed(0)} × ${depth.toFixed(0)} × ${across.toFixed(0)}`);
   let minZ = Infinity;
   for (let i = 2; i < mesh.v.length; i += 3) minZ = Math.min(minZ, mesh.v[i]);
   if (Math.abs(minZ - C.BLOCK_Z0) > 0.2) bad.push(`block rests at z ${minZ}, not ${C.BLOCK_Z0}`);
-  if (ms > 60) bad.push(`frame takes ${ms.toFixed(0)} ms`);
+  if (ms > 90) bad.push(`frame takes ${ms.toFixed(0)} ms`);
   if (bad.length) { console.error(bad.join("\n")); process.exit(1); }
   console.log("product check passed");
   process.exit(0);
@@ -152,9 +157,9 @@ function livePage() {
   });
   const live = `
 const k = { ${Object.keys(k).join(", ")} };
-const MESH = { p: "${b64(SRC.p)}", f: "${b64(SRC.f)}" };
+const MESHES = { fine: { p: "${b64(SRC.p)}", f: "${b64(SRC.f)}" }, mini: { p: "${b64(MINI.p)}", f: "${b64(MINI.f)}" } };
 const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
-const mesh = { v: Float32Array.from(new Int16Array(bytes(MESH.p)), (n) => n / 10), f: new Uint16Array(bytes(MESH.f)) };
+const mesh = ((m) => ({ v: Float32Array.from(new Int16Array(bytes(m.p)), (n) => n / 10), f: new Uint16Array(bytes(m.f)) }))(MESHES[new URLSearchParams(location.search).has("mini") ? "mini" : "fine"]);
 const prep = prepare(mesh);
 const VIEWS = ${JSON.stringify(Object.fromEntries(VIEWS.map(([id, , v]) => [id, v])))};
 const q = new URLSearchParams(location.search);
@@ -185,8 +190,8 @@ function draw() {
   for (const b of viewBtns) if (b.dataset.view === name) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
 }
 function tick(now) {
-  // the panel in the overview shares the page with the 3D line: it turns at about 20 pictures a second
-  if (mini && last && now - last < 48) { frame = visible ? requestAnimationFrame(tick) : 0; return; }
+  // the panel in the overview shares the page with the 3D line: it turns at about 16 pictures a second
+  if (mini && last && now - last < 60) { frame = visible ? requestAnimationFrame(tick) : 0; return; }
   const dt = last ? Math.min((now - last) / 1000, 1 / 15) : 1 / 60;
   last = now;
   if (goal) {

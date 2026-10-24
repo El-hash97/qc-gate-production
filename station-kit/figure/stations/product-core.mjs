@@ -1,5 +1,5 @@
-// The Product figure's drawing: the cylinder block casting (Block Cy 2TR BAGUS.stl, thinned to about 7,000
-// triangles) standing deck up on a turntable, drawn as isometric solids. The build (product.mjs) draws the
+// The Product figure's drawing: the cylinder block casting (Block Cy 2TR BAGUS.stl, thinned to 11,000
+// triangles, or 4,500 for the panel) standing deck up on a turntable, drawn as isometric solids. The build (product.mjs) draws the
 // still pictures with these functions and the live page inlines this file after the kit, so the browser redraws
 // every frame with the same code. Every function takes the kit `k` as its first argument.
 //
@@ -9,6 +9,8 @@ export const TABLE = { r: 310, base: 14, ring: 10, pad: 10 };
 export const BLOCK_Z0 = TABLE.base + TABLE.ring + TABLE.pad; // the lowest point of the casting
 const TOP = 335; // a hair over the highest point of the casting, for fitting
 const CREASE = Math.cos((62 * Math.PI) / 180); // an edge between faces more bent than this is drawn as a line
+const SMOOTH = 4; // passes of neighbour averaging over the vertex normals
+const TONES = 12; // steps of grey a face can take, dark to light
 const WIDTH = 640;
 const HEIGHT = 420;
 export const TILT = [12, 62]; // the elevation range the picture can be tilted through, degrees
@@ -43,6 +45,19 @@ export function prepare(mesh) {
     if (e.f1 < 0) { e.crease = true; continue; }
     const d = nrm[e.f0 * 3] * nrm[e.f1 * 3] + nrm[e.f0 * 3 + 1] * nrm[e.f1 * 3 + 1] + nrm[e.f0 * 3 + 2] * nrm[e.f1 * 3 + 2];
     e.crease = d < CREASE;
+  }
+  // the thinned scan has small and large triangles side by side: pass each vertex normal through its neighbours a few
+  // times so the shading follows the surface, not the triangulation
+  for (let pass = 0; pass < SMOOTH; pass++) {
+    const next = Float32Array.from(vn);
+    for (const e of edges) {
+      const a = e.a * 3, b = e.b * 3;
+      for (let c = 0; c < 3; c++) { next[a + c] += vn[b + c]; next[b + c] += vn[a + c]; }
+    }
+    for (let i = 0; i < next.length; i += 3) {
+      const l = Math.hypot(next[i], next[i + 1], next[i + 2]) || 1;
+      vn[i] = next[i] / l; vn[i + 1] = next[i + 1] / l; vn[i + 2] = next[i + 2] / l;
+    }
   }
   // the shading normal of a face is the mean of its corners' normals, so the faces shade as one smooth surface
   const snr = new Float32Array(n * 3);
@@ -96,7 +111,7 @@ export function blockSvg(k, P, prep) {
   for (const i of order) {
     const a = f[i * 3], b = f[i * 3 + 1], c = f[i * 3 + 2];
     const lam = (snr[i * 3] * lx + snr[i * 3 + 1] * ly + snr[i * 3 + 2] * lz) / ll;
-    const tone = lam < -0.15 ? 0 : lam < 0.12 ? 1 : lam < 0.38 ? 2 : lam < 0.62 ? 3 : 4;
+    const tone = Math.max(0, Math.min(TONES - 1, Math.round(((lam + 0.3) / 1.4) * (TONES - 1))));
     out += `<path class="pm" data-t="${tone}" d="M${fix(sx[a])} ${fix(sy[a])}L${fix(sx[b])} ${fix(sy[b])}L${fix(sx[c])} ${fix(sy[c])}Z"/>`;
     const h = hi.get(i), l = lo.get(i);
     if (l) out += `<path class="iso-line" data-tone="faint" d="${l}"/>`;
@@ -140,15 +155,13 @@ export function sceneSvg(k, P, prep) {
 
 // the stylesheet the casting's faces need on top of the kit's: its own five-tone ramp, a little deeper than the kit's
 // shade tokens so the form reads, light and dark
-export const BLOCK_CSS = `
-.iso{--pm-0:#0a0a0a;--pm-1:#131313;--pm-2:#1e1e1e;--pm-3:#2c2c2c;--pm-4:#404040}
-.iso[data-theme="light"]{--pm-0:#8c8c89;--pm-1:#a2a29f;--pm-2:#b9b9b6;--pm-3:#d0d0cd;--pm-4:#e8e8e5}
+const RAMP = { dark: ["#0e0e0e", "#8c8c8c"], light: ["#7e7e7a", "#f2f2ef"] };
+const hex = (a, b, t) => "#" + [1, 3, 5].map((o) => Math.round(parseInt(a.slice(o, o + 2), 16) * (1 - t) + parseInt(b.slice(o, o + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+// one variable per tone, set once per theme, so a face costs the browser one plain class lookup
+const ramp = (r) => Array.from({ length: TONES }, (_, i) => `--pm-${i}:${hex(r[0], r[1], i / (TONES - 1))}`).join(";");
+export const BLOCK_CSS = `.iso{${ramp(RAMP.dark)}}
+.iso[data-theme="light"]{${ramp(RAMP.light)}}
 .pm{stroke-width:.5;stroke-linejoin:round}
-.pm[data-t="0"]{fill:var(--pm-0);stroke:var(--pm-0)}
-.pm[data-t="1"]{fill:var(--pm-1);stroke:var(--pm-1)}
-.pm[data-t="2"]{fill:var(--pm-2);stroke:var(--pm-2)}
-.pm[data-t="3"]{fill:var(--pm-3);stroke:var(--pm-3)}
-.pm[data-t="4"]{fill:var(--pm-4);stroke:var(--pm-4)}
-`;
+` + Array.from({ length: TONES }, (_, i) => `.pm[data-t="${i}"]{fill:var(--pm-${i});stroke:var(--pm-${i})}`).join("\n") + "\n";
 
 export const VIEW = { width: WIDTH, height: HEIGHT };

@@ -93,7 +93,7 @@ describe('VisualPanels', () => {
     await waitFor(() => expect(screen.getByLabelText('Product')).toBeInTheDocument());
     const order = [...document.querySelectorAll('section[data-panel]')].map((el) => el.getAttribute('data-panel'));
     expect(order.indexOf('product')).toBe(order.indexOf('paretoRepair') + 1);
-    expect(screen.getByTitle('BC 2TR cylinder block')).toHaveAttribute('src', '/stations/product-live.html?mini&theme=dark');
+    expect(screen.getByTitle('BC 2TR cylinder block')).toHaveAttribute('src', '/stations/product-panel.html?theme=dark');
     fireEvent.click(screen.getByRole('button', { name: /Open Product/ }));
     expect(opened).toEqual([1]);
   });

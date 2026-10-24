@@ -84,19 +84,23 @@ Semuanya punya `--check` untuk self-check modelnya.
 Panel Product di Overview menampilkan blok silinder BC 2TR yang berputar sendiri; klik membuka
 kartu seperti station (`PRODUCT_DETAIL` di `utils/stationDetails.ts`). Bedanya dengan station:
 
-- Gambarnya digambar dari **mesh scan** (`Block Cy 2TR BAGUS.stl`, 140.740 segitiga, disederhanakan
-  di Blender ke 11.000 segitiga untuk kartu, 4.500 untuk panel dan 21.111 untuk halaman 3D), bukan dari bentuk yang
-  dibangun tangan. `product-core.mjs` menggambarnya sebagai solid isometrik per frame (normal per-vertex
-  untuk shading halus, garis hanya di lipatan > 62° dan siluet), jadi halaman bisa memutar (geser),
-  memiringkan (geser atas-bawah), zoom (roda), reset (klik dua kali). `?mini` = versi panel, tanpa
-  kontrol, latar transparan, sekitar 20 gambar per detik.
+- Gambarnya digambar dari **mesh scan** (`Block Cy 2TR BAGUS.stl`, 140.740 segitiga), bukan dari bentuk
+  yang dibangun tangan, dalam tiga tingkat detail: 32.000 segitiga saat blok diam (kartu dan SVG still),
+  11.000 saat diputar/digeser (kembali ke 32.000 sesaat setelah dilepas) dan 4.500 untuk panel.
+  `product-core.mjs` menggambarnya sebagai solid isometrik (shading halus: normal dirata-ratakan hanya
+  antar bidang yang tekukannya < 35°, jadi riak scan hilang tapi rusuk tetap tajam; 20 tingkat abu-abu;
+  garis di lipatan > 62° dan siluet). Kartu: `product-live.html` (geser = putar dan miringkan, roda =
+  zoom, klik dua kali = reset). Panel: `product-panel.html`, tanpa kontrol, latar transparan, berputar
+  sendiri sekitar 16 gambar per detik.
+- Halaman 3D memakai mesh 21.111 segitiga.
 - Halaman 3D (`machine/stations/product-3d.html`) memuat `public/models/bc-2tr-detail.stl` dan
   menampilkannya seperti Blender: cahaya studio, orbit mouse, potongan melalui keempat bore.
   Ulang dengan `node station-kit/machine/build.mjs station-kit/machine/stations/product-3d.html`.
 - `node station-kit/figure/stations/product.mjs --check` memeriksa mesh dan biaya per frame.
 - File asli `asset/Block Cy 2TR BAGUS.stl` (7 MB) tidak ada di git; dua salinan ringan itu yang ada.
-  Untuk membuat ulang mesh SVG: Blender, `Laplacian Smooth` (8 kali, volume dijaga), `Decimate` planar 6°,
-  lalu `Decimate` collapse ke 11.000 → `figure/mesh/bc-2tr-lite.stl` dan 4.500 → `figure/mesh/bc-2tr-mini.stl`.
+  Untuk membuat ulang mesh SVG: Blender, `Laplacian Smooth` (3 kali, volume dijaga), `Decimate` planar 3°,
+  lalu `Decimate` collapse ke 32.000 → `figure/mesh/bc-2tr-hi.stl`, 11.000 → `figure/mesh/bc-2tr-lite.stl`
+  dan 4.500 → `figure/mesh/bc-2tr-mini.stl`.
   Mesh halaman 3D: `Decimate` collapse rasio 0,15 → `public/models/bc-2tr-detail.stl`.
 
 ### 3. Mesin 3D (tombol Play)

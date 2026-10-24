@@ -9,8 +9,8 @@ export const TABLE = { r: 310, base: 14, ring: 10, pad: 10 };
 export const BLOCK_Z0 = TABLE.base + TABLE.ring + TABLE.pad; // the lowest point of the casting
 const TOP = 335; // a hair over the highest point of the casting, for fitting
 const CREASE = Math.cos((62 * Math.PI) / 180); // an edge between faces more bent than this is drawn as a line
-const SMOOTH = 4; // passes of neighbour averaging over the vertex normals
-const TONES = 12; // steps of grey a face can take, dark to light
+const SHADE_BEND = Math.cos((35 * Math.PI) / 180); // faces bent more than this from each other don't share shading
+const TONES = 20; // steps of grey a face can take, dark to light
 const WIDTH = 640;
 const HEIGHT = 420;
 export const TILT = [12, 62]; // the elevation range the picture can be tilted through, degrees
@@ -20,7 +20,7 @@ export function prepare(mesh) {
   const { v, f } = mesh;
   const n = f.length / 3;
   const nrm = new Float32Array(n * 3);
-  const vn = new Float32Array(v.length);
+  const area = new Float32Array(n);
   const edges = [];
   const seen = new Map();
   for (let i = 0; i < n; i++) {
@@ -30,7 +30,7 @@ export function prepare(mesh) {
     const x = uy * wz - uz * wy, y = uz * wx - ux * wz, z = ux * wy - uy * wx;
     const len = Math.hypot(x, y, z) || 1;
     nrm[i * 3] = x / len; nrm[i * 3 + 1] = y / len; nrm[i * 3 + 2] = z / len;
-    for (const o of [a, b, c]) { vn[o] += x / len; vn[o + 1] += y / len; vn[o + 2] += z / len; }
+    area[i] = len / 2;
     for (let e = 0; e < 3; e++) {
       const p = f[i * 3 + e], q = f[i * 3 + ((e + 1) % 3)];
       const key = p < q ? p * 65536 + q : q * 65536 + p;
@@ -46,26 +46,31 @@ export function prepare(mesh) {
     const d = nrm[e.f0 * 3] * nrm[e.f1 * 3] + nrm[e.f0 * 3 + 1] * nrm[e.f1 * 3 + 1] + nrm[e.f0 * 3 + 2] * nrm[e.f1 * 3 + 2];
     e.crease = d < CREASE;
   }
-  // the thinned scan has small and large triangles side by side: pass each vertex normal through its neighbours a few
-  // times so the shading follows the surface, not the triangulation
-  for (let pass = 0; pass < SMOOTH; pass++) {
-    const next = Float32Array.from(vn);
-    for (const e of edges) {
-      const a = e.a * 3, b = e.b * 3;
-      for (let c = 0; c < 3; c++) { next[a + c] += vn[b + c]; next[b + c] += vn[a + c]; }
+  // smooth shading that keeps the casting's sharp edges: a corner takes the area-weighted mean normal of the faces
+  // round its vertex that bend less than SHADE_BEND from this face (the scan's ripples and a bore's facets melt into
+  // one surface, a deck edge stays a corner); a face shades with the mean of its three corners, and the same is
+  // done once more with those means so the last ripples settle
+  const round = Array.from({ length: v.length / 3 }, () => []);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) round[f[i * 3 + c]].push(i);
+  let src = nrm;
+  let snr = nrm;
+  for (let pass = 0; pass < 2; pass++) {
+    snr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      let x = 0, y = 0, z = 0;
+      for (let c = 0; c < 3; c++) {
+        let cx = 0, cy = 0, cz = 0;
+        for (const j of round[f[i * 3 + c]]) {
+          if (nrm[i * 3] * nrm[j * 3] + nrm[i * 3 + 1] * nrm[j * 3 + 1] + nrm[i * 3 + 2] * nrm[j * 3 + 2] < SHADE_BEND) continue;
+          cx += src[j * 3] * area[j]; cy += src[j * 3 + 1] * area[j]; cz += src[j * 3 + 2] * area[j];
+        }
+        const l = Math.hypot(cx, cy, cz) || 1;
+        x += cx / l; y += cy / l; z += cz / l;
+      }
+      const len = Math.hypot(x, y, z) || 1;
+      snr[i * 3] = x / len; snr[i * 3 + 1] = y / len; snr[i * 3 + 2] = z / len;
     }
-    for (let i = 0; i < next.length; i += 3) {
-      const l = Math.hypot(next[i], next[i + 1], next[i + 2]) || 1;
-      vn[i] = next[i] / l; vn[i + 1] = next[i + 1] / l; vn[i + 2] = next[i + 2] / l;
-    }
-  }
-  // the shading normal of a face is the mean of its corners' normals, so the faces shade as one smooth surface
-  const snr = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    let x = 0, y = 0, z = 0;
-    for (let c = 0; c < 3; c++) { const o = f[i * 3 + c] * 3; const l = Math.hypot(vn[o], vn[o + 1], vn[o + 2]) || 1; x += vn[o] / l; y += vn[o + 1] / l; z += vn[o + 2] / l; }
-    const len = Math.hypot(x, y, z) || 1;
-    snr[i * 3] = x / len; snr[i * 3 + 1] = y / len; snr[i * 3 + 2] = z / len;
+    src = snr;
   }
   return { v, f, n, nrm, snr, edges };
 }

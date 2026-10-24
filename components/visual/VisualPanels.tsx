@@ -285,7 +285,7 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, onSele
         <Panel {...p('product')}>
           {/* the picture turns by itself; the button over it opens the card (an iframe can't sit inside a button) */}
           <div className={styles.product}>
-            <iframe className={styles.productFrame} src={`/stations/product-live.html?mini&theme=${theme}`}
+            <iframe className={styles.productFrame} src={`/stations/product-panel.html?theme=${theme}`}
               title="BC 2TR cylinder block" tabIndex={-1} loading="lazy" />
             <button type="button" className={styles.productOpen} aria-label="Open Product, the BC 2TR cylinder block"
               onClick={onSelectProduct} />

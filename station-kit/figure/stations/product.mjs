@@ -1,16 +1,20 @@
 // Isometric figure of the Product: the BC cylinder block casting (Block Cy 2TR BAGUS.stl) deck up on a
-// turntable, for the Product panel and card in /overview. The still pictures and the live page draw the same
-// scene (product-core.mjs): the page redraws it every frame, so the block can be turned by hand (drag), tilted
-// (drag up and down) and zoomed (wheel), and turns by itself when nobody touches it.
+// turntable, for the Product panel and card in /overview. The still pictures and the live pages draw the same
+// scene (product-core.mjs): the card's page redraws it as you turn it by hand (drag), tilt it (drag up and down)
+// and zoom (wheel), and the panel's page turns it slowly by itself.
 //   node station-kit/figure/stations/product.mjs [outDir]
-//     →   <outDir>/product-{light,dark}.svg and <outDir>/product-live.html (?theme=dark|light, ?mini for the panel)
+//     →   <outDir>/product-{light,dark}.svg, <outDir>/product-live.html (the card) and
+//         <outDir>/product-panel.html (the panel), both ?theme=dark|light
 //   (outDir defaults to public/stations, relative to where you run it)
 //   node station-kit/figure/stations/product.mjs --check   mesh and frame-cost self-check only
 //
-// The meshes are the 140,740-triangle scan thinned in Blender: Laplacian smooth (8 passes, volume kept), planar
-// dissolve at 6 degrees (flat faces become single faces), then collapse to the target. bc-2tr-lite.stl, 11,000
-// triangles, draws the card and the stills; bc-2tr-mini.stl, 4,500, draws the panel. The 3D page loads
-// public/models/bc-2tr-detail.stl (21 k triangles, plain collapse).
+// The meshes are the 140,740-triangle scan thinned in Blender: Laplacian smooth (volume kept), planar dissolve
+// (flat faces become single faces), then collapse to the target.
+// All three: 3 smoothing passes and a 3° planar angle.
+//   bc-2tr-hi.stl    32,000 triangles: the card whenever the block is still, and the stills
+//   bc-2tr-lite.stl  11,000 triangles: the card while it moves, so dragging stays smooth
+//   bc-2tr-mini.stl   4,500 triangles: the panel, which shares its page's thread with the 3D line
+// The 3D page loads public/models/bc-2tr-detail.stl (21 k triangles, plain collapse).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,9 +25,9 @@ const CHECK = process.argv.includes("--check");
 const OUT = resolve(process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "public/stations");
 if (!CHECK) mkdirSync(OUT, { recursive: true });
 
-// ---- the mesh: STL (metres, bores along y, deck at -y) → world mm, bores along z, deck up --------------------
-function meshOf(path) {
-  const buf = readFileSync(path);
+// ---- the meshes: STL (metres, bores along y, deck at -y) → world mm, bores along z, deck up ------------------
+function meshOf(name) {
+  const buf = readFileSync(fileURLToPath(new URL(`../mesh/${name}`, import.meta.url)));
   const tris = buf.readUInt32LE(80);
   const index = new Map();
   const raw = [];
@@ -38,8 +42,8 @@ function meshOf(path) {
       f.push(i);
     }
   }
-  const lo = [0, 1, 2].map((a) => Math.min(...raw.map((p) => p[a])));
-  const hi = [0, 1, 2].map((a) => Math.max(...raw.map((p) => p[a])));
+  const lo = [0, 1, 2].map((a) => raw.reduce((m, p) => Math.min(m, p[a]), Infinity));
+  const hi = [0, 1, 2].map((a) => raw.reduce((m, p) => Math.max(m, p[a]), -Infinity));
   // world x along the block, y across it, z up with the deck on top: (x, y, z) → (x, z, -y)
   const p = new Int16Array(raw.length * 3);
   raw.forEach(([x, y, z], i) => {
@@ -49,52 +53,53 @@ function meshOf(path) {
   });
   return { p, f: Uint16Array.from(f), size: hi.map((h, a) => h - lo[a]) };
 }
-const SRC = meshOf(fileURLToPath(new URL("../mesh/bc-2tr-lite.stl", import.meta.url)));
-// the panel in the overview turns on the same thread as the 3D line, so it gets a lighter copy
-const MINI = meshOf(fileURLToPath(new URL("../mesh/bc-2tr-mini.stl", import.meta.url)));
-const mesh = { v: Float32Array.from(SRC.p, (n) => n / 10), f: SRC.f };
-const prep = C.prepare(mesh);
+const MESH = { hi: meshOf("bc-2tr-hi.stl"), fine: meshOf("bc-2tr-lite.stl"), mini: meshOf("bc-2tr-mini.stl") };
+const prepOf = (m) => C.prepare({ v: Float32Array.from(m.p, (n) => n / 10), f: m.f });
 const b64 = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString("base64");
 
 // ---- what the figure says -----------------------------------------------------------------------------------
-// measured on the full scan (Blender: 452 × 296 × 368 mm, volume 7.0 L); the thinned copy only has to match within a few mm
+// measured on the full scan (Blender: 452 × 296 × 368 mm, volume 7.0 L); the thinned copies match within a few mm
 const NUMBERS = `452 × 296 × 368 mm · 7.0 L of metal · about 50 kg in cast iron`;
 const LABEL =
   "The BC cylinder block casting, deck up on a turntable: four bores in a row, the head-bolt bosses round the deck, the long gallery along the side and the main-bearing saddles under it. Drag to turn it, wheel to zoom.";
-
-const STYLE = `<style>${C.BLOCK_CSS}</style>`;
-const still = (theme) => k.figureSvg({
-  width: C.VIEW.width, height: C.VIEW.height, label: LABEL, standalone: theme,
-  body: [STYLE, C.sceneSvg(k, C.viewOf(k, { az: 32, el: 30 }), prep)],
-});
+const HOME = { az: 32, el: 30 };
 
 if (CHECK) {
-  const t0 = performance.now();
-  let chars = 0;
-  for (let i = 0; i < 20; i++) chars = C.sceneSvg(k, C.viewOf(k, { az: i * 18, el: 30 }), prep).length;
-  const ms = (performance.now() - t0) / 20;
-  console.log(`mesh ${mesh.v.length / 3} vertices, ${prep.n} faces, ${prep.edges.length} edges; ${ms.toFixed(1)} ms and ${(chars / 1024).toFixed(0)} KB a frame`);
   const bad = [];
-  if (prep.n !== 11000) bad.push(`expected 11,000 faces, got ${prep.n}`);
-  if (MINI.f.length / 3 !== 4500) bad.push(`expected 4,500 faces in the panel mesh, got ${MINI.f.length / 3}`);
-  const [length, depth, across] = SRC.size;
-  if (Math.abs(length - 452) > 6 || Math.abs(depth - 296) > 6 || Math.abs(across - 368) > 8) bad.push(`size ${length.toFixed(0)} × ${depth.toFixed(0)} × ${across.toFixed(0)}`);
-  let minZ = Infinity;
-  for (let i = 2; i < mesh.v.length; i += 3) minZ = Math.min(minZ, mesh.v[i]);
-  if (Math.abs(minZ - C.BLOCK_Z0) > 0.2) bad.push(`block rests at z ${minZ}, not ${C.BLOCK_Z0}`);
-  if (ms > 90) bad.push(`frame takes ${ms.toFixed(0)} ms`);
+  const faces = { hi: 32000, fine: 11000, mini: 4500 };
+  for (const [name, m] of Object.entries(MESH)) {
+    const prep = prepOf(m);
+    const t0 = performance.now();
+    let chars = 0;
+    for (let i = 0; i < 6; i++) chars = C.sceneSvg(k, C.viewOf(k, { az: i * 60, el: 30 }), prep).length;
+    const ms = (performance.now() - t0) / 6;
+    console.log(`${name}: ${m.p.length / 3} vertices, ${prep.n} faces; ${ms.toFixed(1)} ms and ${(chars / 1024).toFixed(0)} KB a frame`);
+    if (prep.n !== faces[name]) bad.push(`${name}: expected ${faces[name]} faces, got ${prep.n}`);
+    const [length, depth, across] = m.size;
+    if (Math.abs(length - 452) > 6 || Math.abs(depth - 296) > 6 || Math.abs(across - 368) > 8) bad.push(`${name}: size ${length.toFixed(0)} × ${depth.toFixed(0)} × ${across.toFixed(0)}`);
+    let minZ = Infinity;
+    for (let i = 2; i < m.p.length; i += 3) minZ = Math.min(minZ, m.p[i] / 10);
+    if (Math.abs(minZ - C.BLOCK_Z0) > 0.2) bad.push(`${name}: block rests at z ${minZ}, not ${C.BLOCK_Z0}`);
+    // what moves must keep up: the card's moving copy and the panel
+    if (name !== "hi" && ms > 40) bad.push(`${name}: a frame takes ${ms.toFixed(0)} ms`);
+  }
   if (bad.length) { console.error(bad.join("\n")); process.exit(1); }
   console.log("product check passed");
   process.exit(0);
 }
 
+const STYLE = `<style>${C.BLOCK_CSS}</style>`;
+const PREP_HI = prepOf(MESH.hi);
 for (const theme of ["light", "dark"]) {
-  const svg = still(theme);
+  const svg = k.figureSvg({
+    width: C.VIEW.width, height: C.VIEW.height, label: LABEL, standalone: theme,
+    body: [STYLE, C.sceneSvg(k, C.viewOf(k, HOME), PREP_HI)],
+  });
   writeFileSync(join(OUT, `product-${theme}.svg`), svg);
   console.log(`wrote ${join(OUT, `product-${theme}.svg`)} (${(svg.length / 1024).toFixed(0)} KB)`);
 }
 
-// ---- live page ----------------------------------------------------------------------------------------------
+// ---- live pages ---------------------------------------------------------------------------------------------
 const kitScript = () => readFileSync(new URL("../iso-kit.mjs", import.meta.url), "utf8").replace(/^export /gm, "");
 const coreScript = () => readFileSync(new URL("./product-core.mjs", import.meta.url), "utf8").replace(/^export /gm, "");
 
@@ -134,16 +139,17 @@ body.mini{background:transparent}
 ${C.BLOCK_CSS}
 </style>`;
 
-const VIEWS = [["iso", "Iso", { az: 32, el: 30 }], ["deck", "Deck", { az: 0, el: 62 }], ["front", "Front", { az: 0, el: 12 }], ["end", "End", { az: 90, el: 12 }]];
+const VIEWS = [["iso", "Iso", HOME], ["deck", "Deck", { az: 0, el: 62 }], ["front", "Front", { az: 0, el: 12 }], ["end", "End", { az: 90, el: 12 }]];
 
-function livePage() {
-  const svg = k.figureSvg({
-    width: C.VIEW.width, height: C.VIEW.height, label: LABEL,
-    body: [`<g data-slot="scene">${C.sceneSvg(k, C.viewOf(k, { az: 32, el: 30 }), prep)}</g>`],
-  });
+// the card's page: still by default, drawn from the 32 k mesh; while it moves it draws the 11 k copy and goes back
+// to the fine picture a moment after it stops. The panel's page: the 4.5 k copy, turning at about 16 pictures a second.
+function livePage(panel) {
+  const meshes = panel ? { move: MESH.mini } : { move: MESH.fine, still: MESH.hi };
+  // the scene is drawn on load from the meshes below, so the page carries no prebuilt picture
+  const svg = k.figureSvg({ width: C.VIEW.width, height: C.VIEW.height, label: LABEL, body: [`<g data-slot="scene"></g>`] });
   const views = VIEWS.map(([id, label]) => `<button type="button" data-view="${id}">${label}</button>`).join("");
   const controls = `<div class="bari-ctl">
-<button type="button" class="bari-play" data-act="play" aria-label="Pause">❚❚</button>
+<button type="button" class="bari-play" data-act="play" aria-label="Turn">▶</button>
 <div class="bari-steps" role="group" aria-label="Jump to a view">${views}</div>
 <label class="bari-p">Zoom <input type="range" data-zoom min="0.6" max="2.5" step="0.05" value="1" aria-label="Zoom"><output>1.0×</output></label>
 <div class="bari-num">${NUMBERS}</div>
@@ -157,14 +163,15 @@ function livePage() {
   });
   const live = `
 const k = { ${Object.keys(k).join(", ")} };
-const MESHES = { fine: { p: "${b64(SRC.p)}", f: "${b64(SRC.f)}" }, mini: { p: "${b64(MINI.p)}", f: "${b64(MINI.f)}" } };
+const MESHES = { ${Object.entries(meshes).map(([id, m]) => `${id}: { p: "${b64(m.p)}", f: "${b64(m.f)}" }`).join(", ")} };
 const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
-const mesh = ((m) => ({ v: Float32Array.from(new Int16Array(bytes(m.p)), (n) => n / 10), f: new Uint16Array(bytes(m.f)) }))(MESHES[new URLSearchParams(location.search).has("mini") ? "mini" : "fine"]);
-const prep = prepare(mesh);
+const unpack = (m) => ({ v: Float32Array.from(new Int16Array(bytes(m.p)), (n) => n / 10), f: new Uint16Array(bytes(m.f)) });
+const preps = {};
+const prepOf = (id) => preps[id] ?? (preps[id] = prepare(unpack(MESHES[id])));
+const mini = ${panel};
 const VIEWS = ${JSON.stringify(Object.fromEntries(VIEWS.map(([id, , v]) => [id, v])))};
 const q = new URLSearchParams(location.search);
 if (q.get("theme") === "light" || q.get("theme") === "dark") { document.body.dataset.theme = q.get("theme"); document.documentElement.style.colorScheme = q.get("theme"); }
-const mini = q.has("mini");
 // transparent only when the frame's colour scheme is the host page's (the app's is the default one)
 if (mini) { document.body.classList.add("mini"); document.documentElement.style.colorScheme = "normal"; }
 const stage = document.querySelector(".iso-stage");
@@ -177,20 +184,22 @@ const viewBtns = [...document.querySelectorAll("[data-view]")];
 const still = matchMedia("(prefers-reduced-motion: reduce)");
 const HOME = VIEWS.iso;
 const view = { az: HOME.az, el: HOME.el, zoom: 1 };
-let goal = null, turning = !still.matches, resumeAt = 0, dirty = true, visible = true, frame = 0, last = 0, drag = null;
+let goal = null, turning = mini && !still.matches, dirty = false, visible = true, frame = 0, last = 0, drag = null;
+// what the picture on screen was drawn from, and the timer that swaps in the fine one once the block is still
+let shown = MESHES.still ? "still" : "move", settle = 0;
 const wrap = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-function draw() {
-  const P = viewOf(k, view);
-  slot.innerHTML = sceneSvg(k, P, prep);
+function draw(id) {
+  shown = id;
+  slot.innerHTML = sceneSvg(k, viewOf(k, view), prepOf(id));
   readout.textContent = "turn " + String(Math.round(((view.az % 360) + 360) % 360)).padStart(3, "0") + "° · tilt " + Math.round(view.el) + "° · " + view.zoom.toFixed(2) + "×";
   zoomInput.value = view.zoom;
   zoomOut.textContent = view.zoom.toFixed(1) + "×";
   const name = goal ? goal.id : viewBtns.find((b) => { const v = VIEWS[b.dataset.view]; return Math.abs(wrap(view.az - v.az)) < 1 && Math.abs(view.el - v.el) < 1; })?.dataset.view;
   for (const b of viewBtns) if (b.dataset.view === name) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
 }
+const moving = () => !!(goal || drag || turning);
 function tick(now) {
-  // the panel in the overview shares the page with the 3D line: it turns at about 16 pictures a second
   if (mini && last && now - last < 60) { frame = visible ? requestAnimationFrame(tick) : 0; return; }
   const dt = last ? Math.min((now - last) / 1000, 1 / 15) : 1 / 60;
   last = now;
@@ -201,23 +210,23 @@ function tick(now) {
     view.zoom += (goal.zoom - view.zoom) * f;
     if (Math.abs(wrap(goal.az - view.az)) < 0.2 && Math.abs(goal.el - view.el) < 0.2 && Math.abs(goal.zoom - view.zoom) < 0.005) { Object.assign(view, goal); goal = null; }
     dirty = true;
-  } else if (turning && !drag && now > resumeAt) {
+  } else if (turning && !drag) {
     view.az = (view.az + 8 * dt) % 360;
     dirty = true;
   }
-  if (dirty) { dirty = false; draw(); }
-  frame = visible ? requestAnimationFrame(tick) : 0;
+  if (dirty) { dirty = false; draw("move"); }
+  // still again: the fine picture, a moment later so a pause in a drag doesn't stall it
+  clearTimeout(settle);
+  if (MESHES.still && !moving() && shown !== "still") settle = setTimeout(() => { if (!moving()) draw("still"); }, 140);
+  frame = visible && moving() ? requestAnimationFrame(tick) : 0;
 }
 const run = () => { if (!frame && visible) { last = 0; frame = requestAnimationFrame(tick); } };
-const setTurning = (on) => {
-  turning = on;
-  playBtn.textContent = on ? "❚❚" : "▶";
-  playBtn.setAttribute("aria-label", on ? "Pause" : "Turn");
-};
-const touch = () => { resumeAt = performance.now() + 2500; };
-playBtn.addEventListener("click", () => { setTurning(!turning); resumeAt = 0; });
+const nudge = () => { dirty = true; run(); };
+const showTurning = () => { playBtn.textContent = turning ? "❚❚" : "▶"; playBtn.setAttribute("aria-label", turning ? "Pause" : "Turn"); };
+const setTurning = (on) => { turning = on; showTurning(); if (on) run(); else nudge(); };
+playBtn.addEventListener("click", () => setTurning(!turning));
 for (const b of viewBtns) b.addEventListener("click", () => { goal = { id: b.dataset.view, ...VIEWS[b.dataset.view], zoom: view.zoom }; run(); });
-zoomInput.addEventListener("input", () => { goal = null; view.zoom = Number(zoomInput.value); dirty = true; touch(); run(); });
+zoomInput.addEventListener("input", () => { goal = null; view.zoom = Number(zoomInput.value); nudge(); });
 if (!mini) {
   stage.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; goal = null; stage.setPointerCapture(e.pointerId); stage.dataset.drag = ""; });
   stage.addEventListener("pointermove", (e) => {
@@ -225,30 +234,32 @@ if (!mini) {
     view.az = (view.az - (e.clientX - drag.x) * 0.45 + 360) % 360;
     view.el = clamp(view.el + (e.clientY - drag.y) * 0.3, TILT[0], TILT[1]);
     drag = { x: e.clientX, y: e.clientY };
-    dirty = true; run();
+    nudge();
   });
-  const end = () => { drag = null; delete stage.dataset.drag; touch(); };
+  const end = () => { drag = null; delete stage.dataset.drag; nudge(); };
   stage.addEventListener("pointerup", end);
   stage.addEventListener("pointercancel", end);
-  stage.addEventListener("wheel", (e) => { e.preventDefault(); goal = null; view.zoom = clamp(view.zoom * Math.exp(-e.deltaY * 0.0015), 0.6, 2.5); dirty = true; touch(); run(); }, { passive: false });
+  stage.addEventListener("wheel", (e) => { e.preventDefault(); goal = null; view.zoom = clamp(view.zoom * Math.exp(-e.deltaY * 0.0015), 0.6, 2.5); nudge(); }, { passive: false });
   stage.addEventListener("dblclick", () => { goal = { id: "iso", ...HOME, zoom: 1 }; run(); });
   stage.addEventListener("keydown", (e) => {
     const step = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, 5], ArrowDown: [0, -5] }[e.key];
-    if (step) { e.preventDefault(); goal = null; view.az = (view.az + step[0] + 360) % 360; view.el = clamp(view.el + step[1], TILT[0], TILT[1]); dirty = true; touch(); run(); }
-    else if (e.key === " ") { e.preventDefault(); setTurning(!turning); resumeAt = 0; }
-    else if (e.key === "+" || e.key === "-") { view.zoom = clamp(view.zoom * (e.key === "+" ? 1.1 : 1 / 1.1), 0.6, 2.5); dirty = true; run(); }
+    if (step) { e.preventDefault(); goal = null; view.az = (view.az + step[0] + 360) % 360; view.el = clamp(view.el + step[1], TILT[0], TILT[1]); nudge(); }
+    else if (e.key === " ") { e.preventDefault(); setTurning(!turning); }
+    else if (e.key === "+" || e.key === "-") { view.zoom = clamp(view.zoom * (e.key === "+" ? 1.1 : 1 / 1.1), 0.6, 2.5); nudge(); }
   });
 }
-new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; if (visible) run(); else { cancelAnimationFrame(frame); frame = 0; } }).observe(stage);
-document.addEventListener("visibilitychange", () => { visible = !document.hidden; if (visible) run(); });
-setTurning(turning);
-draw();
-run();
-window.__product = { view, draw: (v) => { Object.assign(view, v); goal = null; draw(); }, setTurning };
+new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; if (visible && moving()) run(); else if (!visible) { cancelAnimationFrame(frame); frame = 0; } }).observe(stage);
+document.addEventListener("visibilitychange", () => { visible = !document.hidden; if (visible && moving()) run(); });
+showTurning();
+draw(shown);
+if (turning) run();
+window.__product = { view, draw: (v, id = MESHES.still ? "still" : "move") => { Object.assign(view, v); goal = null; draw(id); }, setTurning };
 `;
-  return k.pageHtml({ title: "BC cylinder block · interactive", theme: "light", body: CSS + plate + controls, script: kitScript() + coreScript() + live, width: 640 });
+  return k.pageHtml({ title: panel ? "BC cylinder block" : "BC cylinder block · interactive", theme: "light", body: CSS + plate + controls, script: kitScript() + coreScript() + live, width: 640 });
 }
 
-const html = livePage();
-writeFileSync(join(OUT, "product-live.html"), html);
-console.log(`wrote ${join(OUT, "product-live.html")} (${(html.length / 1024).toFixed(0)} KB)`);
+for (const [file, panel] of [["product-live.html", false], ["product-panel.html", true]]) {
+  const html = livePage(panel);
+  writeFileSync(join(OUT, file), html);
+  console.log(`wrote ${join(OUT, file)} (${(html.length / 1024).toFixed(0)} KB)`);
+}

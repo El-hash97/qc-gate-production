@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BC 2TR cylinder block · Machine Skill</title>
+<meta name="description" content="The BC 2TR cylinder block casting, the scan of the real part (Block Cy 2TR BAGUS.stl) shown the way Blender shows it: studio light, soft shadow, orbit with the mouse, a section through the four bores. Built with the Machine Skill skill for Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+/* one part, so nothing to pull apart or see through: the section and the labels are what this page offers */
+.lab-modes [data-k="explode"], .lab-modes [data-k="xray"] { display: none }
+</style>
+</head>
+<body>
+<!-- lab-kit:start -->
+<script type="module" src="../lab-kit.js"></script>
+<!-- lab-kit:end -->
+<script type="module">
+import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js'
+const { THREE, Lab, MAT, fmt } = window.LabKit
+
+// ------------------------------------------------------------------ research (step 1)
+// "BC 2TR: the cylinder block casting of the finishing line, shown the way Blender shows it"
+// The part: the scan of the real casting, Block Cy 2TR BAGUS.stl, 140,740 triangles, thinned in Blender to 21,111
+// (Decimate, collapse, ratio 0.15) so it loads in a moment. Size 452 x 296 x 368 mm: the 296 is the bore axis, the
+// deck face at one end and the crankcase face with the main-bearing saddles at the other. Volume 7.0 L (Blender,
+// signed volume of the full scan; the scan has a few hundred open edges, so call it 7 L).
+// Standing as it does on the line: deck up, bores vertical. Cast iron is 7.2 g/cm3.
+// Hero: mass, kg = volume x density. Input: density (aluminium 2.7, cast iron 7.2, steel 7.85).
+// Section: a plane through the four bore axes, real caps.
+const VOLUME_L = 7.0
+
+const lab = new Lab({
+  prompt: 'BC 2TR: blok silinder hasil casting, dari scan Block Cy 2TR BAGUS.stl, ditampilkan seperti di Blender.',
+  no: 12, title: 'BC 2TR', sub: 'cylinder block casting',
+  size: 0.45,
+  frame: 'left',
+  view: { az: -34, el: 26, dist: 3.1, target: [0, 0.15, 0], fov: 30 },
+  cut: { a: [0, 0, 1], center: [0, 0.15, 0], reach: 0.5 },
+  pills: ['three.js', 'STL scan', 'Section'],
+})
+
+// the casting: bare cast iron, a little rough
+const iron = MAT.castIron({ color: [0.42, 0.41, 0.4], roughness: 0.7 })
+lab.loading++
+new STLLoader().load('../models/bc-2tr-detail.stl', (raw) => {
+  // the file has the deck at -y; stand it deck up (a half turn about x), centred, resting on the floor
+  raw.rotateX(Math.PI)
+  raw.deleteAttribute('normal')
+  raw.computeBoundingBox()
+  const b = raw.boundingBox
+  raw.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2)
+  const geo = toCreasedNormals(raw, THREE.MathUtils.degToRad(40))
+  lab.mesh(geo, iron, { name: 'Cylinder block', count: 1, label: 'Deck face', at: [-0.13, 0.296, -0.12] })
+  lab.label(lab.parts[0].obj, 'Cylinder bore', { at: [0.062, 0.296, -0.045] })
+  lab.loading--
+}, undefined, () => { lab.loading-- })
+
+// ------------------------------------------------------------------ solver
+let rho = 7.2 // g/cm3, cast iron
+lab.hero({ label: 'Mass', unit: 'kg', max: 60, digits: 1 })
+lab.slider({
+  id: 'density', label: 'Material density', min: 2.7, max: 7.85, value: rho, step: 0.05, digits: 2, unit: 'g/cm³',
+  ends: ['Aluminium', 'Steel'],
+  onInput: (v) => { rho = v },
+})
+lab.onTick(() => {
+  // litres x g/cm3 = kg
+  lab.setHero(VOLUME_L * rho, {
+    state: rho > 7.5 ? 'steel' : rho > 4 ? 'cast iron' : 'aluminium',
+    sub: `452 × 296 × 368 mm · ${VOLUME_L.toFixed(1)} L of metal · ${fmt(rho, 2)} g/cm³`,
+  })
+})
+
+lab.how(
+  'The model is the scan of the real casting, Block Cy 2TR BAGUS.stl, thinned from 140,740 to 21,111 triangles. It stands deck up the way the block stands on the line: four bores in a row, the head-bolt bosses round the deck, the long gallery along the side, the main-bearing saddles at the foot. Drag to orbit, wheel to zoom, right-drag to pan. Cut away slides a plane through the four bore axes. The mass is the volume of the metal times the density: slide the density to see the same casting in aluminium, cast iron or steel. Simplified: the volume is read from the scan, which has a few hundred open edges, so treat 7 L as 7.0 plus or minus 0.1.',
+  [
+    'm = V rho            V = 7.0 L',
+    'cast iron: rho = 7.2 g/cm3  ->  m = 50 kg',
+  ],
+)
+window.__product3d = { lab }
+lab.start()
+</script>
+</body>
+</html>

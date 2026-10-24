@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { StationCard } from '@/station-kit/react/StationCard';
-import { stationDetail } from '@/utils/stationDetails';
+import { PRODUCT_DETAIL, stationDetail } from '@/utils/stationDetails';
 
 describe('StationCard', () => {
   const hsb05 = stationDetail('hsb05')!;
@@ -208,6 +208,17 @@ describe('StationCard', () => {
       fireEvent.click(screen.getByRole('button', { name: /Back to picture/ }));
       expect(container.querySelector('video')).toBeNull();
       expect(screen.getByTitle(/cycle/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Product', () => {
+    it('shows the block page you can turn by hand, and the scan in 3D on Play', () => {
+      render(<StationCard detail={PRODUCT_DETAIL} theme="light" onClose={() => {}} />);
+      expect(screen.getByRole('dialog', { name: /Product BC 2TR cylinder block/ })).toBeInTheDocument();
+      expect(screen.getByTitle(/Product BC 2TR cylinder block cycle/)).toHaveAttribute('src', '/stations/product-live.html?theme=light');
+      expect(screen.getByText('452 × 296 × 368 mm')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Play 3D/ }));
+      expect(screen.getByTitle('Product 3D')).toHaveAttribute('src', '/stations/product-3d.html');
     });
   });
 });

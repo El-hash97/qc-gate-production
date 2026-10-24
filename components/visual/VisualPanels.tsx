@@ -21,6 +21,7 @@ export const PANELS = [
   { id: 'judgement', title: 'Judgement QC Gate 2' },
   { id: 'paretoNg', title: 'NG Pareto' },
   { id: 'paretoRepair', title: 'Repair Pareto' },
+  { id: 'product', title: 'Product' },
   { id: 'hourly', title: 'Hourly output' },
   { id: 'health', title: 'Line health' },
   { id: 'alerts', title: 'Latest alerts' },
@@ -146,12 +147,16 @@ interface Props {
   busy: readonly boolean[];
   now: Date;
   onSelectStation: (id: StationId) => void;
+  // the Product panel opens its card
+  onSelectProduct?: () => void;
+  // the app theme, so the Product picture inside the panel draws in the matching ink
+  theme?: 'light' | 'dark';
   panels: PanelModes;
   // AV line stop at a station going on now (activeStationStop)
   lineStop?: LineStop | null;
 }
 
-export function VisualPanels({ data, running, busy, now, onSelectStation, panels, lineStop = null }: Props) {
+export function VisualPanels({ data, running, busy, now, onSelectStation, onSelectProduct, theme = 'light', panels, lineStop = null }: Props) {
   const { mode, set, setAll, allHidden } = panels;
   const toggles = [
     { label: 'Panels', on: PANELS.some((x) => mode(x.id) !== 'hidden'), flip: (on: boolean) => setAll(on ? 'open' : 'hidden') },
@@ -277,6 +282,15 @@ export function VisualPanels({ data, running, busy, now, onSelectStation, panels
             )}
           </Panel>
         ))}
+        <Panel {...p('product')}>
+          {/* the picture turns by itself; the button over it opens the card (an iframe can't sit inside a button) */}
+          <div className={styles.product}>
+            <iframe className={styles.productFrame} src={`/stations/product-live.html?mini&theme=${theme}`}
+              title="BC 2TR cylinder block" tabIndex={-1} loading="lazy" />
+            <button type="button" className={styles.productOpen} aria-label="Open Product, the BC 2TR cylinder block"
+              onClick={onSelectProduct} />
+          </div>
+        </Panel>
       </div>
 
       <div className={styles.bottom}>

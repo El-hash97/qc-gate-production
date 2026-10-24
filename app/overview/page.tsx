@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { getGrandTotal, getNgTotal, getOkTotal, getRepairTotal } from '@/utils/rates';
 import { isRunning, type Counts, type StationId } from '@/utils/finishingFlow';
-import { stationDetail } from '@/utils/stationDetails';
+import { PRODUCT_DETAIL, stationDetail } from '@/utils/stationDetails';
 import { withBlockCount } from '@/utils/blockCount';
 import { StationCard } from '@/station-kit/react/StationCard';
 import { LineStopDialog } from '@/components/visual/LineStopDialog';
@@ -29,6 +29,7 @@ export default function OverviewPage() {
   const { state } = useProductionState();
   const { theme } = useTheme();
   const [open, setOpen] = useState<StationId | null>(null);
+  const [productOpen, setProductOpen] = useState(false);
   const [stopsAt, setStopsAt] = useState<StationId | null>(null);
   const [busy, setBusy] = useState<boolean[]>([]);
   // Guests read the same view, without the display settings.
@@ -82,11 +83,12 @@ export default function OverviewPage() {
           onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()}
           labels={panelModes.mode('labels') !== 'hidden'} lineStop={lineStop}
           lineStops={stops30} stopCounts={stopCounts} onSelectLineStops={setStopsAt} />
-        {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} panels={panelModes} lineStop={lineStop} />}
+        {panels && <VisualPanels data={panels} running={running} busy={busy} now={now} onSelectStation={goTo} onSelectProduct={() => setProductOpen(true)} theme={theme} panels={panelModes} lineStop={lineStop} />}
         {!running && <div className={styles.overlay}>Production has not started</div>}
         {/* station figures always use the light artwork, even in dark mode */}
         {stopsAt && <LineStopDialog title={stationTitle(stopsAt)} stops={stopsOf(stops30, stopsAt)} active={lineStop} now={now} onClose={() => setStopsAt(null)} />}
         {detail && <StationCard detail={detail} theme="light" onClose={() => setOpen(null)} />}
+        {productOpen && <StationCard detail={PRODUCT_DETAIL} theme="light" onClose={() => setProductOpen(false)} />}
       </div>
     </div>
   );

@@ -36,38 +36,38 @@ afterEach(() => vi.unstubAllGlobals());
 describe('VisualPanels', () => {
   it('shows every panel at first and hides / shows them all with H, on this screen only', async () => {
     render(<Screen {...base} />);
-    await waitFor(() => expect(panels()).toBe(8));
+    await waitFor(() => expect(panels()).toBe(9));
     expect(screen.getByLabelText('KPI')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'h' });
     expect(panels()).toBe(0);
     expect(saved.modes).toEqual({});
     fireEvent.keyDown(window, { key: 'h' });
-    expect(panels()).toBe(8);
+    expect(panels()).toBe(9);
   });
 
   it('saves a hidden panel to the database, so every screen follows', async () => {
     const { unmount } = render(<Screen {...base} />);
-    await waitFor(() => expect(panels()).toBe(8));
+    await waitFor(() => expect(panels()).toBe(9));
     fireEvent.click(screen.getByRole('button', { name: 'Hide NG Pareto' }));
-    await waitFor(() => expect(panels()).toBe(7));
+    await waitFor(() => expect(panels()).toBe(8));
     await waitFor(() => expect(saved.modes).toEqual({ paretoNg: 'hidden' }));
     unmount();
     // another screen, a guest's
     render(<Screen {...base} readOnly />);
-    await waitFor(() => expect(panels()).toBe(7));
+    await waitFor(() => expect(panels()).toBe(8));
     expect(screen.queryByLabelText('NG Pareto')).toBeNull();
   });
 
   it('turns all panels off and back on from the Panels switch', async () => {
     saved = { modes: { paretoNg: 'hidden' } };
     render(<Screen {...base} />);
-    await waitFor(() => expect(panels()).toBe(7));
+    await waitFor(() => expect(panels()).toBe(8));
     fireEvent.click(screen.getByRole('button', { name: 'Display settings' }));
     const panelSwitch = screen.getByRole('switch', { name: 'Panels' });
     fireEvent.click(panelSwitch); // some still showing → all off
     await waitFor(() => expect(panels()).toBe(0));
     fireEvent.click(panelSwitch); // all back on, Pareto included
-    await waitFor(() => expect(panels()).toBe(8));
+    await waitFor(() => expect(panels()).toBe(9));
   });
 
   it('has three switches: panels, 3D pins and station tags', async () => {
@@ -77,7 +77,7 @@ describe('VisualPanels', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Station tags' }));
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Station tags' })).not.toBeChecked());
     await waitFor(() => expect(saved.modes).toEqual({ labels: 'hidden' }));
-    expect(panels()).toBe(8);
+    expect(panels()).toBe(9);
   });
 
   it('opens a station from its workflow row', () => {
@@ -87,13 +87,24 @@ describe('VisualPanels', () => {
     expect(picked).toEqual(['hsb05']);
   });
 
+  it('has the Product panel under the Repair Pareto: the block turning in its own page, one click opens the card', async () => {
+    const opened: number[] = [];
+    render(<Screen {...base} theme="dark" onSelectProduct={() => opened.push(1)} />);
+    await waitFor(() => expect(screen.getByLabelText('Product')).toBeInTheDocument());
+    const order = [...document.querySelectorAll('section[data-panel]')].map((el) => el.getAttribute('data-panel'));
+    expect(order.indexOf('product')).toBe(order.indexOf('paretoRepair') + 1);
+    expect(screen.getByTitle('BC 2TR cylinder block')).toHaveAttribute('src', '/stations/product-live.html?mini&theme=dark');
+    fireEvent.click(screen.getByRole('button', { name: /Open Product/ }));
+    expect(opened).toEqual([1]);
+  });
+
   it('shows guests the shared layout, with no way to change it', async () => {
     saved = { modes: { paretoNg: 'hidden' } };
     render(<Screen {...base} readOnly />);
-    await waitFor(() => expect(panels()).toBe(7));
+    await waitFor(() => expect(panels()).toBe(8));
     expect(screen.queryByRole('button', { name: 'Display settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^(Hide|Collapse)/ })).toBeNull();
     fireEvent.keyDown(window, { key: 'h' });
-    expect(panels()).toBe(7);
+    expect(panels()).toBe(8);
   });
 });

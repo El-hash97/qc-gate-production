@@ -197,6 +197,28 @@ export const STATION_DETAILS: Partial<Record<StationId, StationDetail>> = {
   },
 };
 
+// The Product card (Overview, the panel under Repair Pareto): not a station but the part the line makes. The
+// picture is the BC cylinder block casting drawn from its 3D scan (Block Cy 2TR BAGUS.stl), turned by hand with
+// the mouse; Play 3D shows the scan itself with a section through the bores. Figures are from the scan:
+// 452 x 296 x 368 mm, 7.0 L of metal (140,740 triangles), about 50 kg at cast iron's 7.2 g/cm3.
+export const PRODUCT_DETAIL: StationDetail = {
+  title: 'Product',
+  subtitle: 'BC 2TR cylinder block',
+  image: { light: '/stations/product-light.svg', dark: '/stations/product-dark.svg' },
+  live: '/stations/product-live.html',
+  play: '/stations/product-3d.html',
+  description: [
+    'Produk yang dikerjakan line finishing ini: block cylinder (BC) tipe 2TR, empat silinder segaris hasil casting. Gambar dibuat dari scan 3D bagian aslinya (Block Cy 2TR BAGUS).',
+    'Seret gambar untuk memutar dan memiringkan, roda mouse untuk zoom, klik dua kali untuk kembali ke posisi awal. Tombol Play 3D menampilkan scan lengkapnya, dengan potongan melintang melalui keempat bore.',
+  ],
+  specs: [
+    { label: 'Size', value: '452 × 296 × 368 mm' },
+    { label: 'Bores', value: '4, in a row' },
+    { label: 'Metal volume', value: 'About 7.0 L' },
+    { label: 'Mass', value: 'About 50 kg in cast iron' },
+  ],
+};
+
 export function stationDetail(id: string): StationDetail | null {
   return STATION_DETAILS[id as StationId] ?? null;
 }

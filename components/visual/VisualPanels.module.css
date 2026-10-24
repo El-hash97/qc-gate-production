@@ -146,6 +146,36 @@
 
 .body::-webkit-scrollbar { display: none; }
 
+/* Product: the BC block turning on its table; the picture is a page of its own, the button covers it */
+.product {
+  position: relative;
+  height: 134px;
+  margin: 0 -6px;
+}
+
+.productFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.productOpen {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.productOpen:hover,
+.productOpen:focus-visible {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
 .big {
   font-size: 20px;
   font-weight: 800;

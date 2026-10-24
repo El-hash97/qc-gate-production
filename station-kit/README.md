@@ -11,6 +11,9 @@ station-kit/
   figure/stations/<id>.mjs        satu script per stasiun → <id>-light.svg + <id>-dark.svg
                                   (+ <id>-live.html bila gambarnya bergerak, lihat 2b)
   figure/live-kit.mjs             halaman gambar bergerak bersama (spray, junbiki, repair)
+  figure/stations/product.mjs     Product (bukan station): blok BC dari scan STL di atas turntable,
+                                  diputar dengan mouse → product-{light,dark}.svg + product-live.html
+  figure/stations/product-core.mjs  gambar blok (dipakai build dan halaman); mesh: figure/mesh/bc-2tr-lite.stl
   machine/lab-kit.js              kit mesin 3D (skill machine, MIT)
   machine/template.html           titik awal halaman 3D stasiun baru
   machine/stations/<id>-3d.html   source halaman 3D per stasiun (kit masih berupa link)
@@ -75,6 +78,25 @@ Station cukup memberi gambar dengan slot (`<g data-slot="...">`), model siklus
 (`state` / `step` / `go` / `dur`) dan `scene(state)` yang mengisi slot. Contoh: `spray.mjs`
 (siklus + film oli), `junbiki.mjs` (lift + lane fisika) dan `repair.mjs` (antrean M/M/2).
 Semuanya punya `--check` untuk self-check modelnya.
+
+### 2c. Product (panel di bawah Repair Pareto)
+
+Panel Product di Overview menampilkan blok silinder BC 2TR yang berputar sendiri; klik membuka
+kartu seperti station (`PRODUCT_DETAIL` di `utils/stationDetails.ts`). Bedanya dengan station:
+
+- Gambarnya digambar dari **mesh scan** (`Block Cy 2TR BAGUS.stl`, 140.740 segitiga, disederhanakan
+  di Blender ke 7.037 segitiga untuk SVG dan 21.111 untuk halaman 3D), bukan dari bentuk yang
+  dibangun tangan. `product-core.mjs` menggambarnya sebagai solid isometrik per frame (normal per-vertex
+  untuk shading halus, garis hanya di lipatan > 62° dan siluet), jadi halaman bisa memutar (geser),
+  memiringkan (geser atas-bawah), zoom (roda), reset (klik dua kali). `?mini` = versi panel, tanpa
+  kontrol, latar transparan, sekitar 20 gambar per detik.
+- Halaman 3D (`machine/stations/product-3d.html`) memuat `public/models/bc-2tr-detail.stl` dan
+  menampilkannya seperti Blender: cahaya studio, orbit mouse, potongan melalui keempat bore.
+  Ulang dengan `node station-kit/machine/build.mjs station-kit/machine/stations/product-3d.html`.
+- `node station-kit/figure/stations/product.mjs --check` memeriksa mesh dan biaya per frame.
+- File asli `asset/Block Cy 2TR BAGUS.stl` (7 MB) tidak ada di git; dua salinan ringan itu yang ada.
+  Untuk membuat ulang: Blender `Decimate` (collapse), rasio 0,05 → `figure/mesh/bc-2tr-lite.stl`,
+  rasio 0,15 → `public/models/bc-2tr-detail.stl`.
 
 ### 3. Mesin 3D (tombol Play)
 

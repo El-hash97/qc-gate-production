@@ -10,10 +10,10 @@
 //
 // The meshes are the 140,740-triangle scan thinned in Blender: Laplacian smooth (volume kept), planar dissolve
 // (flat faces become single faces), then collapse to the target.
-// All three: 3 smoothing passes and a 3° planar angle.
+// Both: 3 smoothing passes and a 3° planar angle.
 //   bc-2tr-hi.stl    32,000 triangles: the card whenever the block is still, and the stills
-//   bc-2tr-lite.stl  11,000 triangles: the card while it moves, so dragging stays smooth
-//   bc-2tr-mini.stl   4,500 triangles: the panel, which shares its page's thread with the 3D line
+//   bc-2tr-lite.stl  11,000 triangles: the card while it moves, so dragging stays smooth, and the panel, which
+//                    paints it on a canvas (no page to rebuild each frame) at about 30 pictures a second
 // The 3D page loads public/models/bc-2tr-detail.stl (21 k triangles, plain collapse).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -53,7 +53,7 @@ function meshOf(name) {
   });
   return { p, f: Uint16Array.from(f), size: hi.map((h, a) => h - lo[a]) };
 }
-const MESH = { hi: meshOf("bc-2tr-hi.stl"), fine: meshOf("bc-2tr-lite.stl"), mini: meshOf("bc-2tr-mini.stl") };
+const MESH = { hi: meshOf("bc-2tr-hi.stl"), fine: meshOf("bc-2tr-lite.stl") };
 const prepOf = (m) => C.prepare({ v: Float32Array.from(m.p, (n) => n / 10), f: m.f });
 const b64 = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString("base64");
 
@@ -66,7 +66,7 @@ const HOME = { az: 32, el: 30 };
 
 if (CHECK) {
   const bad = [];
-  const faces = { hi: 32000, fine: 11000, mini: 4500 };
+  const faces = { hi: 32000, fine: 11000 };
   for (const [name, m] of Object.entries(MESH)) {
     const prep = prepOf(m);
     const t0 = performance.now();
@@ -80,7 +80,7 @@ if (CHECK) {
     let minZ = Infinity;
     for (let i = 2; i < m.p.length; i += 3) minZ = Math.min(minZ, m.p[i] / 10);
     if (Math.abs(minZ - C.BLOCK_Z0) > 0.2) bad.push(`${name}: block rests at z ${minZ}, not ${C.BLOCK_Z0}`);
-    // what moves must keep up: the card's moving copy and the panel
+    // what moves must keep up: the card's moving copy, also the panel's
     if (name !== "hi" && ms > 40) bad.push(`${name}: a frame takes ${ms.toFixed(0)} ms`);
   }
   if (bad.length) { console.error(bad.join("\n")); process.exit(1); }
@@ -127,7 +127,9 @@ body{background:var(--anatomy-card);display:flex;flex-direction:column}
 body.mini{background:transparent}
 .mini .iso-plate{padding:0;background:transparent}
 .mini .iso-plate-corners,.mini .bari-ctl{display:none}
-.mini .iso-stage{cursor:pointer;pointer-events:none}
+.mini .iso-stage{cursor:pointer;pointer-events:none;position:relative}
+/* the casting is painted on a canvas over the turntable, so the panel can turn smoothly */
+.mini .iso-stage canvas{position:absolute;inset:0;width:100%;height:100%}
 @media (max-width:480px){
 .iso-plate{padding:24px 4px 20px}
 .iso-plate-corner[data-corner="hint"],.bari-num{display:none}
@@ -142,9 +144,9 @@ ${C.BLOCK_CSS}
 const VIEWS = [["iso", "Iso", HOME], ["deck", "Deck", { az: 0, el: 62 }], ["front", "Front", { az: 0, el: 12 }], ["end", "End", { az: 90, el: 12 }]];
 
 // the card's page: still by default, drawn from the 32 k mesh; while it moves it draws the 11 k copy and goes back
-// to the fine picture a moment after it stops. The panel's page: the 4.5 k copy, turning at about 16 pictures a second.
+// to the fine picture a moment after it stops. The panel's page: the 11 k copy on a canvas, turning by itself.
 function livePage(panel) {
-  const meshes = panel ? { move: MESH.mini } : { move: MESH.fine, still: MESH.hi };
+  const meshes = panel ? { move: MESH.fine } : { move: MESH.fine, still: MESH.hi };
   // the scene is drawn on load from the meshes below, so the page carries no prebuilt picture
   const svg = k.figureSvg({ width: C.VIEW.width, height: C.VIEW.height, label: LABEL, body: [`<g data-slot="scene"></g>`] });
   const views = VIEWS.map(([id, label]) => `<button type="button" data-view="${id}">${label}</button>`).join("");
@@ -159,7 +161,7 @@ function livePage(panel) {
     title: "Cylinder block casting",
     hint: "Drag to turn · wheel to zoom",
     readout: "",
-    body: `<div class="iso-stage" tabindex="0" aria-label="BC cylinder block, drag to turn it, wheel to zoom, double-click to reset">${svg}</div>`,
+    body: `<div class="iso-stage" tabindex="0" aria-label="BC cylinder block, drag to turn it, wheel to zoom, double-click to reset">${svg}${panel ? `<canvas aria-hidden="true"></canvas>` : ""}</div>`,
   });
   const live = `
 const k = { ${Object.keys(k).join(", ")} };
@@ -189,9 +191,27 @@ let goal = null, turning = mini && !still.matches, dirty = false, visible = true
 let shown = MESHES.still ? "still" : "move", settle = 0;
 const wrap = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+// the panel: the turntable stays SVG, the casting is painted on the canvas over it with the same faces and tones
+const canvas = stage.querySelector("canvas");
+const ctx = canvas && canvas.getContext("2d");
+const colors = rampOf(document.body.dataset.theme === "dark" ? "dark" : "light");
+const lineColor = getComputedStyle(document.body).getPropertyValue("--anatomy-mid").trim();
+function paint(P) {
+  slot.innerHTML = sceneSvg(k, P, null, { block: false });
+  const r = stage.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 1.5);
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  // the SVG's own fit (viewBox, centred, whole picture shown), so canvas and SVG line up exactly
+  const s = Math.min(r.width / VIEW.width, r.height / VIEW.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.setTransform(dpr * s, 0, 0, dpr * s, (dpr * (r.width - VIEW.width * s)) / 2, (dpr * (r.height - VIEW.height * s)) / 2);
+  blockCanvas(ctx, k, P, prepOf("move"), colors, lineColor, 1 / s);
+}
 function draw(id) {
   shown = id;
-  slot.innerHTML = sceneSvg(k, viewOf(k, view), prepOf(id));
+  if (ctx) paint(viewOf(k, view)); else slot.innerHTML = sceneSvg(k, viewOf(k, view), prepOf(id));
   readout.textContent = "turn " + String(Math.round(((view.az % 360) + 360) % 360)).padStart(3, "0") + "° · tilt " + Math.round(view.el) + "° · " + view.zoom.toFixed(2) + "×";
   zoomInput.value = view.zoom;
   zoomOut.textContent = view.zoom.toFixed(1) + "×";
@@ -200,7 +220,7 @@ function draw(id) {
 }
 const moving = () => !!(goal || drag || turning);
 function tick(now) {
-  if (mini && last && now - last < 60) { frame = visible ? requestAnimationFrame(tick) : 0; return; }
+  if (mini && last && now - last < 32) { frame = visible ? requestAnimationFrame(tick) : 0; return; }
   const dt = last ? Math.min((now - last) / 1000, 1 / 15) : 1 / 60;
   last = now;
   if (goal) {

@@ -77,8 +77,9 @@ export function prepare(mesh) {
 
 const fix = (n) => (Math.round(n * 10) / 10).toString();
 
-// the casting as depth-sorted flat faces in five tones, each with the creases and outline edges it owns
-export function blockSvg(k, P, prep) {
+// the casting's faces for one view: screen points, the faces that face the viewer back to front, a tone for each,
+// and which face owns each outline (one face seen) and crease (both seen, bent more than CREASE) edge
+export function facesOf(k, P, prep) {
   const { v, f, n, nrm, snr, edges } = prep;
   const { sinA, cosA, sinE, cosE, k: kk } = k.cameraOf(P);
   const [ox, oy] = P.origin;
@@ -102,27 +103,69 @@ export function blockSvg(k, P, prep) {
     order.push(i);
   }
   order.sort((a, b) => key[a] - key[b]);
-  const hi = new Map(), lo = new Map();
-  const own = (map, i, a, b) => map.set(i, (map.get(i) ?? "") + `M${fix(sx[a])} ${fix(sy[a])}L${fix(sx[b])} ${fix(sy[b])}`);
+  const tone = new Uint8Array(n);
+  for (const i of order) {
+    const lam = (snr[i * 3] * lx + snr[i * 3 + 1] * ly + snr[i * 3 + 2] * lz) / ll;
+    tone[i] = Math.max(0, Math.min(TONES - 1, Math.round(((lam + 0.3) / 1.4) * (TONES - 1))));
+  }
+  // an edge is drawn with the face that owns it, so faces painted later still cover it
+  const outline = new Map(), crease = new Map();
+  const own = (map, i, a, b) => { const list = map.get(i); if (list) list.push(a, b); else map.set(i, [a, b]); };
   for (const e of edges) {
     const v0 = !Number.isNaN(key[e.f0]);
     const v1 = e.f1 >= 0 && !Number.isNaN(key[e.f1]);
     if (!v0 && !v1) continue;
     // both faces seen: a crease is a line on the nearer one; one face seen: the outline (or a crease on the open edge)
-    if (v0 && v1) { if (e.crease) own(lo, key[e.f0] > key[e.f1] ? e.f0 : e.f1, e.a, e.b); }
-    else own(hi, v0 ? e.f0 : e.f1, e.a, e.b);
+    if (v0 && v1) { if (e.crease) own(crease, key[e.f0] > key[e.f1] ? e.f0 : e.f1, e.a, e.b); }
+    else own(outline, v0 ? e.f0 : e.f1, e.a, e.b);
   }
+  return { f, sx, sy, order, tone, outline, crease };
+}
+
+// the casting as SVG: depth-sorted flat faces, each with the creases and outline edges it owns
+export function blockSvg(k, P, prep) {
+  const { f, sx, sy, order, tone, outline, crease } = facesOf(k, P, prep);
+  const segs = (list) => { let d = ""; for (let j = 0; j < list.length; j += 2) d += `M${fix(sx[list[j]])} ${fix(sy[list[j]])}L${fix(sx[list[j + 1]])} ${fix(sy[list[j + 1]])}`; return d; };
   let out = "";
   for (const i of order) {
     const a = f[i * 3], b = f[i * 3 + 1], c = f[i * 3 + 2];
-    const lam = (snr[i * 3] * lx + snr[i * 3 + 1] * ly + snr[i * 3 + 2] * lz) / ll;
-    const tone = Math.max(0, Math.min(TONES - 1, Math.round(((lam + 0.3) / 1.4) * (TONES - 1))));
-    out += `<path class="pm" data-t="${tone}" d="M${fix(sx[a])} ${fix(sy[a])}L${fix(sx[b])} ${fix(sy[b])}L${fix(sx[c])} ${fix(sy[c])}Z"/>`;
-    const h = hi.get(i), l = lo.get(i);
-    if (l) out += `<path class="iso-line" data-tone="faint" d="${l}"/>`;
-    if (h) out += `<path class="iso-line" data-tone="mid" d="${h}"/>`;
+    out += `<path class="pm" data-t="${tone[i]}" d="M${fix(sx[a])} ${fix(sy[a])}L${fix(sx[b])} ${fix(sy[b])}L${fix(sx[c])} ${fix(sy[c])}Z"/>`;
+    const l = crease.get(i), h = outline.get(i);
+    if (l) out += `<path class="iso-line" data-tone="faint" d="${segs(l)}"/>`;
+    if (h) out += `<path class="iso-line" data-tone="mid" d="${segs(h)}"/>`;
   }
   return out;
+}
+
+// the same faces painted on a canvas, for the overview panel that turns all the time: no page to rebuild each
+// frame, so it can turn smoothly. ctx is already scaled to the figure's units; colours: the tone ramp, the outline
+// colour, and px, one screen pixel in figure units. A panel this small shows the outline only, no creases.
+export function blockCanvas(ctx, k, P, prep, colors, line, px) {
+  const { f, sx, sy, order, tone, outline } = facesOf(k, P, prep);
+  ctx.lineJoin = "round";
+  ctx.lineWidth = px * 0.7;
+  ctx.strokeStyle = line;
+  // each face grows by about half a pixel from its centre, so neighbours overlap instead of leaving a hairline of
+  // background between them (a fill only: stroking every face doubled the cost)
+  const grow = px * 0.6;
+  const out = (x, cx, d) => x + ((x - cx) / d) * grow;
+  for (const i of order) {
+    const a = f[i * 3], b = f[i * 3 + 1], c = f[i * 3 + 2];
+    const cx = (sx[a] + sx[b] + sx[c]) / 3, cy = (sy[a] + sy[b] + sy[c]) / 3;
+    const da = Math.hypot(sx[a] - cx, sy[a] - cy) || 1, db = Math.hypot(sx[b] - cx, sy[b] - cy) || 1, dc = Math.hypot(sx[c] - cx, sy[c] - cy) || 1;
+    ctx.fillStyle = colors[tone[i]];
+    ctx.beginPath();
+    ctx.moveTo(out(sx[a], cx, da), out(sy[a], cy, da));
+    ctx.lineTo(out(sx[b], cx, db), out(sy[b], cy, db));
+    ctx.lineTo(out(sx[c], cx, dc), out(sy[c], cy, dc));
+    ctx.fill();
+    const h = outline.get(i);
+    if (h) {
+      ctx.beginPath();
+      for (let j = 0; j < h.length; j += 2) { ctx.moveTo(sx[h[j]], sy[h[j]]); ctx.lineTo(sx[h[j + 1]], sy[h[j + 1]]); }
+      ctx.stroke();
+    }
+  }
 }
 
 // the projection for a view: the table always fills the picture, whatever the turn and tilt
@@ -133,8 +176,8 @@ export function viewOf(k, { az = 45, el = 30, zoom = 1 } = {}) {
   return { ...fit, azimuth: az, scale: fit.scale * zoom, origin: [cx + (fit.origin[0] - cx) * zoom, cy + (fit.origin[1] - cy) * zoom] };
 }
 
-// the whole picture: turntable, pads and casting, back to front
-export function sceneSvg(k, P, prep) {
+// the whole picture: turntable, pads and casting, back to front (block: false leaves the casting to a canvas on top)
+export function sceneSvg(k, P, prep, { block = true } = {}) {
   const S = (paths, style) => k.solidSvg(paths, style);
   const ringTop = TABLE.base + TABLE.ring;
   const ticks = k.radialTicks(0, 0, TABLE.r - 18, 72, 6, ringTop, [4, 9], P);
@@ -154,7 +197,7 @@ export function sceneSvg(k, P, prep) {
     k.lineSvg(ticks.major, { tone: "mid" }),
     k.lineSvg(zero.major, { tone: "hi" }),
     ...pads.map((plan) => S(k.slabOf(plan, ringTop, TABLE.pad, P, 3, 0.5), { tone: "mid" })),
-    blockSvg(k, P, prep),
+    block ? blockSvg(k, P, prep) : "",
   ].join("");
 }
 
@@ -162,6 +205,8 @@ export function sceneSvg(k, P, prep) {
 // shade tokens so the form reads, light and dark
 const RAMP = { dark: ["#0e0e0e", "#8c8c8c"], light: ["#7e7e7a", "#f2f2ef"] };
 const hex = (a, b, t) => "#" + [1, 3, 5].map((o) => Math.round(parseInt(a.slice(o, o + 2), 16) * (1 - t) + parseInt(b.slice(o, o + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+// the ramp as colours, for the canvas painter
+export const rampOf = (theme) => Array.from({ length: TONES }, (_, i) => hex(RAMP[theme][0], RAMP[theme][1], i / (TONES - 1)));
 // one variable per tone, set once per theme, so a face costs the browser one plain class lookup
 const ramp = (r) => Array.from({ length: TONES }, (_, i) => `--pm-${i}:${hex(r[0], r[1], i / (TONES - 1))}`).join(";");
 export const BLOCK_CSS = `.iso{${ramp(RAMP.dark)}}

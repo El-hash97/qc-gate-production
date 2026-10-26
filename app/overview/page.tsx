@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { useProductionState } from '@/hooks/useProductionState';
+import { useLivePoll } from '@/hooks/useLivePoll';
 import { useLineStopHistory } from '@/hooks/useLineStopHistory';
 import { useBlocksProduced, useResetBlockCounter } from '@/hooks/useBlocksProduced';
 import { useTheme } from '@/hooks/useTheme';
@@ -26,7 +27,8 @@ const FinishingLine3D = dynamic(() => import('@/components/visual/FinishingLine3
 });
 
 export default function OverviewPage() {
-  const { state } = useProductionState();
+  useLivePoll('overview');
+  const { state } = useProductionState({ poll: false });
   const { theme } = useTheme();
   const [open, setOpen] = useState<StationId | null>(null);
   const [productOpen, setProductOpen] = useState(false);

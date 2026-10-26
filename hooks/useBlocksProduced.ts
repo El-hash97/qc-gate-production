@@ -2,9 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-// Archived shifts only change at a reset, so a slow poll is plenty; the shift
-// running now comes from the live production state instead.
-const POLL_MS = 60_000;
+// Archived shifts only change at a reset; the Overview's useLivePoll keeps
+// this fresh, and the shift running now comes from the live production state.
 
 // archived: blocks of all archived shifts; baseline: the count at the last reset
 export interface BlockCounter {
@@ -19,7 +18,7 @@ async function call(method: 'GET' | 'POST'): Promise<BlockCounter> {
 }
 
 export function useBlocksProduced() {
-  return useQuery({ queryKey: ['blocksProduced'], queryFn: () => call('GET'), refetchInterval: POLL_MS, refetchOnWindowFocus: false });
+  return useQuery({ queryKey: ['blocksProduced'], queryFn: () => call('GET'), refetchOnWindowFocus: false });
 }
 
 export function useResetBlockCounter() {

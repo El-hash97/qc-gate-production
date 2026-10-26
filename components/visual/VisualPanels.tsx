@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { shouldPausePoll } from '@/hooks/useProductionState';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PanelData } from '@/utils/visualPanels';
 import { WORKFLOW_CARDS, stepState } from '@/utils/workflowCards';
 import type { LineStop } from '@/lib/types';
@@ -34,10 +33,10 @@ type Modes = Partial<Record<PanelId, Mode>>;
 
 // The layout is shared by every screen (database, /api/display-settings):
 // whatever the logged-in user hides here is hidden on the TVs too.
-const SETTINGS_KEY = ['displaySettings', 'overview'] as const;
+// Kept fresh by the Overview's useLivePoll.
+export const SETTINGS_KEY = ['displaySettings', 'overview'] as const;
 const SETTINGS_URL = '/api/display-settings/overview';
-const POLL_MS = 5000;
-// after a save, hold the poll so a lagging read can't bounce the toggle back
+// after a save, wait before re-reading so a lagging read can't bounce the toggle back
 const GRACE_MS = 3000;
 
 async function fetchModes(): Promise<Modes> {
@@ -60,12 +59,9 @@ async function putModes(modes: Modes): Promise<void> {
 // pressing it on one screen never blanks the others.
 export function usePanelModes(readOnly = false) {
   const queryClient = useQueryClient();
-  const pending = useIsMutating({ mutationKey: SETTINGS_KEY });
-  const [grace, setGrace] = useState(false);
   const { data: modes = {} } = useQuery({
     queryKey: SETTINGS_KEY,
     queryFn: fetchModes,
-    refetchInterval: shouldPausePoll(pending, grace) ? false : POLL_MS,
     refetchOnWindowFocus: false,
   });
   const mutation = useMutation({
@@ -81,11 +77,7 @@ export function usePanelModes(readOnly = false) {
       if (context) queryClient.setQueryData(SETTINGS_KEY, context.previous);
     },
     onSuccess: () => {
-      setGrace(true);
-      setTimeout(() => {
-        setGrace(false);
-        queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
-      }, GRACE_MS);
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }), GRACE_MS);
     },
   });
   const [allHidden, setAllHidden] = useState(false);

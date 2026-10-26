@@ -27,6 +27,7 @@ vi.mock('@/hooks/useProductionState', () => ({
 }));
 vi.mock('react-chartjs-2', () => ({ Doughnut: () => null, Bar: () => null, Chart: () => null }));
 vi.mock('@/hooks/useAutoReset', () => ({ useAutoReset: () => {} }));
+vi.mock('@/hooks/useLivePoll', () => ({ useLivePoll: () => {} }));
 vi.mock('@/hooks/useDefectTypes', async () => {
   const { typesFor } = await vi.importActual<typeof import('@/utils/constants')>('@/utils/constants');
   return { useTypesFor: (product: any, kind: any) => typesFor(product, kind, []) };

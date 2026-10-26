@@ -5,7 +5,7 @@ import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/
 import type { ProductionState } from '@/lib/types';
 
 const STATE_QUERY_KEY = ['productionState'] as const;
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 15_000;
 // Neon's serverless driver can take >1.5s on a cold compute; keep the grace
 // window comfortably above that so a post-save poll can't land before the
 // write is durable and bounce the field back to its old value.
@@ -40,7 +40,8 @@ async function postState(state: ProductionState): Promise<void> {
   if (!json.success) throw new Error(json.error ?? 'Failed to save state');
 }
 
-export function useProductionState() {
+// poll: false on pages whose useLivePoll already refreshes the state.
+export function useProductionState({ poll = true }: { poll?: boolean } = {}) {
   const queryClient = useQueryClient();
   const pendingWrites = useIsMutating({ mutationKey: STATE_QUERY_KEY });
   // True from the moment a save succeeds until OPTIMISTIC_GRACE_MS later.
@@ -56,7 +57,7 @@ export function useProductionState() {
     // Pause the background poll while a save is in flight, and through the
     // grace window after it, so a stale GET can't overwrite what the user
     // just typed/clicked.
-    refetchInterval: shouldPausePoll(pendingWrites, inGraceWindow) ? false : POLL_INTERVAL_MS,
+    refetchInterval: !poll || shouldPausePoll(pendingWrites, inGraceWindow) ? false : POLL_INTERVAL_MS,
     refetchOnWindowFocus: false,
   });
 

@@ -3,9 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { WINDOW_DAYS, lastDays, type DatedStop } from '@/utils/stopHistory';
 
-// Archived shifts only change at a reset, so a slow poll is plenty; the shift
-// running now comes from the live production state instead.
-const POLL_MS = 60_000;
+// Archived shifts only change at a reset; the Overview's useLivePoll keeps
+// this fresh, and the shift running now comes from the live production state.
 
 async function fetchArchived(since: string): Promise<DatedStop[]> {
   const json = await (await fetch(`/api/line-stops?since=${since}`)).json();
@@ -19,7 +18,6 @@ export function useLineStopHistory() {
   return useQuery({
     queryKey: ['lineStopHistory', since],
     queryFn: () => fetchArchived(since),
-    refetchInterval: POLL_MS,
     refetchOnWindowFocus: false,
   });
 }

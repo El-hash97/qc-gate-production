@@ -15,8 +15,7 @@ interface PhotoResponse {
   error?: string;
 }
 
-const FLAGS_KEY = ['defectPhotoFlags'] as const;
-const FLAGS_POLL_MS = 5000;
+export const FLAGS_KEY = ['defectPhotoFlags'] as const;
 
 function flagKey(group: PhotoGroup, chartType: PhotoChartType, defectType: string): string {
   return `${group}:${chartType}:${defectType}`;
@@ -29,13 +28,17 @@ async function fetchFlags(): Promise<Set<string>> {
   const res = await fetch('/api/defect-photos', { cache: 'no-store' });
   const json: FlagsResponse = await res.json();
   if (!json.success) throw new Error(json.error ?? 'Failed to load photo flags');
-  return new Set(json.data.map((f) => flagKey(f.group, f.chartType, f.defectType)));
+  return toFlagSet(json.data);
+}
+
+export function toFlagSet(flags: FlagsResponse['data']): Set<string> {
+  return new Set(flags.map((f) => flagKey(f.group, f.chartType, f.defectType)));
 }
 
 // Which of the N (group x NG/repair x defect) slots currently have a photo — lightweight,
-// polled independently of the actual image bytes.
+// kept fresh by the Dashboard's useLivePoll, separately from the image bytes.
 export function useDefectPhotoFlags() {
-  const query = useQuery({ queryKey: FLAGS_KEY, queryFn: fetchFlags, refetchInterval: FLAGS_POLL_MS });
+  const query = useQuery({ queryKey: FLAGS_KEY, queryFn: fetchFlags, refetchOnWindowFocus: false });
   return {
     hasPhoto: (group: PhotoGroup, chartType: PhotoChartType, defectType: string) =>
       query.data?.has(flagKey(group, chartType, defectType)) ?? false,

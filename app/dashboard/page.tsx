@@ -10,6 +10,7 @@ import { useDefectPhotoFlags } from '@/hooks/useDefectPhotos';
 import type { PhotoChartType, PhotoGroup } from '@/lib/defectPhotos';
 import { useAuth } from '@/hooks/useAuth';
 import { useAutoReset } from '@/hooks/useAutoReset';
+import { useLivePoll } from '@/hooks/useLivePoll';
 import type { EntryLog, HourWindow, ProductionState } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -26,7 +27,8 @@ const EMPTY_STATE: ProductionState = {
 };
 
 export default function DashboardPage() {
-  const { state, isFetching, isError, updateState } = useProductionState();
+  useLivePoll('dashboard');
+  const { state, isFetching, isError, updateState } = useProductionState({ poll: false });
   const { authed } = useAuth();
   // The line's screen keeps the Dashboard open all shift, so it drives the 07:10 / 19:50 auto reset.
   useAutoReset();

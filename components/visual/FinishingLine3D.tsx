@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { ViewGizmo, viewPose, type ViewAxis } from './ViewGizmo';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
@@ -280,6 +281,9 @@ export default function FinishingLine3D({
   const busyChanged = useRef(onBusyChange);
   busyChanged.current = onBusyChange;
   const flyTo = useRef<(id: StationId) => void>(() => {});
+  const flyView = useRef<(axis: ViewAxis) => void>(() => {});
+  const gizmo = useRef<((q: THREE.Quaternion) => void) | null>(null);
+  const bindGizmo = useCallback((update: ((q: THREE.Quaternion) => void) | null) => { gizmo.current = update; }, []);
   // Read by the render loop, so a 3 s poll updates these without rebuilding the scene.
   const shownPins = new Set<PinId>(pins ?? PINS.map((p) => p.id));
   const station = lineStop?.station;
@@ -334,6 +338,10 @@ export default function FinishingLine3D({
       const dir = camera.position.clone().sub(controls.target).normalize();
       fly = { target, pos: target.clone().addScaledVector(dir, 12).clamp(roomMin, roomMax) };
     };
+    // the view gizmo: axis views of the whole hall, or back to the start view
+    const home = { target: controls.target.clone(), pos: camera.position.clone() };
+    const hall = new THREE.Vector3((ROOM.x0 + ROOM.x1) / 2, 0, (ROOM.z0 + ROOM.z1) / 2);
+    flyView.current = (axis) => { fly = viewPose(axis, hall, home); };
     controls.addEventListener('start', () => { fly = null; });
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
@@ -658,7 +666,12 @@ export default function FinishingLine3D({
         const k = 1 - Math.exp(-dt * 4);
         controls.target.lerp(fly.target, k);
         camera.position.lerp(fly.pos, k);
-        if (camera.position.distanceTo(fly.pos) < 0.05) fly = null;
+        // snap the last bit, so a straight-down view keeps its exact heading
+        if (camera.position.distanceTo(fly.pos) < 0.05) {
+          camera.position.copy(fly.pos);
+          controls.target.copy(fly.target);
+          fly = null;
+        }
       }
       controls.update();
       controls.target.x = THREE.MathUtils.clamp(controls.target.x, roomMin.x, roomMax.x);
@@ -670,6 +683,7 @@ export default function FinishingLine3D({
       const inside = p.x > roomMin.x && p.x < roomMax.x && p.z > roomMin.z && p.z < roomMax.z;
       p.y = Math.max(p.y, inside ? roomMin.y : ROOM.h + 1);
       renderer.render(scene, camera);
+      gizmo.current?.(camera.quaternion);
       callouts.update(camera, sim, c, live.current.running, live.current.pins, ROOM.x0);
       nameTags.update(camera, live.current.labels, c, live.current.lineStop);
     };
@@ -720,13 +734,14 @@ export default function FinishingLine3D({
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
+      <ViewGizmo onPick={(axis) => flyView.current(axis)} bind={bindGizmo} />
       {/* A partial yellow pallet can go to Line Repair before it holds a full batch. */}
       {waitingRepair > 0 && waitingRepair < REPAIR_BATCH && (
         <button
           type="button"
           onClick={() => { if (simRef.current) dispatchRepair(simRef.current); }}
           style={{
-            position: 'absolute', left: 16, bottom: 16, padding: '8px 14px', borderRadius: 8,
+            position: 'absolute', left: 'calc(var(--view-left, 16px) + 140px)', bottom: 'var(--view-bottom, 16px)', padding: '8px 14px', borderRadius: 8,
             border: '1px solid #a16207', background: '#eab308', color: '#1f2937',
             fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             boxShadow: '0 2px 8px rgba(0,0,0,0.25)',

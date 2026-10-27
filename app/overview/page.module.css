@@ -14,6 +14,19 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--bg-secondary);
+  /* the 3D view gizmo sits right of the left panels, above the bottom row
+     (VisualPanels: --side 210px, --bottom-h 156px, scaled by --ui-zoom) */
+  --view-left: calc((210px + 24px) * var(--ui-zoom, 1));
+  --view-bottom: calc((156px + 24px) * var(--ui-zoom, 1));
+}
+
+/* no panels (all hidden with H, or a narrow screen): into the corner */
+.stage[data-bare] {
+  --view-left: 16px;
+  --view-bottom: 16px;
+}
+@media (max-width: 1100px) {
+  .stage { --view-left: 16px; --view-bottom: 16px; }
 }
 
 .overlay,

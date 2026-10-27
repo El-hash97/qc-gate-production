@@ -80,7 +80,7 @@ export default function OverviewPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.stage}>
+      <div className={styles.stage} data-bare={!panels || panelModes.allHidden || undefined}>
         <FinishingLine3D counts={counts} running={running} theme={theme} onSelectStation={setOpen}
           onBusyChange={setBusy} focus={focus} pins={panelModes.shownPins()}
           labels={panelModes.mode('labels') !== 'hidden'} lineStop={lineStop}

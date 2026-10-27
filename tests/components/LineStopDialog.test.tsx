@@ -41,7 +41,7 @@ describe('LineStopDialog', () => {
     // 30 days by default: both stops, 30 bars
     expect(screen.getAllByTestId('day')).toHaveLength(30);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(screen.getByText('2× / 30 days')).toBeInTheDocument();
+    expect(screen.getByText('1× this shift · 2× / 30 days')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '7 days' }));
     expect(screen.getAllByTestId('day')).toHaveLength(7);
@@ -53,14 +53,14 @@ describe('LineStopDialog', () => {
     expect(days[6]).toHaveAttribute('title', '2026-10-19 · 1 stop · 45m');
   });
 
-  it('shows the 30-day level next to the title: neutral, orange from 3, red from 10', () => {
-    const many = (n: number) => Array.from({ length: n }, () => a);
+  it('colours by this shift only: neutral, orange from 3, red from 10; archived stops never count', () => {
+    const many = (n: number) => [a, a, a, ...Array.from({ length: n }, () => b)];
     const { rerender } = open(many(2));
-    expect(screen.getByText('2× / 30 days')).toHaveAttribute('data-level', 'ok');
+    expect(screen.getByText('2× this shift · 5× / 30 days')).toHaveAttribute('data-level', 'ok');
     rerender(<LineStopDialog title="QC Gate 1" stops={many(3)} active={null} now={NOW} onClose={vi.fn()} />);
-    expect(screen.getByText('3× / 30 days')).toHaveAttribute('data-level', 'orange');
+    expect(screen.getByText('3× this shift · 6× / 30 days')).toHaveAttribute('data-level', 'orange');
     rerender(<LineStopDialog title="QC Gate 1" stops={many(10)} active={null} now={NOW} onClose={vi.fn()} />);
-    expect(screen.getByText('10× / 30 days')).toHaveAttribute('data-level', 'red');
+    expect(screen.getByText('10× this shift · 13× / 30 days')).toHaveAttribute('data-level', 'red');
   });
 
   it('says so when the range has none, and closes on × and Escape', async () => {

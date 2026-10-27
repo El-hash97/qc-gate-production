@@ -36,7 +36,7 @@
   font-weight: 700;
   color: var(--text-secondary);
 }
-.level[data-level='orange'] { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.level[data-level='orange'] { background: #f97316; border-color: #f97316; color: #fff; }
 .level[data-level='red'] { background: #dc2626; border-color: #dc2626; color: #fff; }
 
 .filter { flex: none; display: flex; align-items: center; gap: 6px; }

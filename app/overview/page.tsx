@@ -47,13 +47,13 @@ export default function OverviewPage() {
   const panels = useMemo(() => (state ? panelData(state, now) : null), [state, now]);
   const lineStop = useMemo(() => activeStationStop(state?.lineStops, now), [state, now]);
   // last 30 days of line stops: archived shifts + the one running now. Per
-  // machine, 3+ turns it orange and 10+ red.
+  // machine, 3+ in this shift turns it orange (blinking) and 10+ red.
   const { data: archived } = useLineStopHistory();
   const stops30 = useMemo(
     () => withLiveStops(archived ?? [], state?.lineStops, state?.date, now),
     [archived, state?.lineStops, state?.date, now],
   );
-  const stopCounts = useMemo(() => stationCounts(stops30, now), [stops30, now]);
+  const stopCounts = useMemo(() => stationCounts(stops30), [stops30]);
   // Workflow row: fly the camera there, and open the station card if it has one.
   const goTo = (id: StationId) => {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));

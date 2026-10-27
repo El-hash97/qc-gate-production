@@ -36,7 +36,8 @@ export function LineStopDialog({ title, stops, active, now, onClose }: Props) {
   }, [onClose]);
 
   const month = stopsInRange(stops, WINDOW_DAYS, now);
-  const level = stopLevel(month.length);
+  const shift = stops.filter((s) => s.live).length;
+  const level = stopLevel(shift);
   const shown = stopsInRange(stops, range, now);
   const days = dailyCounts(shown, range, now, now);
   const peak = Math.max(1, ...days.map((d) => d.count));
@@ -49,7 +50,7 @@ export function LineStopDialog({ title, stops, active, now, onClose }: Props) {
         <header className={styles.head}>
           <h2 className={styles.title}>{title ? `${title} · Line Stop` : 'Line Stop'}</h2>
           <span className={styles.level} data-level={level}>
-            {month.length}× / {WINDOW_DAYS} days
+            {shift}× this shift · {month.length}× / {WINDOW_DAYS} days
           </span>
           <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>×</button>
         </header>

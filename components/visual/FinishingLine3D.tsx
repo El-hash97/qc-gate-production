@@ -110,7 +110,8 @@ interface Props {
   // the last 30 days of line stops (archived shifts + this one): a station's
   // board shows its latest one and is clickable when it has any
   lineStops?: LineStop[];
-  // line stops per station in those 30 days: 3+ turns the machine orange, 10+ red
+  // line stops per station in the shift running now: 3+ turns the machine
+  // orange, 10+ red, and it blinks
   stopCounts?: Record<string, number>;
   // a station's board was clicked (only boards that carry a line stop)
   onSelectLineStops?: (id: StationId) => void;
@@ -350,9 +351,9 @@ export default function FinishingLine3D({
     // workflow boards on the empty floor east of the line, Baritori end to Line Repair
     const boards = createWorkflowBoards(WORKFLOW_CARDS, 15.5, -3, 3.1);
     scene.add(boards.group);
-    // Machines with 3+ (orange) or 10+ (red) line stops in the last 30 days get
-    // their body tinted (see `machines` below).
-    const HALO = { orange: 0xf59e0b, red: 0xdc2626 } as const;
+    // Machines with 3+ (orange) or 10+ (red) line stops this shift get their
+    // body tinted and blinking, and so does their board (see `machines` below).
+    const HALO = { orange: 0xf97316, red: 0xdc2626 } as const;
     // click (not drag) on a board that carries a line stop opens the details;
     // the pointer shows it is clickable
     const ray = new THREE.Raycaster();
@@ -623,25 +624,29 @@ export default function FinishingLine3D({
       const c = live.current.counts;
       const busy = sim.segments.map((seg) => seg.busy !== null);
       const stopAt = live.current.lineStop?.station ?? null;
-      const counts30 = live.current.stopCounts ?? {};
+      const shiftStops = live.current.stopCounts ?? {};
       boards.draw(
-        (card) => cardRows(card, c, live.current.running, busy, stopAt, stopsAt(live.current.lineStops, card.id).at(-1) ?? null, counts30[card.id] ?? 0),
+        (card) => cardRows(card, c, live.current.running, busy, stopAt, stopsAt(live.current.lineStops, card.id).at(-1) ?? null, shiftStops[card.id] ?? 0),
         boardTheme,
-        (card) => stopLevel(counts30[card.id] ?? 0),
+        (card) => stopLevel(shiftStops[card.id] ?? 0),
       );
+      // 0..1, about once a second
+      const blink = 0.5 + 0.5 * Math.sin(now / 160);
+      for (const { id, face } of boards.faces) {
+        (face.material as THREE.MeshBasicMaterial).color.setScalar(stopLevel(shiftStops[id] ?? 0) === 'ok' ? 1 : 0.45 + 0.55 * blink);
+      }
       for (const mc of machines) {
-        const level = stopLevel(counts30[mc.id] ?? 0);
-        if (tinted.get(mc.id) === level) continue;
-        tinted.set(mc.id, level);
-        const tint = new THREE.Color(level === 'ok' ? 0 : HALO[level]);
-        for (const t of mc.mats) {
-          t.m.color.copy(t.color);
-          t.m.emissive.copy(t.emissive);
-          if (level !== 'ok') {
-            t.m.color.lerp(tint, 0.7);
-            t.m.emissive.copy(tint).multiplyScalar(0.25);
+        const level = stopLevel(shiftStops[mc.id] ?? 0);
+        if (tinted.get(mc.id) !== level) {
+          tinted.set(mc.id, level);
+          for (const t of mc.mats) {
+            t.m.color.copy(t.color);
+            t.m.emissive.copy(t.emissive);
+            if (level !== 'ok') t.m.color.lerp(new THREE.Color(HALO[level]), 0.7);
           }
         }
+        if (level === 'ok') continue;
+        for (const t of mc.mats) t.m.emissive.setHex(HALO[level]).multiplyScalar(0.1 + 0.5 * blink);
       }
       const busyKey = busy.join();
       if (busyKey !== lastBusy) {

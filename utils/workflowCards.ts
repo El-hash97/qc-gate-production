@@ -62,7 +62,7 @@ const STATUS: Record<StepState, string> = {
 };
 
 // Label of the 30-day line stop count row (the board colours it by level).
-export const STOPS_30D = 'Stops · 30 days';
+export const STOPS_SHIFT = 'Stops · this shift';
 
 // The data rows printed under a card's description.
 export function cardRows(
@@ -73,7 +73,7 @@ export function cardRows(
   stop: StationId | null = null,
   // the latest line stop logged at this station, if any
   lastStop: LineStop | null = null,
-  // line stops at this station in the last 30 days
+  // line stops at this station in the shift running now
   stopCount = 0,
 ): [string, string][] {
   const rows: [string, string][] = [];
@@ -89,7 +89,7 @@ export function cardRows(
   if (card.id === 'junbiki') rows.push(['OK', `${counts.ok} (${pct(counts.ok)})`]);
   if (card.id === 'lineRepair') rows.push(['Repair', `${counts.repair} (${pct(counts.repair)})`]);
   if (lastStop) rows.push(['Line stop', `${lastStop.problem} · ${stopLabel(lastStop)}`]);
-  if (stopCount > 0) rows.push([STOPS_30D, `${stopCount}×`]);
+  if (stopCount > 0) rows.push([STOPS_SHIFT, `${stopCount}×`]);
   rows.push(['Next', card.next]);
   return rows;
 }

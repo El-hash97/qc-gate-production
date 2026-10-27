@@ -22,13 +22,14 @@ describe('lastDays', () => {
 });
 
 describe('stationCounts', () => {
-  it('counts only the last 30 days and only stops that have a station', () => {
+  it('counts only the shift running now and only stops that have a station', () => {
+    const live = { live: true };
     const stops = [
-      stop('2026-10-20', 'qc1'), stop('2026-10-01', 'qc1'), stop('2026-09-21', 'qc1'),
-      stop('2026-09-20', 'qc1'), // day 31: out
-      stop('2026-10-10', 'hsb05'), stop('2026-10-10'), // no station: nobody's
+      stop('2026-10-20', 'qc1', live), stop('2026-10-20', 'qc1', live), stop('2026-10-20', 'qc1', live),
+      stop('2026-10-20', 'qc1'), // archived shift: history only
+      stop('2026-10-20', 'hsb05', live), stop('2026-10-20', undefined, live), // no station: nobody's
     ];
-    expect(stationCounts(stops, today)).toEqual({ qc1: 3, hsb05: 1 });
+    expect(stationCounts(stops)).toEqual({ qc1: 3, hsb05: 1 });
   });
 });
 

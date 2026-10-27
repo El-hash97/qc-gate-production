@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Theme } from '@/hooks/useTheme';
-import { STOPS_30D, type WorkflowCard } from '@/utils/workflowCards';
+import { STOPS_SHIFT, type WorkflowCard } from '@/utils/workflowCards';
 import type { StopLevel } from '@/utils/stopHistory';
 
 // Standing workflow boards on the empty floor beside the line: one per process
@@ -17,8 +17,8 @@ const COLORS: Record<Theme, { bg: string; ink: string; muted: string; rule: stri
   light: { bg: '#ffffff', ink: '#1b1e28', muted: '#59616f', rule: '#e3e6ec', chip: '#f3f4f6' },
 };
 const ACCENT = '#eb0a1e';
-// header band of a machine with 3+ (orange) / 10+ (red) line stops in 30 days
-const LEVEL: Record<Exclude<StopLevel, 'ok'>, string> = { orange: '#f59e0b', red: '#dc2626' };
+// header band of a machine with 3+ (orange) / 10+ (red) line stops this shift
+const LEVEL: Record<Exclude<StopLevel, 'ok'>, string> = { orange: '#f97316', red: '#dc2626' };
 
 function fit(g: CanvasRenderingContext2D, text: string, width: number): string {
   if (g.measureText(text).width <= width) return text;
@@ -128,7 +128,7 @@ function makeBoard(card: WorkflowCard, step: number, total: number) {
       g.fillText(label.toUpperCase(), 64, y + (rowH - 6) / 2);
       // a line stop at this station: its description and time, in red
       const stop = label === 'Line stop';
-      g.fillStyle = label === STOPS_30D && lc ? lc : stop || value === 'Line stop' ? ACCENT : label === 'Status' && value === 'Processing' ? '#16a34a' : c.ink;
+      g.fillStyle = label === STOPS_SHIFT && lc ? lc : stop || value === 'Line stop' ? ACCENT : label === 'Status' && value === 'Processing' ? '#16a34a' : c.ink;
       g.font = stop ? 'bold 28px sans-serif' : 'bold 34px sans-serif';
       g.textAlign = 'right';
       g.fillText(stop ? fit(g, value, 600) : value, W - 64, y + (rowH - 6) / 2);

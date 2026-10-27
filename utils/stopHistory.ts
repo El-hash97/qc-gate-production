@@ -9,7 +9,8 @@ export interface DatedStop extends LineStop {
   live?: boolean;
 }
 
-// A machine turns orange / red from this many line stops within the window.
+// A machine turns orange / red from this many line stops in the shift running
+// now; a shift change clears it (the archived stops stay in the history).
 export const ORANGE_AT = 3;
 export const RED_AT = 10;
 export const WINDOW_DAYS = 30;
@@ -44,12 +45,12 @@ export function stopsInRange(stops: readonly DatedStop[], days: number, today: D
   return stops.filter((s) => dates.has(s.date));
 }
 
-// Stops per machine over the last WINDOW_DAYS. A stop without a station
-// belongs to no machine and is not counted.
-export function stationCounts(stops: readonly DatedStop[], today: Date): Record<string, number> {
+// Stops per machine in the shift running now (`live`). A stop without a
+// station belongs to no machine and is not counted.
+export function stationCounts(stops: readonly DatedStop[]): Record<string, number> {
   const counts: Record<string, number> = {};
-  for (const s of stopsInRange(stops, WINDOW_DAYS, today)) {
-    if (s.station) counts[s.station] = (counts[s.station] ?? 0) + 1;
+  for (const s of stops) {
+    if (s.live && s.station) counts[s.station] = (counts[s.station] ?? 0) + 1;
   }
   return counts;
 }

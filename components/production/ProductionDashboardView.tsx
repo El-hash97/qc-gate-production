@@ -14,6 +14,7 @@ import { LineStopTable } from '@/components/production/LineStopTable';
 import { OeeCard } from '@/components/production/OeeCard';
 import { PicCard } from '@/components/production/PicCard';
 import { LineParetoChart } from '@/components/production/LineParetoChart';
+import { RepairSuspectPanel } from '@/components/production/RepairSuspectPanel';
 import { useDefectLines } from '@/hooks/useDefectLines';
 import { paretoByLine } from '@/utils/defectLines';
 import { useTheme } from '@/hooks/useTheme';
@@ -535,6 +536,12 @@ export function ProductionDashboardView({
           <section className={`${styles.panel} ${styles.spanHalf} ${styles.hLog}`}>
             <div className={styles.panelTitle}>Lot × Defect</div>
             <div className={styles.panelBody}><LotDefectChart logs={entryLogs} /></div>
+          </section>
+        )}
+
+        {!hidden.has('repairSuspect') && (
+          <section className={`${styles.panel} ${styles.spanFull} ${styles.hSuspect}`}>
+            <RepairSuspectPanel logs={entryLogs} mappings={defectLineMappings} product={defectProduct} />
           </section>
         )}
 

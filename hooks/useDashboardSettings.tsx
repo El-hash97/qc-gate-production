@@ -18,6 +18,7 @@ export const PANELS = [
   { id: 'repairDetails', label: 'Repair Details' },
   { id: 'heatmap', label: 'Flask/Cavity × Defect' },
   { id: 'lotDefect', label: 'Lot × Defect' },
+  { id: 'repairSuspect', label: 'Pareto Suspect Repair Berulang' },
   { id: 'entryLog', label: 'Lot/Flask Log' },
   { id: 'overDimensi', label: 'Pareto Over Dimensi per Die' },
 ] as const;

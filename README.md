@@ -5,12 +5,12 @@ React (Next.js) + Neon Postgres monitoring app for the Block Cylinder finishing 
 ## Setup
 
 1. `npm install`
-2. Create a Neon project at https://console.neon.tech and copy its connection string.
+2. Create a Postgres database (Supabase free plan works) and copy its connection string. On Supabase use Connect → Connection String → **Transaction pooler** (port 6543); the direct connection is IPv6-only and does not work from Vercel.
 3. Copy `.env.example` to `.env.local` and fill in:
-   - `DATABASE_URL` — your Neon connection string
+   - `DATABASE_URL` — your Postgres connection string
    - `RESET_PASSWORD` — password required to reset/archive the current shift
    - `CRON_SECRET` — random secret Vercel Cron uses to authenticate scheduled shift-reset calls
-4. Apply the schema: run the contents of `lib/schema.sql` against your Neon database (via the Neon SQL Editor, or `psql "$DATABASE_URL" -f lib/schema.sql`).
+4. Apply the schema: `node --env-file=.env.local scripts/setup-supabase.mjs` (runs `lib/schema.sql`, locks the tables from Supabase's public REST API with row-level security, and starts history ids at 100000). Or run `lib/schema.sql` yourself with `psql`.
 5. `npm run dev` — app runs at http://localhost:3000, redirecting to `/dashboard`.
 
 ## Routes

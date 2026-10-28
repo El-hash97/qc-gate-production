@@ -66,6 +66,10 @@
 }
 
 .left { left: var(--gap); }
+/* room under the panels for the camera view gizmo (96px + gap, drawn unzoomed) */
+@media (min-width: 1101px) {
+  .left { bottom: calc(var(--gap) + (96px + 10px) / var(--ui-zoom, 1)); }
+}
 .right { right: var(--gap); }
 
 .bottom {

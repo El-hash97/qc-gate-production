@@ -1,8 +1,8 @@
 // Downscale + re-encode a photo before it goes over the wire: a phone photo
 // can be 10+ MB, and Vercel's serverless functions cap request bodies at
 // ~4.5MB — well below what a raw upload plus base64's 1.33x overhead would need.
-const MAX_DIMENSION = 1600;
-const JPEG_QUALITY = 0.72;
+const MAX_DIMENSION = 1024; // photos are viewed in a dashboard modal, not printed: ~100KB each keeps the free Supabase 500MB far away
+const JPEG_QUALITY = 0.7;
 
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const MAX_SOURCE_FILE_BYTES = 15 * 1024 * 1024; // reject absurd files before even decoding them

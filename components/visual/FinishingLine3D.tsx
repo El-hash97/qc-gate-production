@@ -13,7 +13,7 @@ import {
   stationHold, type Counts, type StationId,
 } from '@/utils/finishingFlow';
 import {
-  FORK_AHEAD, FORK_FLOOR_Y, HOME_HEADING, TRUCK_BED_Y, createSim, dispatchRepair, repairWaiting, step,
+  FORK_AHEAD, FORK_FLOOR_Y, HOME_HEADING, TRUCK_BED_Y, createSim, dispatchRepair, repairWaiting, sprayed, step,
   type BlockColor, type Sim,
 } from '@/utils/finishingSim';
 import { createStationAnim, type StationClip } from './stationAnim';
@@ -511,6 +511,9 @@ export default function FinishingLine3D({
     const blockMats = Object.fromEntries(
       Object.entries(BLOCK_COLORS).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, clippingPlanes: outside })]),
     ) as Record<BlockColor, THREE.MeshStandardMaterial>;
+    // out of the Spray Booth: black paint with a soft sheen, as the real block leaves it
+    const paintedMat = new THREE.MeshStandardMaterial({ color: 0x1c1d21, metalness: 0.35, roughness: 0.42, clippingPlanes: outside });
+    const blockMat = (b: Sim['blocks'][number]) => (sprayed(b) ? paintedMat : blockMats[b.color]);
     // The visible block is the user's BC 2TR mesh (asset/BC 2TR.stl). It is
     // re-seated onto the placeholder box's footprint [length, height, width]
     // in scene axes, so everything on top of it — the recorded track
@@ -586,11 +589,11 @@ export default function FinishingLine3D({
         seen.add(b.id);
         let m = meshes.get(b.id);
         if (!m) {
-          m = new THREE.Mesh(blockGeo, blockMats[b.color]);
+          m = new THREE.Mesh(blockGeo, blockMat(b));
           meshes.set(b.id, m);
           scene.add(m);
         }
-        m.material = blockMats[b.color];
+        m.material = blockMat(b);
         if (b.quat) {
           // riding a recorded station segment: exact Blender rotation
           m.quaternion.set(...b.quat);

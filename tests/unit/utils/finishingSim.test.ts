@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  FORK_BENCH_Y, FORK_CARRY_Y, FORK_FLOOR_Y, FORK_PALLET_Y, RETURN_S, createSim, dispatchRepair, repairWaiting, step,
+  FORK_BENCH_Y, FORK_CARRY_Y, FORK_FLOOR_Y, FORK_PALLET_Y, RETURN_S, createSim, dispatchRepair, repairWaiting, sprayed, step,
   stepReturn, type Sim,
 } from '@/utils/finishingSim';
 import {
@@ -278,6 +278,32 @@ describe('yellow repair pallet', () => {
     for (let k = 1; k < entries.length; k++) {
       if (entries[k].rework === entries[k - 1].rework) expect(entries[k].otherWaiting).toBe(false);
     }
+  });
+});
+
+describe('Spray Booth paint', () => {
+  it('turns an OK block black only from the booth on: green before it, black into Junbiki', () => {
+    const sim = createSim();
+    const sprayAt = (stationHold('spray') as { at: number }).at;
+    const seen: string[] = [];
+    run(sim, MAIN_S + OK_S + 5, { ok: 1, repair: 0, ng: 0 }, () => 0.5, (s) => {
+      const b = s.blocks.find((x) => x.id === 1);
+      if (!b || b.color !== 'ok') return;
+      const where = b.phase === 'seg' && b.seg === JUNBIKI_SEGMENT ? (b.t < sprayAt ? 'beforeBooth' : 'afterBooth') : b.phase;
+      const look = `${where}:${sprayed(b) ? 'black' : 'green'}`;
+      if (seen[seen.length - 1] !== look) seen.push(look);
+    });
+    // green up to the booth, then black for the rest of the way (into the Junbiki rack, onto the truck)
+    expect(seen.slice(0, 2)).toEqual(['beforeBooth:green', 'afterBooth:black']);
+    expect(seen.length).toBeGreaterThan(2);
+    expect(seen.slice(2).every((s) => s.endsWith(':black'))).toBe(true);
+  });
+
+  it('never paints Repair, NG or raw blocks', () => {
+    const sim = createSim();
+    run(sim, MAIN_S + OK_S, { ok: 0, repair: 0, ng: 1 }, () => 0, (s) => {
+      for (const b of s.blocks) expect(sprayed(b)).toBe(false);
+    });
   });
 });
 

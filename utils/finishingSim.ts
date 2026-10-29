@@ -18,7 +18,7 @@ import {
   PALLET_DECK, PALLET_PITCH, REPAIR_BATCH, REPAIR_PALLET,
   REPAIR_STUB, REPAIR_TIME_S, REWORK_DWELL_S, REWORK_PALLET, REWORK_PALLET_TOP, SEGMENTS,
   TRUCK_AWAY_OFFSET, TRUCK_CAPACITY, TRUCK_DOCK, TRUCK_SPEED,
-  pickOutcome, pickReinspect, routePoints, segmentSeconds, stationPos, trackAt,
+  pickOutcome, pickReinspect, routePoints, segmentSeconds, stationHold, stationPos, trackAt,
   type Counts, type Hold, type Leg, type Outcome, type Quat, type Vec2,
 } from './finishingFlow';
 
@@ -47,7 +47,17 @@ export interface Block {
   glideY: [number, number];
 }
 
-export type ForkliftState = 'idle' | 'toRepair' | 'repairing' | 'toPallet' | 'unloading' | 'returning';
+// The Spray Booth coats OK blocks black (rust-preventive paint): green from QC Gate 2 into the booth, black from
+// the booth on, through the Junbiki rack and onto the truck. The booth is the point of the Spray → Junbiki segment
+// closest to it, the same point a line stop at the Spray Booth holds a block.
+const SPRAY_AT = (stationHold('spray') as { seg: number; at: number }).at;
+export function sprayed(b: Block): boolean {
+  if (b.color !== 'ok') return false;
+  if (b.phase === 'waitJunbiki' || b.phase === 'loaded') return true;
+  return b.phase === 'seg' && b.seg === JUNBIKI_SEGMENT && b.t >= SPRAY_AT;
+}
+
+export type ForkliftState ='idle' | 'toRepair' | 'repairing' | 'toPallet' | 'unloading' | 'returning';
 
 export interface Sim {
   blocks: Block[];

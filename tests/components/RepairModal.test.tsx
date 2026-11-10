@@ -127,6 +127,46 @@ describe('RepairModal', () => {
     expect(screen.queryByRole('group', { name: 'Pilih No. Die' })).not.toBeInTheDocument();
   });
 
+  describe('No. Die for every type (Block Cylinder, dieEntry)', () => {
+    it('shows optional boxes for a type that has no mandatory die, and saves without one', async () => {
+      const onSave = vi.fn();
+      render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} dieEntry />);
+      await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
+      expect(within(screen.getByRole('group', { name: 'Pilih No. Die' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['1', '2', '3', '4']);
+      await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+      await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(onSave).toHaveBeenCalledWith('Dakon', 1, 'L1', 'F1');
+    });
+
+    it('saves the picked die for a non-Mejashi type, and tapping it again clears it', async () => {
+      const onSave = vi.fn();
+      render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} dieEntry />);
+      await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
+      const die = within(screen.getByRole('group', { name: 'Pilih No. Die' }));
+      await userEvent.click(die.getByRole('button', { name: '4' }));
+      await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+      await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(onSave).toHaveBeenLastCalledWith('Dakon', 1, 'L1', 'F1', 4);
+
+      await userEvent.click(die.getByRole('button', { name: '4' }));
+      expect(die.getByRole('button', { name: '4' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('keeps the die pick when moving between types, and Mejashi Bore stays mandatory', async () => {
+      const onSave = vi.fn();
+      render(<RepairModal isOpen onClose={() => {}} onSave={onSave} types={REPAIR_TYPES} dieEntry />);
+      await userEvent.click(screen.getByRole('button', { name: '2' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
+      expect(screen.getByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
+      await userEvent.click(screen.getByRole('option', { name: 'Mejashi Bore 3' }));
+      // tapping the picked die on Mejashi Bore does not clear it (mandatory)
+      await userEvent.click(screen.getByRole('button', { name: '2' }));
+      expect(screen.getByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
   it('resets to the new list\'s first option when the types prop changes', () => {
     const { rerender } = render(
       <RepairModal isOpen onClose={() => {}} onSave={() => {}} types={REPAIR_TYPES} />,

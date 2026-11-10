@@ -50,7 +50,8 @@ export interface EntryLog {
   lot: string;
   flask: string;
   // Die (mould) number the piece came from: 1-4 for Mejashi Bore repairs (see
-  // DIE_NUMBER_REPAIR_TYPES in utils/constants.ts), 1-2 for every Camshaft
+  // DIE_NUMBER_REPAIR_TYPES in utils/constants.ts, mandatory) and, optionally,
+  // for any other BC 1TR / BC 2TR NG or Repair entry; 1-2 for every Camshaft
   // entry (from its cavity, see entryDie in utils/flask.ts). Other entries, and
   // logs written before this was recorded, omit it.
   die?: 1 | 2 | 3 | 4;

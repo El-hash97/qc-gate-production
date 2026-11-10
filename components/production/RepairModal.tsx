@@ -25,12 +25,15 @@ interface RepairModalProps {
   takenFlasks?: (lot: string) => readonly string[];
   // Camshaft only: pick the cavity via TR KAI + No. Die toggles instead of typing.
   cavityPicker?: boolean;
+  // Block Cylinder only: offer the No. Die 1-4 boxes for every repair type, not
+  // just Mejashi Bore. Optional there (tap the die again to clear it).
+  dieEntry?: boolean;
   // Editing a logged entry: prefill every field from it and use this title.
   initial?: EntryLogEdit;
   title?: string;
 }
 
-export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker, initial, title = 'Input Repair' }: RepairModalProps) {
+export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker, dieEntry = false, initial, title = 'Input Repair' }: RepairModalProps) {
   // A logged type missing from the list was typed via 'Other'.
   const initialKnown = !initial || types.includes(initial.type);
   const [repairType, setRepairType] = useState<string>(initial ? (initialKnown ? initial.type : OTHER_TYPE) : types[0]);
@@ -72,7 +75,7 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     setRepairType(value);
     // Drop a stale pick when moving to a type that has no die field, so it
     // can't leak into the saved record.
-    if (!needsDieNumber(value)) setDieNumber(null);
+    if (!needsDieNumber(value) && !dieEntry) setDieNumber(null);
   }
 
   function handleSave() {
@@ -84,8 +87,9 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     const overDetail = needsOverDimensiDetail(type) ? toOverDimensiDetail(overDimensi) : undefined;
     // A die number is mandatory for Mejashi Bore repairs. The inline No. Die
     // boxes are right there on the form, so an unselected one just blocks the
-    // save like a missing lot or flask does.
-    const die = needsDieNumber(type) ? dieNumber : null;
+    // save like a missing lot or flask does. Block Cylinder (dieEntry) offers
+    // the same boxes for every other type, where leaving them empty is fine.
+    const die = needsDieNumber(type) || dieEntry ? dieNumber : null;
     if (needsDieNumber(type) && die === null) return;
     if (die !== null && overDetail) {
       onSave(type, qty, lot.trim(), flask.trim(), die, overDetail);
@@ -125,8 +129,8 @@ export function RepairModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
           />
         </label>
       )}
-      {!isSearching && needsDieNumber(repairType) && (
-        <DieNumberFields value={dieNumber} onChange={setDieNumber} />
+      {!isSearching && (needsDieNumber(repairType) || dieEntry) && (
+        <DieNumberFields value={dieNumber} onChange={setDieNumber} optional={!needsDieNumber(repairType)} />
       )}
       {!isSearching && needsOverDimensiDetail(repairType === OTHER_TYPE ? customType.trim() : repairType) && (
         <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />

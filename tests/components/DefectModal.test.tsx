@@ -153,7 +153,62 @@ describe('DefectModal editing an entry (initial)', () => {
     const dies = within(screen.getByRole('group', { name: 'Pilih No. Die Mould' }));
     expect(dies.getByRole('button', { name: '4' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
-    expect(onSave).toHaveBeenCalledWith('Over Dimensi', 1, 'L1', 'F1', od);
+    expect(onSave).toHaveBeenCalledWith('Over Dimensi', 1, 'L1', 'F1', undefined, od);
+  });
+
+  describe('No. Die (Block Cylinder, dieEntry)', () => {
+    const fill = async () => {
+      await userEvent.type(screen.getByLabelText('Nomor Lot'), 'L1');
+      await userEvent.type(screen.getByLabelText('Nomor Flask'), 'F1');
+    };
+
+    it('has no No. Die boxes unless dieEntry is on', () => {
+      render(<DefectModal isOpen onClose={() => {}} onSave={() => {}} types={DEFECT_TYPES} />);
+      expect(screen.queryByRole('group', { name: 'Pilih No. Die' })).not.toBeInTheDocument();
+    });
+
+    it('shows boxes 1-4, none picked, and saves without a die when left empty', async () => {
+      const onSave = vi.fn();
+      render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} dieEntry />);
+      const boxes = within(screen.getByRole('group', { name: 'Pilih No. Die' })).getAllByRole('button');
+      expect(boxes.map((b) => b.textContent)).toEqual(['1', '2', '3', '4']);
+      expect(boxes.every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true);
+      await fill();
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(onSave).toHaveBeenCalledWith(DEFECT_TYPES[0], 1, 'L1', 'F1');
+    });
+
+    it('saves the picked die, and tapping it again clears it', async () => {
+      const onSave = vi.fn();
+      render(<DefectModal isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} dieEntry />);
+      const die = within(screen.getByRole('group', { name: 'Pilih No. Die' }));
+      await userEvent.click(die.getByRole('button', { name: '3' }));
+      expect(die.getByRole('button', { name: '3' })).toHaveAttribute('aria-pressed', 'true');
+      await fill();
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(onSave).toHaveBeenLastCalledWith(DEFECT_TYPES[0], 1, 'L1', 'F1', 3);
+
+      // the pick carries over to the next entry; tapping it clears it
+      await userEvent.click(die.getByRole('button', { name: '3' }));
+      expect(die.getByRole('button', { name: '3' })).toHaveAttribute('aria-pressed', 'false');
+      await fill();
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(onSave).toHaveBeenLastCalledWith(DEFECT_TYPES[0], 1, 'L1', 'F1');
+    });
+
+    it('passes the die and the Over Dimensi detail together', async () => {
+      const onSave = vi.fn();
+      const od = { dieMould: 4 as const, crankCaseNo: '1', slubWjNo: '2', position: '3' };
+      render(
+        <DefectModal
+          isOpen onClose={() => {}} onSave={onSave} types={DEFECT_TYPES} dieEntry
+          initial={{ type: 'Over Dimensi', qty: 1, lot: 'L1', flask: 'F1', die: 2, overDimensi: od }}
+        />,
+      );
+      expect(within(screen.getByRole('group', { name: 'Pilih No. Die' })).getByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
+      await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+      expect(onSave).toHaveBeenCalledWith('Over Dimensi', 1, 'L1', 'F1', 2, od);
+    });
   });
 
   it('opens the Camshaft cavity picker on the logged TR KAI / die', () => {

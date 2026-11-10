@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '@/components/ui/ToastProvider';
 
@@ -181,6 +181,36 @@ describe('InputPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
     const saved = updateStateMock.mock.calls[0][0];
     expect(saved.entryLogs.at(-1)).toMatchObject({ line: 3, flask: '1-6', die: 2 });
+  });
+
+  it('logs the No. Die picked on a BC 2TR NG, and on a BC 1TR Repair', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[1]);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Pilih No. Die' })).getByRole('button', { name: '3' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 4' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(updateStateMock.mock.calls[0][0].entryLogs.at(-1)).toMatchObject({ kind: 'defect', line: 2, flask: '4', die: 3 });
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah Repair' })[0]);
+    await userEvent.click(screen.getByRole('option', { name: 'Dakon' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Pilih No. Die' })).getByRole('button', { name: '1' }));
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), '13');
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(updateStateMock.mock.calls[1][0].entryLogs.at(-1)).toMatchObject({ kind: 'repair', line: 1, flask: '2', die: 1 });
+  });
+
+  it('logs a BC NG without a die when none is picked, and shows no die boxes for Crankshaft', async () => {
+    render(<ToastProvider><InputPage /></ToastProvider>);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[0]);
+    await userEvent.type(screen.getByLabelText('Nomor Lot'), '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Flask 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+    expect(updateStateMock.mock.calls[0][0].entryLogs.at(-1)).not.toHaveProperty('die');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Tambah NG' })[3]);
+    expect(screen.queryByRole('group', { name: 'Pilih No. Die' })).not.toBeInTheDocument();
   });
 
   it('files an "Other" defect typed in a different case under the existing spelling', async () => {

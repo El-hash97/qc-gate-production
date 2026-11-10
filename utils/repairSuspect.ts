@@ -32,7 +32,8 @@ export interface RepairSuspect {
 }
 
 // Only repairs with a die number take part (Mejashi Bore, every Camshaft
-// entry); other inputs in between don't break a run.
+// entry, and any BC repair where the operator picked a die); other inputs in
+// between, NG included, don't break a run.
 export function repairSuspects(logs: readonly EntryLog[], mappings: DefectLineMapping[], product?: DefectProduct): RepairSuspect {
   const runs: { log: EntryLog; at: number }[][] = [];
   logs.forEach((log, i) => {

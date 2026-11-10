@@ -8,16 +8,19 @@ export type DieNumber = (typeof DICE)[number];
 
 interface Props {
   value: DieNumber | null;
-  onChange: (die: DieNumber) => void;
+  onChange: (die: DieNumber | null) => void;
+  // Not mandatory: tapping the picked die again clears it (null).
+  optional?: boolean;
 }
 
 /**
- * Die (mould) picker for Mejashi Bore repairs. Same boxed-detail treatment as
+ * Die (mould) picker: Mejashi Bore repairs (mandatory) and every BC 1TR / BC
+ * 2TR NG and Repair entry (optional). Same boxed-detail treatment as
  * OverDimensiFields: the "No. Die" label with the four boxes in a row to its
- * right, so the mandatory choice stays visible and editable instead of hiding
- * behind a one-shot popup.
+ * right, so the choice stays visible and editable instead of hiding behind a
+ * one-shot popup.
  */
-export function DieNumberFields({ value, onChange }: Props) {
+export function DieNumberFields({ value, onChange, optional = false }: Props) {
   return (
     <div className={styles.overDimensiBox}>
       <div className={styles.dieNumberRow}>
@@ -29,7 +32,7 @@ export function DieNumberFields({ value, onChange }: Props) {
               type="button"
               className={value === die ? styles.dieCardActive : styles.dieCard}
               aria-pressed={value === die}
-              onClick={() => onChange(die)}
+              onClick={() => onChange(optional && value === die ? null : die)}
             >
               {die}
             </button>

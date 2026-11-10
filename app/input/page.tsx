@@ -106,6 +106,12 @@ function usesFlaskBoxes(target: DefectTarget | RepairTarget | null): boolean {
   return target !== null && lineGroup(lineForTarget(target)) === 'bc';
 }
 
+// BC 1TR and BC 2TR can log the No. Die (1-4) of any NG or Repair entry (optional);
+// the shaft lines have no such pick (Camshaft's die follows from its cavity).
+function usesDieEntry(target: DefectTarget | RepairTarget | null): boolean {
+  return target !== null && lineGroup(lineForTarget(target)) === 'bc';
+}
+
 // Line 3 is Camshaft: its cavity is picked via TR KAI + No. Die toggles.
 function isCamshaft(target: DefectTarget | RepairTarget | null): boolean {
   return target !== null && lineForTarget(target) === 3;
@@ -194,7 +200,9 @@ export default function InputPage() {
     return (lot: string) => takenFlasks(current.entryLogs, lot, line);
   }
 
-  function handleSaveDefect(typedType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) {
+  function handleSaveDefect(
+    typedType: string, qty: number, lot: string, flask: string, pickedDie?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail,
+  ) {
     if (!defectTarget) return;
     const line = lineForTarget(defectTarget);
     const group = lineGroup(line);
@@ -202,7 +210,7 @@ export default function InputPage() {
     const currentData = current[dataKey] ?? {};
     // An "Other" name typed in a different case/spacing joins the existing type.
     const defectType = canonicalType(typedType, [...defectTypes, ...Object.keys(currentData)]);
-    const die = entryDie(line, flask);
+    const die = entryDie(line, flask, pickedDie);
     commit({
       [defectTarget]: (current[defectTarget] ?? 0) + qty,
       [dataKey]: { ...currentData, [defectType]: (currentData[defectType] ?? 0) + qty },
@@ -473,6 +481,7 @@ export default function InputPage() {
         flaskLabel={flaskLabelFor(defectTarget)}
         takenFlasks={takenFlasksFor(defectTarget)}
         cavityPicker={isCamshaft(defectTarget)}
+        dieEntry={usesDieEntry(defectTarget)}
       />
       <RepairModal
         isOpen={repairTarget !== null}
@@ -482,6 +491,7 @@ export default function InputPage() {
         flaskLabel={flaskLabelFor(repairTarget)}
         takenFlasks={takenFlasksFor(repairTarget)}
         cavityPicker={isCamshaft(repairTarget)}
+        dieEntry={usesDieEntry(repairTarget)}
       />
       <ResetModal isOpen={isResetOpen} onClose={() => setResetOpen(false)} />
     </main>

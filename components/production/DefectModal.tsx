@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { DieNumberFields } from './DieNumberFields';
+import type { DieNumber } from './DieNumberFields';
 import { TypeSelect, OTHER_TYPE } from './TypeSelect';
 import { OverDimensiFields, initialOverDimensiState, isOverDimensiValid, toOverDimensiDetail, fromOverDimensiDetail } from './OverDimensiFields';
 import { FlaskNumberFields } from './FlaskNumberFields';
@@ -14,7 +16,7 @@ import styles from './EntryModal.module.css';
 interface DefectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (defectType: string, qty: number, lot: string, flask: string, overDimensi?: OverDimensiDetail) => void;
+  onSave: (defectType: string, qty: number, lot: string, flask: string, die?: 1 | 2 | 3 | 4, overDimensi?: OverDimensiDetail) => void;
   types: readonly string[];
   flaskLabel?: string;
   // Block Cylinder only: when given, the flask is picked from boxes 1-5 and
@@ -23,12 +25,15 @@ interface DefectModalProps {
   takenFlasks?: (lot: string) => readonly string[];
   // Camshaft only: pick the cavity via TR KAI + No. Die toggles instead of typing.
   cavityPicker?: boolean;
+  // Block Cylinder only: offer the No. Die 1-4 boxes (optional: tap the die
+  // again to clear it) so the NG is logged against the mould it came from.
+  dieEntry?: boolean;
   // Editing a logged entry: prefill every field from it and use this title.
   initial?: EntryLogEdit;
   title?: string;
 }
 
-export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker, initial, title = 'Input Defect (NG)' }: DefectModalProps) {
+export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomor Flask', takenFlasks, cavityPicker, dieEntry = false, initial, title = 'Input Defect (NG)' }: DefectModalProps) {
   // A logged type missing from the list was typed via 'Other'.
   const initialKnown = !initial || types.includes(initial.type);
   const [defectType, setDefectType] = useState<string>(initial ? (initialKnown ? initial.type : OTHER_TYPE) : types[0]);
@@ -56,6 +61,9 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
   const [qtyInput, setQtyInput] = useState(String(initial?.qty ?? 1));
   const [lot, setLot] = useState(initial?.lot ?? '');
   const [flask, setFlask] = useState(initial?.flask ?? '');
+  // Which die (mould) the piece came from. Like repairType in the Repair form it
+  // carries over after a save, so several NGs from the same die need one pick.
+  const [dieNumber, setDieNumber] = useState<DieNumber | null>(initial?.die ?? null);
   const [overDimensi, setOverDimensi] = useState(
     initial?.overDimensi ? fromOverDimensiDetail(initial.overDimensi) : initialOverDimensiState,
   );
@@ -75,8 +83,13 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
     if (taken.includes(flask.trim())) return;
     if (needsOverDimensiDetail(type) && !isOverDimensiValid(overDimensi)) return;
     const detail = needsOverDimensiDetail(type) ? toOverDimensiDetail(overDimensi) : undefined;
-    if (detail) {
-      onSave(type, qty, lot.trim(), flask.trim(), detail);
+    const die = dieEntry ? dieNumber : null;
+    if (die !== null && detail) {
+      onSave(type, qty, lot.trim(), flask.trim(), die, detail);
+    } else if (die !== null) {
+      onSave(type, qty, lot.trim(), flask.trim(), die);
+    } else if (detail) {
+      onSave(type, qty, lot.trim(), flask.trim(), undefined, detail);
     } else {
       onSave(type, qty, lot.trim(), flask.trim());
     }
@@ -109,6 +122,7 @@ export function DefectModal({ isOpen, onClose, onSave, types, flaskLabel = 'Nomo
           />
         </label>
       )}
+      {!isSearching && dieEntry && <DieNumberFields value={dieNumber} onChange={setDieNumber} optional />}
       {!isSearching && needsOverDimensiDetail(defectType === OTHER_TYPE ? customType.trim() : defectType) && (
         <OverDimensiFields value={overDimensi} onChange={setOverDimensi} />
       )}

@@ -39,6 +39,8 @@ export function EntryLogEditModal({ logs, index, onSave, onClose }: Props) {
     flaskLabel: isShaft ? 'Nomor Cavity' : 'Nomor Flask',
     takenFlasks: isShaft ? undefined : (lot: string) => takenFlasks(others, lot, line),
     cavityPicker: line === 3,
+    // BC: the No. Die pick (optional) for NG and Repair alike
+    dieEntry: !isShaft,
   };
 
   return log.kind === 'defect' ? (
@@ -46,7 +48,8 @@ export function EntryLogEditModal({ logs, index, onSave, onClose }: Props) {
       {...shared}
       title="Edit Defect (NG)"
       types={types}
-      onSave={(type, qty, lot, flask, overDimensi) => onSave({ type, qty, lot, flask, ...(overDimensi ? { overDimensi } : {}) })}
+      onSave={(type, qty, lot, flask, die, overDimensi) =>
+        onSave({ type, qty, lot, flask, ...(die ? { die } : {}), ...(overDimensi ? { overDimensi } : {}) })}
     />
   ) : (
     <RepairModal

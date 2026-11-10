@@ -37,6 +37,16 @@ describe('EntryLogList', () => {
     expect(container.textContent).toContain('Mejashi Bore 2 · Lot L1 / Flask F1 · Die 3');
   });
 
+  it('appends the die number for any BC NG and Repair entry that has one', () => {
+    const logs: EntryLog[] = [
+      { kind: 'defect', line: 2, group: 'bc', type: 'Crack', qty: 1, lot: 'L5', flask: '3', die: 4 },
+      { kind: 'repair', line: 1, group: 'bc', type: 'Dakon', qty: 2, lot: 'L6', flask: '1', die: 2 },
+    ];
+    const { container } = render(<EntryLogList title="Lot / Flask Log" logs={logs} />);
+    expect(container.textContent).toContain('BC 2TR — Crack · Lot L5 / Flask 3 · Die 4');
+    expect(container.textContent).toContain('BC 1TR — Dakon · Lot L6 / Flask 1 · Die 2');
+  });
+
   it('omits the die suffix when an entry has none', () => {
     const logs: EntryLog[] = [
       { kind: 'repair', line: 1, group: 'bc', type: 'Dakon', qty: 1, lot: 'L1', flask: 'F1' },

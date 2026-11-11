@@ -145,6 +145,18 @@ export function ProductionDashboardView({
   const achievement = getAchievementPercent(state, scopedTarget, scope);
   const progress = getProgressPercent(state, scopedTarget, scope);
 
+  // "Rincian per produk" table: OK/NG/Repair per product group with a
+  // one-decimal OK rate (getRates rounds to whole percent).
+  const productBreakdown = (['bc', 'camshaft', 'crankshaft'] as const).map((v) => {
+    const sc = v === 'bc' ? 'bc' : LINE_FOR[v];
+    const pOk = getOkTotal(state, sc);
+    const pNg = getNgTotal(state, sc);
+    const pRepair = getRepairTotal(state, sc);
+    const total = pOk + pNg + pRepair;
+    const okRate = total === 0 ? '—' : `${((pOk / total) * 100).toFixed(1).replace('.', ',')}%`;
+    return { view: v, label: VIEW_OPTIONS.find((o) => o.value === v)!.label, ok: pOk, ng: pNg, repair: pRepair, total, okRate };
+  });
+
   // Memoised so an unchanged background poll (react-query keeps the same
   // `state` reference via structural sharing) doesn't hand the charts a new
   // object every 3s and make them redraw.
@@ -413,6 +425,32 @@ export function ProductionDashboardView({
         </div>
         <div className={styles.achievementBadge}>Achievement: {achievement}%</div>
       </div>
+
+      {/* Per-product breakdown — always the 3 groups, active view highlighted. */}
+      <section className={`${styles.panel} ${styles.breakdownPanel}`}>
+        <div className={styles.panelTitle}>Rincian per produk</div>
+        <div className={styles.breakdownScroll}>
+          <table className={styles.breakdownTable}>
+            <thead>
+              <tr>
+                <th>Produk</th><th>Total</th><th>OK</th><th>NG</th><th>Repair</th><th>OK Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productBreakdown.map((row) => (
+                <tr key={row.view} className={view === row.view ? styles.breakdownActive : undefined}>
+                  <td>{row.label}</td>
+                  <td>{row.total}</td>
+                  <td>{row.ok}</td>
+                  <td className={styles.breakdownNg}>{row.ng}</td>
+                  <td className={styles.breakdownRepair}>{row.repair}</td>
+                  <td>{row.okRate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className={styles.bento}>
         {!hidden.has('distribution') && (

@@ -457,3 +457,18 @@
     flex: none !important;
   }
 }
+
+/* "Rincian per produk" table */
+.breakdownPanel { margin: 0; }
+.breakdownScroll { overflow-x: auto; }
+.breakdownTable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.breakdownTable th,
+.breakdownTable td { padding: 10px 14px; text-align: right; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+.breakdownTable th:first-child,
+.breakdownTable td:first-child { text-align: left; font-weight: 600; }
+.breakdownTable th { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.breakdownTable tbody tr:last-child td { border-bottom: none; }
+.breakdownTable td { font-variant-numeric: tabular-nums; }
+.breakdownNg { color: var(--danger, #ef4444); }
+.breakdownRepair { color: var(--warning, #f59e0b); }
+.breakdownActive td { background: rgba(255, 255, 255, 0.05); }
